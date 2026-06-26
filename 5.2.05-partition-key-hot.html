@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Partition Key: Even Load vs. Hot Partition</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      90%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+    .hint-text { font-size: 16px; line-height: 1.4; }
+
+    /* ── Main area ── */
+    .main { padding: 20px; }
+
+    /* ── Mode tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px 8px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+      text-align: center;
+    }
+
+    .tab.active {
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .tab-title {
+      font-size: 14px;
+      color: #1A1A1A;
+      font-weight: 500;
+    }
+
+    .tab:not(.active) .tab-title { color: rgba(0,0,0,0.50); }
+    .tab:hover:not(.active) .tab-title { color: rgba(0,0,0,0.75); }
+
+    .tab-sub {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      color: rgba(0,0,0,0.40);
+      margin-top: 2px;
+    }
+
+    /* ── Event card ── */
+    .event-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .card-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .route-display {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.40);
+      transition: color 0.2s;
+    }
+
+    .route-display.active { color: #1878DC; font-weight: 500; }
+
+    .key-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .key-row:last-child { margin-bottom: 0; }
+
+    .key-name {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      min-width: 108px;
+      flex-shrink: 0;
+    }
+
+    .key-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .pk-good { background: rgba(24, 120, 220, 0.10); color: #1878DC; }
+    .pk-bad  { background: rgba(222, 76, 69, 0.10);  color: #DE4C45; }
+    .sk-chip { background: rgba(50, 143, 81, 0.10);  color: #328F51; }
+
+    /* ── Cluster ── */
+    .cluster-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .cluster-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .total-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+    }
+
+    .nodes-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .node {
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.12);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .node.highlighted {
+      border-color: #1878DC;
+      box-shadow: 0 0 0 3px rgba(24, 120, 220, 0.14);
+    }
+
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(222, 76, 69, 0.15); }
+      50%       { box-shadow: 0 0 0 5px rgba(222, 76, 69, 0.26); }
+    }
+
+    .node.throttled {
+      border-color: #DE4C45;
+      animation: pulse-red 1.5s ease-in-out infinite;
+    }
+
+    .throttle-badge {
+      position: absolute;
+      top: -9px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #DE4C45;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    .node.throttled .throttle-badge { opacity: 1; }
+
+    .node-name {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      color: rgba(0,0,0,0.35);
+      margin-bottom: 8px;
+    }
+
+    .bar-container {
+      height: 56px;
+      background: #F2F1EE;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      margin-bottom: 6px;
+    }
+
+    .bar-fill {
+      width: 100%;
+      height: 0%;
+      background: #1878DC;
+      border-radius: 3px 3px 0 0;
+      transition: height 0.32s ease;
+    }
+
+    .node.throttled .bar-fill { background: #DE4C45; }
+
+    .node-count {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .btn-send {
+      flex: 1;
+      padding: 12px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.18s;
+    }
+
+    .btn-send:hover:not(:disabled) { opacity: 0.82; }
+    .btn-send:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .btn-reset {
+      padding: 12px 16px;
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.18s;
+    }
+
+    .btn-reset:hover { opacity: 0.68; }
+
+    /* ── Status ── */
+    .status {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      background: #F2F1EE;
+      color: rgba(0,0,0,0.60);
+      transition: background 0.25s, color 0.25s, border-color 0.25s;
+      border: 1px solid transparent;
+    }
+
+    .status.ok {
+      background: rgba(50, 143, 81, 0.08);
+      color: #328F51;
+      border-color: rgba(50, 143, 81, 0.18);
+    }
+
+    .status.warn {
+      background: rgba(222, 76, 69, 0.08);
+      color: #DE4C45;
+      border-color: rgba(222, 76, 69, 0.18);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 440px) {
+      .nodes-grid { gap: 6px; }
+      .node { padding: 8px 4px; }
+      .bar-container { height: 44px; }
+      .hint-text { font-size: 14px; }
+    }
+
+    @media (max-width: 360px) {
+      .nodes-grid { grid-template-columns: repeat(2, 1fr); }
+      .tab-sub { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hint header -->
+    <div class="hint-header">
+      <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="hint-text">Toggle between key designs and click <strong>Send Write</strong> to watch how traffic routes to nodes.</span>
+    </div>
+
+    <div class="main">
+
+      <!-- Mode tabs -->
+      <div class="tabs">
+        <button class="tab active" id="tab-good" onclick="switchMode('good')">
+          <div class="tab-title">High-Cardinality Key</div>
+          <div class="tab-sub">pk = USER#id&thinsp;|&thinsp;date</div>
+        </button>
+        <button class="tab" id="tab-bad" onclick="switchMode('bad')">
+          <div class="tab-title">Low-Cardinality Key</div>
+          <div class="tab-sub">pk = date only</div>
+        </button>
+      </div>
+
+      <!-- Incoming write card -->
+      <div class="event-card">
+        <div class="card-header">
+          <span class="card-label">Incoming write</span>
+          <span class="route-display" id="route-disp">ready</span>
+        </div>
+        <div class="key-row">
+          <span class="key-name">PartitionKey:</span>
+          <span class="key-chip pk-good" id="pk-chip">USER#4821 | 2026-06-26</span>
+        </div>
+        <div class="key-row">
+          <span class="key-name">SortKey:</span>
+          <span class="key-chip sk-chip" id="sk-chip">EVENT#14:03:22Z</span>
+        </div>
+      </div>
+
+      <!-- Cluster -->
+      <div class="cluster-header">
+        <span class="cluster-label">4-node cluster</span>
+        <span class="total-label" id="total-lbl">0 writes total</span>
+      </div>
+
+      <div class="nodes-grid">
+        <div class="node" id="n0">
+          <div class="throttle-badge">THROTTLED</div>
+          <div class="node-name">node-1</div>
+          <div class="bar-container"><div class="bar-fill" id="b0"></div></div>
+          <div class="node-count" id="c0">0</div>
+        </div>
+        <div class="node" id="n1">
+          <div class="throttle-badge">THROTTLED</div>
+          <div class="node-name">node-2</div>
+          <div class="bar-container"><div class="bar-fill" id="b1"></div></div>
+          <div class="node-count" id="c1">0</div>
+        </div>
+        <div class="node" id="n2">
+          <div class="throttle-badge">THROTTLED</div>
+          <div class="node-name">node-3</div>
+          <div class="bar-container"><div class="bar-fill" id="b2"></div></div>
+          <div class="node-count" id="c2">0</div>
+        </div>
+        <div class="node" id="n3">
+          <div class="throttle-badge">THROTTLED</div>
+          <div class="node-name">node-4</div>
+          <div class="bar-container"><div class="bar-fill" id="b3"></div></div>
+          <div class="node-count" id="c3">0</div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls">
+        <button class="btn-send" id="send-btn" onclick="sendWrite()">Send Write</button>
+        <button class="btn-reset" onclick="resetAll()">Reset</button>
+      </div>
+
+      <!-- Status -->
+      <div class="status" id="status-box">
+        Click <strong>Send Write</strong> to route an event through the partition key and see which node receives it.
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── State ──────────────────────────────────────────────────────
+    let mode   = 'good';
+    let counts = [0, 0, 0, 0];
+    let total  = 0;
+
+    const MAX_SENDS        = 20;
+    const THROTTLE_AT      = 10;  // writes on one node before throttle badge appears
+    const BAR_SCALE        = 16;  // writes that fill bar to 100 %
+
+    // Deterministic routing: 5 writes to each of the 4 nodes over 20 sends
+    const GOOD_ROUTE = [0, 2, 1, 3, 0, 1, 2, 3, 1, 0, 3, 2, 0, 1, 3, 2, 0, 1, 2, 3];
+    const BAD_ROUTE  = new Array(MAX_SENDS).fill(0);  // every write → node-1
+
+    const GOOD_PKS = [
+      'USER#4821 | 2026-06-26', 'USER#3307 | 2026-06-26',
+      'USER#9012 | 2026-06-26', 'USER#1154 | 2026-06-26',
+      'USER#7765 | 2026-06-26', 'USER#2230 | 2026-06-26',
+      'USER#5519 | 2026-06-26', 'USER#8843 | 2026-06-26',
+    ];
+    const BAD_PK = '2026-06-26';
+
+    const SORT_KEYS = [
+      'EVENT#14:03:22Z', 'EVENT#14:03:45Z', 'EVENT#14:04:01Z', 'EVENT#14:04:18Z',
+      'EVENT#14:04:33Z', 'EVENT#14:04:49Z', 'EVENT#14:05:03Z', 'EVENT#14:05:20Z',
+    ];
+
+    // ── Helpers ────────────────────────────────────────────────────
+    function el(id) { return document.getElementById(id); }
+
+    function setStatus(text, variant) {
+      const s = el('status-box');
+      s.className = 'status' + (variant ? ' ' + variant : '');
+      s.innerHTML = text;
+    }
+
+    function updateCard() {
+      const pk = mode === 'good' ? GOOD_PKS[total % GOOD_PKS.length] : BAD_PK;
+      const sk = SORT_KEYS[total % SORT_KEYS.length];
+
+      const pkChip = el('pk-chip');
+      pkChip.textContent = pk;
+      pkChip.className = 'key-chip ' + (mode === 'good' ? 'pk-good' : 'pk-bad');
+
+      el('sk-chip').textContent = sk;
+      el('route-disp').textContent = 'ready';
+      el('route-disp').classList.remove('active');
+    }
+
+    function updateBars() {
+      for (let i = 0; i < 4; i++) {
+        const pct = Math.min(100, (counts[i] / BAR_SCALE) * 100);
+        el('b' + i).style.height = pct + '%';
+        el('c' + i).textContent  = counts[i];
+      }
+      el('total-lbl').textContent = total + (total === 1 ? ' write total' : ' writes total');
+    }
+
+    // ── Core actions ───────────────────────────────────────────────
+    function switchMode(m) {
+      if (mode === m) return;
+      mode = m;
+      el('tab-good').classList.toggle('active', m === 'good');
+      el('tab-bad').classList.toggle('active',  m === 'bad');
+      resetAll();
+    }
+
+    function sendWrite() {
+      if (total >= MAX_SENDS) return;
+
+      const route  = mode === 'good' ? GOOD_ROUTE : BAD_ROUTE;
+      const target = route[total % route.length];
+
+      // Show route in card
+      el('route-disp').textContent = '→ node-' + (target + 1);
+      el('route-disp').classList.add('active');
+
+      // Remove old highlights
+      for (let i = 0; i < 4; i++) el('n' + i).classList.remove('highlighted');
+
+      // Update data
+      counts[target]++;
+      total++;
+      updateBars();
+
+      // Node state
+      const nodeEl = el('n' + target);
+      if (counts[target] >= THROTTLE_AT) {
+        nodeEl.classList.remove('highlighted');
+        nodeEl.classList.add('throttled');
+      } else {
+        nodeEl.classList.add('highlighted');
+        setTimeout(() => nodeEl.classList.remove('highlighted'), 550);
+      }
+
+      // Status
+      if (counts[target] >= THROTTLE_AT) {
+        setStatus(
+          '<strong>Hot partition.</strong> Node ' + (target + 1) + ' has absorbed all ' + counts[target] +
+          ' writes. The key <code style="font-family:\'Suisse Intl Mono\',monospace">' + BAD_PK +
+          '</code> has only one value today, so every event hashes to the same partition while the other nodes sit idle.',
+          'warn'
+        );
+      } else if (mode === 'bad' && total >= 4) {
+        setStatus(
+          'Every write is landing on node-1. The date-only key produces just one hash value today — keep sending to see the node throttle.',
+          'warn'
+        );
+      } else if (mode === 'good') {
+        setStatus(
+          'Write routed to node-' + (target + 1) + '. Different user IDs hash to different nodes, spreading the load evenly across the cluster.',
+          'ok'
+        );
+      } else {
+        setStatus('Write sent to node-' + (target + 1) + '. Keep clicking to watch the pattern develop.', '');
+      }
+
+      // Prepare next card state
+      updateCard();
+
+      if (total >= MAX_SENDS) el('send-btn').disabled = true;
+    }
+
+    function resetAll() {
+      counts = [0, 0, 0, 0];
+      total  = 0;
+
+      for (let i = 0; i < 4; i++) {
+        el('b' + i).style.height = '0%';
+        el('c' + i).textContent  = '0';
+        el('n' + i).classList.remove('highlighted', 'throttled');
+      }
+
+      el('total-lbl').textContent = '0 writes total';
+      el('send-btn').disabled     = false;
+
+      setStatus('Click <strong>Send Write</strong> to route an event through the partition key and see which node receives it.', '');
+      updateCard();
+    }
+
+    // ── Init ───────────────────────────────────────────────────────
+    updateCard();
+  </script>
+</body>
+</html>

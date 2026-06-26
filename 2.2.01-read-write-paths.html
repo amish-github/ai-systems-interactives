@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read and Write Paths</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: wiggle 4s ease-in-out infinite;
+    }
+    @keyframes wiggle {
+      0%,100% { transform: rotate(0deg); }
+      15%     { transform: rotate(-10deg); }
+      30%     { transform: rotate(10deg); }
+      45%     { transform: rotate(-8deg); }
+      60%     { transform: rotate(6deg); }
+      75%     { transform: rotate(-3deg); }
+    }
+    .hint-text { font-size: 18px; }
+
+    /* ── Mode toggle ── */
+    .toggle-row {
+      display: flex;
+      gap: 8px;
+      padding: 20px 24px 0;
+    }
+    .toggle-btn {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 10px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .toggle-btn:hover:not(.on-read):not(.on-write) {
+      background: #E8E7E4;
+      color: #1A1A1A;
+    }
+    .toggle-btn.on-read {
+      background: #EBF4FF;
+      border-color: #1878DC;
+      color: #1878DC;
+      font-weight: 600;
+    }
+    .toggle-btn.on-write {
+      background: #FFF4EE;
+      border-color: #D35722;
+      color: #D35722;
+      font-weight: 600;
+    }
+
+    /* ── Diagram wrapper ── */
+    .diagram {
+      padding: 24px 32px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Node box ── */
+    .node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      text-align: center;
+      width: 160px;
+      transition: background 0.25s, border-color 0.25s, box-shadow 0.25s, opacity 0.25s;
+    }
+    .node-icon { font-size: 20px; margin-bottom: 2px; }
+    .node-name { font-size: 14px; font-weight: 600; }
+    .node-sub  {
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .node.lit-blue   { background: #EBF4FF; border-color: #1878DC; box-shadow: 0 0 0 3px rgba(24,120,220,0.14); }
+    .node.lit-orange { background: #FFF4EE; border-color: #D35722; box-shadow: 0 0 0 3px rgba(211,87,34,0.14);  }
+    .node.lit-green  { background: #EDFAF2; border-color: #328F51; box-shadow: 0 0 0 3px rgba(50,143,81,0.14);  }
+    .node.lit-purple { background: #F3EEFF; border-color: #8754FD; box-shadow: 0 0 0 3px rgba(135,84,253,0.14); }
+    .node.dim        { opacity: 0.28; }
+
+    .node.small {
+      width: 120px;
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+    .node.small .node-icon { font-size: 16px; }
+    .node.small .node-name { font-size: 12px; }
+
+    /* ── Connector arrows ── */
+    .arrow {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(0,0,0,0.18);
+      font-size: 20px;
+      transition: color 0.25s, opacity 0.25s;
+      flex-shrink: 0;
+    }
+    .arrow.lit-blue   { color: #1878DC; }
+    .arrow.lit-orange { color: #D35722; }
+    .arrow.lit-green  { color: #328F51; }
+    .arrow.lit-purple { color: #8754FD; }
+    .arrow.dim        { opacity: 0.18; }
+
+    /* ── Branch layout ── */
+    .branch-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+    .branch-cols {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      width: 100%;
+    }
+    .branch-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+      max-width: 176px;
+    }
+
+    /* ── Fan-out row ── */
+    .fanout-row {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      width: 100%;
+    }
+    .fanout-row .node.small {
+      flex: 1;
+      max-width: 120px;
+      min-width: 80px;
+    }
+
+    /* ── Description card ── */
+    .desc-card {
+      margin: 12px 24px 16px;
+      padding: 16px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      min-height: 84px;
+    }
+    .desc-label {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 6px;
+      min-height: 16px;
+    }
+    .desc-text { font-size: 16px; line-height: 1.55; }
+
+    /* ── Progress dots ── */
+    .dots {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      padding: 0 24px 12px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.2s;
+    }
+    .dot.done-blue   { background: #1878DC; }
+    .dot.done-orange { background: #D35722; }
+
+    /* ── Controls ── */
+    .controls {
+      display: flex;
+      gap: 8px;
+      padding: 0 24px 28px;
+    }
+    .btn-primary {
+      flex: 1;
+      padding: 12px 0;
+      border-radius: 12px;
+      border: none;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #333; }
+    .btn-primary:disabled { background: rgba(0,0,0,0.18); cursor: default; }
+    .btn-secondary {
+      padding: 12px 20px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: transparent;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-secondary:hover { background: #F2F1EE; color: #1A1A1A; }
+
+    @media (max-width: 480px) {
+      .hint-header, .toggle-row, .controls { padding-left: 16px; padding-right: 16px; }
+      .desc-card { margin-left: 16px; margin-right: 16px; }
+      .diagram { padding: 16px 12px 8px; }
+      .node { width: 140px; }
+      .branch-cols { gap: 8px; }
+    }
+    @media (max-width: 360px) {
+      .node { width: 120px; padding: 8px 10px; }
+      .node.small { min-width: 68px; }
+      .toggle-btn { font-size: 14px; }
+      .hint-text { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Choose a request type, then step through its path.</span>
+  </div>
+
+  <!-- Mode toggle -->
+  <div class="toggle-row">
+    <button class="toggle-btn on-read" id="tb-read"  onclick="setMode('read')">Read Request</button>
+    <button class="toggle-btn"         id="tb-write" onclick="setMode('write')">Write Request</button>
+  </div>
+
+  <!-- Diagram -->
+  <div class="diagram">
+
+    <!-- Client -->
+    <div class="node" id="n-client">
+      <div class="node-icon">&#128187;</div>
+      <div class="node-name">Client</div>
+      <div class="node-sub">makes a request</div>
+    </div>
+
+    <div class="arrow" id="a-to-router">&#8595;</div>
+
+    <!-- Router -->
+    <div class="node" id="n-router">
+      <div class="node-icon">&#8644;</div>
+      <div class="node-name">Router</div>
+      <div class="node-sub">read or write?</div>
+    </div>
+
+    <!-- READ BRANCH -->
+    <div id="branch-read" class="branch-wrap">
+      <div class="arrow" id="a-to-copies">&#8595;</div>
+      <div class="branch-cols">
+        <div class="branch-col">
+          <div class="node" id="n-cache">
+            <div class="node-icon">&#9889;</div>
+            <div class="node-name">Cache</div>
+            <div class="node-sub">fast copy</div>
+          </div>
+        </div>
+        <div class="branch-col">
+          <div class="node" id="n-replica">
+            <div class="node-icon">&#128203;</div>
+            <div class="node-name">Read Replica</div>
+            <div class="node-sub">DB copy for reads</div>
+          </div>
+        </div>
+      </div>
+      <div class="arrow" id="a-read-return">&#8595;</div>
+      <div class="node" id="n-response">
+        <div class="node-icon">&#10003;</div>
+        <div class="node-name">Response</div>
+        <div class="node-sub">served from copy</div>
+      </div>
+    </div>
+
+    <!-- WRITE BRANCH -->
+    <div id="branch-write" class="branch-wrap" style="display:none">
+      <div class="arrow" id="a-to-primary">&#8595;</div>
+      <div class="node" id="n-primary">
+        <div class="node-icon">&#128451;</div>
+        <div class="node-name">Primary DB</div>
+        <div class="node-sub">source of truth only</div>
+      </div>
+      <div class="arrow" id="a-to-fanout">&#8595;</div>
+      <div class="fanout-row">
+        <div class="node small" id="n-event">
+          <div class="node-icon">&#128227;</div>
+          <div class="node-name">Publish event</div>
+          <div class="node-sub">fan-out</div>
+        </div>
+        <div class="node small" id="n-index">
+          <div class="node-icon">&#128269;</div>
+          <div class="node-name">Update index</div>
+          <div class="node-sub">fan-out</div>
+        </div>
+        <div class="node small" id="n-cacheref">
+          <div class="node-icon">&#8635;</div>
+          <div class="node-name">Refresh cache</div>
+          <div class="node-sub">fan-out</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /diagram -->
+
+  <!-- Progress dots -->
+  <div class="dots" id="dots"></div>
+
+  <!-- Description card -->
+  <div class="desc-card">
+    <div class="desc-label" id="desc-label"></div>
+    <div class="desc-text"  id="desc-text">Select a request type above, then press <strong>Send Request</strong> to trace its path through the system.</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn-primary"   id="btn-next"  onclick="advance()">Send Request</button>
+    <button class="btn-secondary"                onclick="reset()">Reset</button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  var mode = 'read';
+  var step = 0;
+
+  var STEPS = {
+    read: [
+      {
+        label: 'Step 1 of 4',
+        text: 'A client sends a request to <strong>fetch existing data</strong> — like loading a product page or looking up a user profile.',
+        nodes: { 'n-client': 'lit-blue' },
+        arrows: {}
+      },
+      {
+        label: 'Step 2 of 4',
+        text: 'The router identifies this as a <strong>read</strong>. It only needs to return data — nothing is being changed. That unlocks options about where to serve it from.',
+        nodes: { 'n-client': 'lit-blue', 'n-router': 'lit-blue' },
+        arrows: { 'a-to-router': 'lit-blue' }
+      },
+      {
+        label: 'Step 3 of 4',
+        text: 'Reads can be served from <strong>a cache or a read replica</strong> — fast copies that exist specifically to handle read load. The primary database is not required at all.',
+        nodes: { 'n-client': 'lit-blue', 'n-router': 'lit-blue', 'n-cache': 'lit-blue', 'n-replica': 'lit-blue' },
+        arrows: { 'a-to-router': 'lit-blue', 'a-to-copies': 'lit-blue' }
+      },
+      {
+        label: 'Step 4 of 4',
+        text: 'Response returned. No state changed, no follow-up work triggered. Need more capacity? <strong>Add another replica or cache node</strong> and spread the load — reads scale out easily.',
+        nodes: { 'n-client': 'lit-green', 'n-router': 'lit-blue', 'n-cache': 'lit-blue', 'n-replica': 'lit-blue', 'n-response': 'lit-green' },
+        arrows: { 'a-to-router': 'lit-blue', 'a-to-copies': 'lit-blue', 'a-read-return': 'lit-green' }
+      }
+    ],
+    write: [
+      {
+        label: 'Step 1 of 4',
+        text: 'A client sends a request to <strong>change data</strong> — like saving an order, updating a profile, or recording a payment.',
+        nodes: { 'n-client': 'lit-orange' },
+        arrows: {}
+      },
+      {
+        label: 'Step 2 of 4',
+        text: 'The router identifies this as a <strong>write</strong>. It changes the truth. A cache or replica is just a copy — neither can be the place where a change is first recorded.',
+        nodes: { 'n-client': 'lit-orange', 'n-router': 'lit-orange' },
+        arrows: { 'a-to-router': 'lit-orange' }
+      },
+      {
+        label: 'Step 3 of 4',
+        text: 'The write <strong>must reach the primary database</strong> — the one authoritative source of truth. Every write converges here. You cannot simply clone it the way you clone a stateless service.',
+        nodes: { 'n-client': 'lit-orange', 'n-router': 'lit-orange', 'n-primary': 'lit-orange' },
+        arrows: { 'a-to-router': 'lit-orange', 'a-to-primary': 'lit-orange' }
+      },
+      {
+        label: 'Step 4 of 4',
+        text: 'One write spreads into several downstream tasks: an event is published, a search index is updated, a cache entry is refreshed. This is <strong>fan-out</strong> — why the write path is heavier than the read path.',
+        nodes: { 'n-client': 'lit-orange', 'n-router': 'lit-orange', 'n-primary': 'lit-orange', 'n-event': 'lit-purple', 'n-index': 'lit-purple', 'n-cacheref': 'lit-purple' },
+        arrows: { 'a-to-router': 'lit-orange', 'a-to-primary': 'lit-orange', 'a-to-fanout': 'lit-purple' }
+      }
+    ]
+  };
+
+  var ALL = {
+    read: {
+      nodes:  ['n-client','n-router','n-cache','n-replica','n-response'],
+      arrows: ['a-to-router','a-to-copies','a-read-return']
+    },
+    write: {
+      nodes:  ['n-client','n-router','n-primary','n-event','n-index','n-cacheref'],
+      arrows: ['a-to-router','a-to-primary','a-to-fanout']
+    }
+  };
+
+  function clearAll() {
+    ['read','write'].forEach(function(m) {
+      ALL[m].nodes.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.className = el.className.replace(/\s+(lit-\w+|dim)/g, '');
+      });
+      ALL[m].arrows.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.className = el.className.replace(/\s+(lit-\w+|dim)/g, '');
+      });
+    });
+  }
+
+  function applyStep(s) {
+    clearAll();
+    var activeNodes  = s.nodes;
+    var activeArrows = s.arrows;
+
+    Object.keys(activeNodes).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add(activeNodes[id]);
+    });
+    Object.keys(activeArrows).forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add(activeArrows[id]);
+    });
+
+    ALL[mode].nodes.forEach(function(id) {
+      if (!activeNodes[id]) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('dim');
+      }
+    });
+    ALL[mode].arrows.forEach(function(id) {
+      if (!activeArrows[id]) {
+        var el = document.getElementById(id);
+        if (el) el.classList.add('dim');
+      }
+    });
+  }
+
+  function setMode(m) {
+    mode = m;
+    step = 0;
+
+    document.getElementById('tb-read').className  = 'toggle-btn' + (m === 'read'  ? ' on-read'  : '');
+    document.getElementById('tb-write').className = 'toggle-btn' + (m === 'write' ? ' on-write' : '');
+
+    document.getElementById('branch-read').style.display  = m === 'read'  ? 'flex' : 'none';
+    document.getElementById('branch-write').style.display = m === 'write' ? 'flex' : 'none';
+
+    clearAll();
+
+    document.getElementById('desc-label').textContent = '';
+    document.getElementById('desc-text').innerHTML = m === 'read'
+      ? 'Press <strong>Send Request</strong> to trace how a read request travels through the system.'
+      : 'Press <strong>Send Request</strong> to trace how a write request travels through the system.';
+
+    var btn = document.getElementById('btn-next');
+    btn.textContent = 'Send Request';
+    btn.disabled    = false;
+
+    renderDots();
+  }
+
+  function advance() {
+    var steps = STEPS[mode];
+    if (step >= steps.length) return;
+
+    applyStep(steps[step]);
+    document.getElementById('desc-label').textContent = steps[step].label;
+    document.getElementById('desc-text').innerHTML    = steps[step].text;
+    step++;
+    renderDots();
+
+    var btn = document.getElementById('btn-next');
+    if (step >= steps.length) {
+      btn.textContent = 'Done';
+      btn.disabled    = true;
+    } else {
+      btn.textContent = 'Next →';
+    }
+  }
+
+  function reset() {
+    step = 0;
+    clearAll();
+    document.getElementById('desc-label').textContent = '';
+    document.getElementById('desc-text').innerHTML = mode === 'read'
+      ? 'Press <strong>Send Request</strong> to trace how a read request travels through the system.'
+      : 'Press <strong>Send Request</strong> to trace how a write request travels through the system.';
+    var btn = document.getElementById('btn-next');
+    btn.textContent = 'Send Request';
+    btn.disabled    = false;
+    renderDots();
+  }
+
+  function renderDots() {
+    var n    = STEPS[mode].length;
+    var done = step;
+    var cls  = mode === 'read' ? 'done-blue' : 'done-orange';
+    var html = '';
+    for (var i = 0; i < n; i++) {
+      html += '<div class="dot' + (i < done ? ' ' + cls : '') + '"></div>';
+    }
+    document.getElementById('dots').innerHTML = html;
+  }
+
+  // Init
+  setMode('read');
+</script>
+</body>
+</html>

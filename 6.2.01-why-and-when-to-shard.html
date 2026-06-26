@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Which lever fits which bottleneck?</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      padding: 32px 20px 40px;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .cursor-icon {
+      animation: cursor-wiggle 4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* Section label */
+    .section-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 12px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    /* Scenario cards */
+    .scenarios {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .scenario-card {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: #FFFFFF;
+      user-select: none;
+    }
+    .scenario-card:hover {
+      border-color: rgba(0,0,0,0.28);
+      background: #FAFAF9;
+    }
+    .scenario-card.selected {
+      border-color: #1878DC;
+      background: rgba(24,120,220,0.04);
+    }
+    .scenario-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .radio-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.22);
+      flex-shrink: 0;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .radio-dot::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: transparent;
+      transition: background 0.15s;
+    }
+    .scenario-card.selected .radio-dot {
+      border-color: #1878DC;
+    }
+    .scenario-card.selected .radio-dot::after {
+      background: #1878DC;
+    }
+    .scenario-name {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .scenario-desc {
+      font-size: 14px;
+      color: rgba(0,0,0,0.52);
+      margin-left: 26px;
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+    .scenario-metrics {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-left: 26px;
+    }
+    .metric-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.12);
+      background: #F2F1EE;
+      color: #1A1A1A;
+    }
+    .metric-chip.red {
+      background: rgba(222,76,69,0.08);
+      border-color: rgba(222,76,69,0.28);
+      color: #C43A33;
+    }
+    .metric-chip.orange {
+      background: rgba(211,87,34,0.08);
+      border-color: rgba(211,87,34,0.28);
+      color: #B8481C;
+    }
+    .metric-chip.green {
+      background: rgba(50,143,81,0.08);
+      border-color: rgba(50,143,81,0.28);
+      color: #277040;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: rgba(0,0,0,0.10);
+      margin: 4px 0 24px;
+    }
+
+    /* Levers */
+    .levers {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .lever-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .lever-number {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.28);
+      width: 20px;
+      flex-shrink: 0;
+      padding-top: 15px;
+      text-align: right;
+    }
+    .lever-card {
+      flex: 1;
+      border: 1.5px solid rgba(0,0,0,0.12);
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      background: #FFFFFF;
+    }
+    .lever-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 24px;
+    }
+    .lever-name {
+      font-size: 16px;
+      color: #1A1A1A;
+    }
+    .lever-badge {
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-weight: 500;
+      flex-shrink: 0;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      white-space: nowrap;
+    }
+    .lever-badge.solves {
+      background: rgba(50,143,81,0.10);
+      color: #277040;
+      border: 1px solid rgba(50,143,81,0.30);
+    }
+    .lever-badge.partial {
+      background: rgba(244,142,0,0.10);
+      color: #B86000;
+      border: 1px solid rgba(244,142,0,0.30);
+    }
+    .lever-badge.no {
+      background: rgba(0,0,0,0.04);
+      color: rgba(0,0,0,0.38);
+      border: 1px solid rgba(0,0,0,0.10);
+    }
+    .lever-badge.warranted {
+      background: rgba(135,84,253,0.10);
+      color: #6B3FD4;
+      border: 1px solid rgba(135,84,253,0.28);
+    }
+    .lever-explanation {
+      font-size: 14px;
+      color: rgba(0,0,0,0.52);
+      margin-top: 6px;
+      line-height: 1.55;
+    }
+
+    /* Arrow between levers */
+    .lever-connector {
+      display: flex;
+      align-items: center;
+      height: 16px;
+      padding-left: 32px;
+    }
+    .lever-connector::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 100%;
+      background: rgba(0,0,0,0.15);
+      margin-left: 10px;
+    }
+
+    /* Takeaway */
+    .takeaway {
+      margin-top: 20px;
+      padding: 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.60);
+      line-height: 1.6;
+      transition: opacity 0.2s;
+    }
+    .takeaway strong {
+      color: #1A1A1A;
+      font-weight: 600;
+    }
+
+    @media (max-width: 480px) {
+      .container { padding: 20px 12px 32px; }
+      .lever-name { font-size: 15px; }
+      .scenario-name { font-size: 15px; }
+    }
+    @media (max-width: 360px) {
+      .scenario-metrics { gap: 4px; }
+      .metric-chip { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Pick a scenario to see which scaling lever fits.</span>
+  </div>
+
+  <!-- Scenario selector -->
+  <div class="section-label">Choose a scenario</div>
+  <div class="scenarios" id="scenarios">
+
+    <div class="scenario-card selected" onclick="selectScenario(0)">
+      <div class="scenario-header">
+        <div class="radio-dot"></div>
+        <div class="scenario-name">Product catalog — mostly reads</div>
+      </div>
+      <div class="scenario-desc">The same product pages are fetched millions of times per day. Writes are infrequent. All data fits comfortably on one server.</div>
+      <div class="scenario-metrics">
+        <span class="metric-chip red">reads: very high</span>
+        <span class="metric-chip green">writes: low</span>
+        <span class="metric-chip green">storage: fits on one machine</span>
+      </div>
+    </div>
+
+    <div class="scenario-card" onclick="selectScenario(1)">
+      <div class="scenario-header">
+        <div class="radio-dot"></div>
+        <div class="scenario-name">IoT sensor archive — data keeps growing</div>
+      </div>
+      <div class="scenario-desc">Billions of sensor readings accumulate over time. Reads are modest. Storage has grown beyond what any single server's disk can hold.</div>
+      <div class="scenario-metrics">
+        <span class="metric-chip green">reads: moderate</span>
+        <span class="metric-chip orange">writes: moderate</span>
+        <span class="metric-chip red">storage: exceeds one machine</span>
+      </div>
+    </div>
+
+    <div class="scenario-card" onclick="selectScenario(2)">
+      <div class="scenario-header">
+        <div class="radio-dot"></div>
+        <div class="scenario-name">Event pipeline — write flood</div>
+      </div>
+      <div class="scenario-desc">50,000 events written per second at peak. One primary can no longer absorb the write rate. Query optimization and indexing have already been applied.</div>
+      <div class="scenario-metrics">
+        <span class="metric-chip green">reads: moderate</span>
+        <span class="metric-chip red">writes: exceeds one machine</span>
+        <span class="metric-chip orange">storage: growing fast</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Levers (decision order) -->
+  <div class="section-label">Decision order — try each lever in sequence</div>
+  <div class="levers">
+
+    <div class="lever-row">
+      <div class="lever-number">1</div>
+      <div class="lever-card">
+        <div class="lever-top">
+          <span class="lever-name">Query optimization &amp; indexes</span>
+          <span class="lever-badge" id="badge-0"></span>
+        </div>
+        <div class="lever-explanation" id="exp-0"></div>
+      </div>
+    </div>
+
+    <div class="lever-connector"></div>
+
+    <div class="lever-row">
+      <div class="lever-number">2</div>
+      <div class="lever-card">
+        <div class="lever-top">
+          <span class="lever-name">Caching layer</span>
+          <span class="lever-badge" id="badge-1"></span>
+        </div>
+        <div class="lever-explanation" id="exp-1"></div>
+      </div>
+    </div>
+
+    <div class="lever-connector"></div>
+
+    <div class="lever-row">
+      <div class="lever-number">3</div>
+      <div class="lever-card">
+        <div class="lever-top">
+          <span class="lever-name">Read replicas</span>
+          <span class="lever-badge" id="badge-2"></span>
+        </div>
+        <div class="lever-explanation" id="exp-2"></div>
+      </div>
+    </div>
+
+    <div class="lever-connector"></div>
+
+    <div class="lever-row">
+      <div class="lever-number">4</div>
+      <div class="lever-card">
+        <div class="lever-top">
+          <span class="lever-name">Sharding</span>
+          <span class="lever-badge" id="badge-3"></span>
+        </div>
+        <div class="lever-explanation" id="exp-3"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="takeaway" id="takeaway"></div>
+
+</div>
+
+<script>
+  var scenarios = [
+    {
+      levers: [
+        {
+          status: 'partial',
+          label: 'Worth checking',
+          explanation: 'Always worth confirming no missing index is causing extra work. But the underlying bottleneck here is read volume from many users, not slow queries.'
+        },
+        {
+          status: 'solves',
+          label: 'Solves it',
+          explanation: 'A cache serves repeated reads from memory, taking the vast majority of load off the database entirely. This is the correct lever for this problem.'
+        },
+        {
+          status: 'partial',
+          label: 'Also helps',
+          explanation: 'If the cache does not fully close the gap, read replicas can spread the remaining reads across several copies. But the cache alone often resolves it.'
+        },
+        {
+          status: 'no',
+          label: 'Not needed',
+          explanation: 'Writes are light and the data fits on one machine. Sharding here adds permanent complexity to a problem caching already solved. This is the most common and expensive mistake.'
+        }
+      ],
+      takeaway: 'The bottleneck is repeated reads — exactly what a cache is built for. Sharding would be premature: it solves write throughput and storage limits, neither of which is the problem.'
+    },
+    {
+      levers: [
+        {
+          status: 'no',
+          label: "Doesn't help",
+          explanation: 'Optimizing queries is always good practice, but no index or query rewrite changes how much disk space the data occupies.'
+        },
+        {
+          status: 'no',
+          label: "Doesn't help",
+          explanation: 'A cache serves hot reads from memory. It reduces database load, but the data set itself still does not fit on one machine. Disk capacity is unchanged.'
+        },
+        {
+          status: 'no',
+          label: "Doesn't help",
+          explanation: 'Replicas copy the full data set to more machines. When the data is too large for any one machine, each replica faces the exact same storage ceiling.'
+        },
+        {
+          status: 'warranted',
+          label: 'Warranted here',
+          explanation: 'Storage that genuinely exceeds one machine is one of the two cases sharding exists to solve. Each shard holds only its portion of the data, so storage scales across machines.'
+        }
+      ],
+      takeaway: 'The bottleneck is total storage — a genuine case for sharding. No simpler lever increases disk capacity. The data must be split across machines.'
+    },
+    {
+      levers: [
+        {
+          status: 'partial',
+          label: 'Already done',
+          explanation: 'The scenario states indexes and query optimization have been applied. This lever is exhausted. Move to the next one.'
+        },
+        {
+          status: 'no',
+          label: "Doesn't help writes",
+          explanation: 'A cache reduces how often the database is read. It does nothing to reduce the volume of writes hitting the primary — every write still goes there.'
+        },
+        {
+          status: 'no',
+          label: "Doesn't help writes",
+          explanation: 'All writes still flow to a single primary. Read replicas spread read traffic, but they have no effect on write capacity — the primary absorbs every write regardless.'
+        },
+        {
+          status: 'warranted',
+          label: 'Warranted here',
+          explanation: 'Write throughput that exceeds one machine is the other case sharding is built for. Distributing rows across shards distributes the writes too, so write capacity scales with the number of shards.'
+        }
+      ],
+      takeaway: 'The bottleneck is write throughput on a single primary. Indexing is done, caching does not help writes, and replicas add no write capacity. Sharding is the right last resort.'
+    }
+  ];
+
+  var currentScenario = 0;
+
+  function selectScenario(idx) {
+    currentScenario = idx;
+    var cards = document.querySelectorAll('.scenario-card');
+    cards.forEach(function(c, i) {
+      c.classList.toggle('selected', i === idx);
+    });
+    renderLevers(idx);
+  }
+
+  function renderLevers(idx) {
+    var s = scenarios[idx];
+    for (var i = 0; i < 4; i++) {
+      var lever = s.levers[i];
+      var badge = document.getElementById('badge-' + i);
+      var exp = document.getElementById('exp-' + i);
+      badge.textContent = lever.label;
+      badge.className = 'lever-badge ' + lever.status;
+      exp.textContent = lever.explanation;
+    }
+    var takeaway = document.getElementById('takeaway');
+    takeaway.innerHTML = '<strong>Takeaway:</strong> ' + s.takeaway;
+  }
+
+  renderLevers(0);
+</script>
+</body>
+</html>

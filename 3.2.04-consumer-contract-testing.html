@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consumer Contract Testing</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px 0;
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+.hint-icon {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── Progress ── */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  flex-shrink: 0;
+  transition: background 0.25s;
+}
+.dot.done   { background: #328F51; }
+.dot.active { background: #1878DC; }
+
+.prog-label {
+  font-size: 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.40);
+  margin-left: 4px;
+}
+
+/* ── Card ── */
+.card {
+  margin: 12px 16px 0;
+  background: #FFFFFF;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.12);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 16px 20px 12px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+}
+
+.step-num {
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.38);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.card-header h2 {
+  font-size: 18px;
+  font-weight: 400;
+  color: #1A1A1A;
+  line-height: 1.3;
+}
+
+.card-body { padding: 20px; }
+
+/* ── Prose ── */
+.desc {
+  font-size: 16px;
+  color: rgba(0,0,0,0.62);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 0.88em;
+  background: rgba(0,0,0,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── Diff / code blocks ── */
+.diff-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .diff-grid { grid-template-columns: 1fr; }
+}
+
+.diff-label {
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.38);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.code-block {
+  background: #1E1E1E;
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #D4D4D4;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.ln { color: #D4D4D4; }
+.lr { color: #FF7875; }
+.la { color: #73C991; }
+
+.insight-box {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: #F2F1EE;
+  border-left: 3px solid #1878DC;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #1A1A1A;
+}
+.insight-box.green  { border-left-color: #328F51; }
+.insight-box.hidden { opacity: 0; transition: opacity 0.4s ease; }
+.insight-box.shown  { opacity: 1; }
+
+/* ── Test rows ── */
+.test-list { display: flex; flex-direction: column; gap: 8px; }
+
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #F2F1EE;
+  font-size: 15px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.test-row.show { opacity: 1; transform: translateY(0); }
+
+.t-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.t-icon.pass { background: #328F51; color: #FFFFFF; }
+.t-icon.fail { background: #DE4C45; color: #FFFFFF; }
+
+.t-name { flex: 1; color: #1A1A1A; }
+
+.t-badge {
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.t-badge.pass { background: rgba(50,143,81,0.12); color: #328F51; }
+.t-badge.fail { background: rgba(222,76,69,0.12); color: #DE4C45; }
+
+.test-summary {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.test-summary.show { opacity: 1; }
+.test-summary.pass { background: rgba(50,143,81,0.10); color: #328F51; }
+.test-summary.fail { background: rgba(222,76,69,0.10); color: #DE4C45; }
+
+.error-detail {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  background: rgba(222,76,69,0.05);
+  border: 1px solid rgba(222,76,69,0.20);
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #1A1A1A;
+  white-space: pre;
+  overflow-x: auto;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.error-detail.show { opacity: 1; }
+
+/* ── Decision step ── */
+.decision-list { display: flex; flex-direction: column; gap: 10px; }
+
+.d-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  text-align: left;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 2px 0 rgba(0,0,0,0.10);
+  transition: border-color 0.18s, background 0.18s, transform 0.1s, box-shadow 0.1s;
+  width: 100%;
+}
+
+.d-btn:hover:not(:disabled) {
+  border-color: rgba(0,0,0,0.30);
+  background: #F8F7F5;
+  transform: translateY(-1px);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 2px 6px 0 rgba(0,0,0,0.12);
+}
+.d-btn:active:not(:disabled) { transform: translateY(0); }
+.d-btn:disabled { cursor: default; }
+
+.d-btn.correct {
+  border-color: #328F51;
+  background: rgba(50,143,81,0.05);
+}
+.d-btn.wrong {
+  border-color: #DE4C45;
+  background: rgba(222,76,69,0.05);
+}
+
+.d-chip {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-family: 'Suisse Intl Mono', monospace;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.45);
+  transition: background 0.2s, color 0.2s;
+  margin-top: 1px;
+}
+.d-btn.correct .d-chip { background: #328F51; color: #FFFFFF; }
+.d-btn.wrong   .d-chip { background: #DE4C45; color: #FFFFFF; }
+
+.d-content { flex: 1; min-width: 0; }
+.d-title { font-size: 16px; color: #1A1A1A; line-height: 1.3; }
+
+.d-explain {
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(0,0,0,0.55);
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, margin-top 0.35s ease;
+}
+.d-btn.correct .d-explain { color: #2A7840; }
+.d-btn.wrong   .d-explain { color: #B83232; }
+.d-explain.open { max-height: 160px; margin-top: 6px; }
+
+/* ── Nav ── */
+.nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 28px;
+  gap: 12px;
+}
+
+.nav-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+  line-height: 1.4;
+}
+.nav-btn:active:not(:disabled) { transform: translateY(1px); }
+
+.btn-primary {
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+}
+.btn-primary:hover:not(:disabled) { background: #2E2E2E; }
+.btn-primary:disabled { background: rgba(0,0,0,0.18); cursor: default; transform: none; }
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(0,0,0,0.50);
+  border: 1px solid rgba(0,0,0,0.14);
+}
+.btn-ghost:hover { background: #F2F1EE; color: #1A1A1A; }
+
+.invisible { visibility: hidden; pointer-events: none; }
+
+/* ── Steps ── */
+.step { display: none; }
+.step.active { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <span class="hint-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Step through a scenario — then decide what to do when a contract fails
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-row">
+    <div class="dot active" id="dot-0"></div>
+    <div class="dot" id="dot-1"></div>
+    <div class="dot" id="dot-2"></div>
+    <div class="dot" id="dot-3"></div>
+    <span class="prog-label" id="prog-label">1 / 4</span>
+  </div>
+
+  <!-- ─────────────────────────────── Step 0: The Change ─── -->
+  <div class="step active" id="step-0">
+    <div class="card">
+      <div class="card-header">
+        <div class="step-num">Step 01 — The Change</div>
+        <h2>A developer renames a response field</h2>
+      </div>
+      <div class="card-body">
+        <p class="desc">A service returns user records. The developer renames <code>status</code> to <code>state</code> for clarity. Internal logic is unchanged — only the field name moves.</p>
+        <div class="diff-grid">
+          <div>
+            <div class="diff-label">Before</div>
+            <div class="code-block"><span class="ln">{
+  "user_id": "u_42",
+</span><span class="lr">  "status": "active",
+</span><span class="ln">  "email": "jo@co.com"
+}</span></div>
+          </div>
+          <div>
+            <div class="diff-label">After</div>
+            <div class="code-block"><span class="ln">{
+  "user_id": "u_42",
+</span><span class="la">  "state":  "active",
+</span><span class="ln">  "email": "jo@co.com"
+}</span></div>
+          </div>
+        </div>
+        <div class="insight-box">The change looks clean and intentional. No business logic changed. Is this safe to ship?</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────── Step 1: Unit Tests ─── -->
+  <div class="step" id="step-1">
+    <div class="card">
+      <div class="card-header">
+        <div class="step-num">Step 02 — Unit Tests</div>
+        <h2>The developer runs the unit test suite</h2>
+      </div>
+      <div class="card-body">
+        <p class="desc">These tests were written to check the service's own internal logic. They pass when the code does what the developer intended.</p>
+        <div class="test-list">
+          <div class="test-row" id="ut-1">
+            <div class="t-icon pass">&#10003;</div>
+            <span class="t-name">returns 200 for a valid user ID</span>
+            <span class="t-badge pass">PASS</span>
+          </div>
+          <div class="test-row" id="ut-2">
+            <div class="t-icon pass">&#10003;</div>
+            <span class="t-name">returns 404 for an unknown user ID</span>
+            <span class="t-badge pass">PASS</span>
+          </div>
+          <div class="test-row" id="ut-3">
+            <div class="t-icon pass">&#10003;</div>
+            <span class="t-name">"state" field is a non-empty string</span>
+            <span class="t-badge pass">PASS</span>
+          </div>
+        </div>
+        <div class="test-summary pass" id="ut-summary">3 / 3 passed</div>
+        <div class="insight-box green hidden" id="ut-insight">Green unit tests confirm the code does what <em>you</em> intended. But they were written by you, for you — never from a consumer's point of view.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────── Step 2: Contract Fails ─── -->
+  <div class="step" id="step-2">
+    <div class="card">
+      <div class="card-header">
+        <div class="step-num">Step 03 — Consumer Contract Suite</div>
+        <h2>The contract suite finds a broken promise</h2>
+      </div>
+      <div class="card-body">
+        <p class="desc">The contract suite was written from Consumer A's point of view. It asserts only the promises Consumer A actually depends on — not the provider's internal behavior.</p>
+        <div class="test-list">
+          <div class="test-row" id="ct-1">
+            <div class="t-icon fail">&#10007;</div>
+            <span class="t-name">Consumer A &middot; response includes field "status"</span>
+            <span class="t-badge fail">FAIL</span>
+          </div>
+          <div class="test-row" id="ct-2">
+            <div class="t-icon pass">&#10003;</div>
+            <span class="t-name">Consumer A &middot; response includes field "email"</span>
+            <span class="t-badge pass">PASS</span>
+          </div>
+          <div class="test-row" id="ct-3">
+            <div class="t-icon pass">&#10003;</div>
+            <span class="t-name">Consumer A &middot; 404 returned for unknown user</span>
+            <span class="t-badge pass">PASS</span>
+          </div>
+        </div>
+        <div class="test-summary fail" id="ct-summary">1 failure &mdash; a consumer promise was broken</div>
+        <div class="error-detail" id="ct-error">Consumer A expected: { "status": string }
+Received:           { "state": "active" }
+
+&#x2192; Consumer A reads the "status" field at runtime.
+  It will crash in production when this change ships.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────────────────────────────── Step 3: Decision ─── -->
+  <div class="step" id="step-3">
+    <div class="card">
+      <div class="card-header">
+        <div class="step-num">Step 04 — Your Decision</div>
+        <h2>The contract is red. What do you do?</h2>
+      </div>
+      <div class="card-body">
+        <p class="desc">Pick every response that correctly resolves the broken contract. One of the three options is always wrong — no matter the situation.</p>
+        <div class="decision-list">
+
+          <button class="d-btn" id="btn-fix" onclick="choose('fix')">
+            <div class="d-chip" id="chip-fix">A</div>
+            <div class="d-content">
+              <div class="d-title">Fix the change</div>
+              <div class="d-explain" id="exp-fix">Correct. Revert the rename, or output both "status" and "state" as an alias until all consumers migrate. The promise is kept, the contract goes green, and Consumer A is safe.</div>
+            </div>
+          </button>
+
+          <button class="d-btn" id="btn-version" onclick="choose('version')">
+            <div class="d-chip" id="chip-version">B</div>
+            <div class="d-content">
+              <div class="d-title">Version the change</div>
+              <div class="d-explain" id="exp-version">Correct. Expose the new "state" field under /v2/users. Existing consumers keep calling /v1/users where "status" is still returned. Both versions coexist safely while consumers migrate.</div>
+            </div>
+          </button>
+
+          <button class="d-btn" id="btn-weaken" onclick="choose('weaken')">
+            <div class="d-chip" id="chip-weaken">C</div>
+            <div class="d-content">
+              <div class="d-title">Weaken the assertion</div>
+              <div class="d-explain" id="exp-weaken">Wrong. Removing the failing check from the contract suite makes the build green — but Consumer A is still broken. You silenced the alarm without fixing the problem. The crash ships to production.</div>
+            </div>
+          </button>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav-row">
+    <button class="nav-btn btn-ghost invisible" id="back-btn" onclick="goBack()">&#8592; Back</button>
+    <button class="nav-btn btn-primary" id="next-btn" onclick="goNext()">Next &#8594;</button>
+  </div>
+
+</div>
+<script>
+(function () {
+  var TOTAL = 4;
+  var step = 0;
+  var decided = false;
+
+  function render() {
+    for (var i = 0; i < TOTAL; i++) {
+      var el = document.getElementById('step-' + i);
+      el.classList.toggle('active', i === step);
+      var dot = document.getElementById('dot-' + i);
+      dot.classList.remove('active', 'done');
+      if (i < step)        dot.classList.add('done');
+      else if (i === step) dot.classList.add('active');
+    }
+
+    document.getElementById('prog-label').textContent = (step + 1) + ' / ' + TOTAL;
+
+    var backBtn = document.getElementById('back-btn');
+    var nextBtn = document.getElementById('next-btn');
+
+    if (step === 0) {
+      backBtn.classList.add('invisible');
+    } else {
+      backBtn.classList.remove('invisible');
+    }
+
+    nextBtn.classList.remove('invisible');
+    if (step === TOTAL - 1) {
+      if (decided) {
+        nextBtn.innerHTML = '&#8635; Try again';
+        nextBtn.disabled = false;
+        nextBtn.onclick = resetAll;
+      } else {
+        nextBtn.classList.add('invisible');
+      }
+    } else {
+      nextBtn.innerHTML = 'Next &#8594;';
+      nextBtn.disabled = false;
+      nextBtn.onclick = goNext;
+    }
+
+    if (step === 1) setTimeout(animateUnitTests, 80);
+    if (step === 2) setTimeout(animateContractTests, 80);
+  }
+
+  function goNext() {
+    if (step < TOTAL - 1) { step++; render(); }
+  }
+
+  function goBack() {
+    if (step > 0) { step--; render(); }
+  }
+
+  function animateUnitTests() {
+    ['ut-1', 'ut-2', 'ut-3'].forEach(function (id, i) {
+      setTimeout(function () {
+        document.getElementById(id).classList.add('show');
+      }, i * 200 + 60);
+    });
+    setTimeout(function () {
+      document.getElementById('ut-summary').classList.add('show');
+    }, 760);
+    setTimeout(function () {
+      var el = document.getElementById('ut-insight');
+      el.classList.remove('hidden');
+      el.classList.add('shown');
+    }, 980);
+  }
+
+  function animateContractTests() {
+    ['ct-1', 'ct-2', 'ct-3'].forEach(function (id, i) {
+      setTimeout(function () {
+        document.getElementById(id).classList.add('show');
+      }, i * 220 + 60);
+    });
+    setTimeout(function () {
+      document.getElementById('ct-summary').classList.add('show');
+    }, 860);
+    setTimeout(function () {
+      document.getElementById('ct-error').classList.add('show');
+    }, 1100);
+  }
+
+  function choose(choice) {
+    if (decided) return;
+    decided = true;
+
+    var isCorrect = { fix: true, version: true, weaken: false };
+
+    ['fix', 'version', 'weaken'].forEach(function (key) {
+      var btn  = document.getElementById('btn-' + key);
+      var chip = document.getElementById('chip-' + key);
+      var exp  = document.getElementById('exp-' + key);
+
+      btn.disabled = true;
+
+      if (isCorrect[key]) {
+        btn.classList.add('correct');
+        chip.innerHTML = '&#10003;';
+      } else {
+        btn.classList.add('wrong');
+        chip.innerHTML = '&#10007;';
+      }
+
+      exp.classList.add('open');
+    });
+
+    var nextBtn = document.getElementById('next-btn');
+    nextBtn.classList.remove('invisible');
+    nextBtn.innerHTML = '&#8635; Try again';
+    nextBtn.onclick = resetAll;
+  }
+
+  function resetAll() {
+    decided = false;
+    step = 0;
+
+    ['ut-1', 'ut-2', 'ut-3'].forEach(function (id) {
+      document.getElementById(id).classList.remove('show');
+    });
+    document.getElementById('ut-summary').classList.remove('show');
+    var utInsight = document.getElementById('ut-insight');
+    utInsight.classList.remove('shown');
+    utInsight.classList.add('hidden');
+
+    ['ct-1', 'ct-2', 'ct-3'].forEach(function (id) {
+      document.getElementById(id).classList.remove('show');
+    });
+    document.getElementById('ct-summary').classList.remove('show');
+    document.getElementById('ct-error').classList.remove('show');
+
+    var labels = { fix: 'A', version: 'B', weaken: 'C' };
+    ['fix', 'version', 'weaken'].forEach(function (key) {
+      var btn  = document.getElementById('btn-' + key);
+      var chip = document.getElementById('chip-' + key);
+      var exp  = document.getElementById('exp-' + key);
+
+      btn.disabled = false;
+      btn.classList.remove('correct', 'wrong');
+      chip.textContent = labels[key];
+      exp.classList.remove('open');
+    });
+
+    render();
+  }
+
+  render();
+}());
+</script>
+</body>
+</html>

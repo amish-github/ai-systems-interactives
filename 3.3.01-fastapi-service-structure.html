@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FastAPI Service Structure</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 16px;
+  font-size: 18px;
+  color: #1A1A1A;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s ease-in-out infinite; }
+
+@keyframes cursor-wiggle {
+  0%,60%,100% { transform: rotate(0deg); }
+  10%  { transform: rotate(-10deg); }
+  20%  { transform: rotate(10deg); }
+  30%  { transform: rotate(-8deg); }
+  40%  { transform: rotate(6deg); }
+  50%  { transform: rotate(-3deg); }
+}
+
+/* ── Wrapper ── */
+.interactive { padding: 24px; }
+
+/* ── Step info box ── */
+.step-info {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  min-height: 88px;
+}
+
+.step-label {
+  display: block;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.step-title {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 6px;
+}
+
+.step-desc {
+  display: block;
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 1.5;
+}
+
+.step-desc .code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  background: rgba(0,0,0,0.07);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* ── Request pill ── */
+.request-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.request-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #1878DC;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.method-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.22);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.path-param {
+  background: rgba(255,255,255,0.18);
+  border-radius: 4px;
+  padding: 1px 5px;
+  transition: background 0.3s, color 0.3s;
+}
+
+.path-param.hl { background: #FFFFFF; color: #1878DC; }
+
+/* ── Layers ── */
+.layers { display: flex; flex-direction: column; gap: 0; margin-bottom: 20px; }
+
+.layer-row { position: relative; }
+
+.layer {
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+  margin-bottom: 4px;
+}
+
+.layer.state-idle {
+  border-color: rgba(0,0,0,0.14);
+  background: #FFFFFF;
+}
+
+.layer.state-active {
+  border-color: #1878DC;
+  background: #EEF5FD;
+  box-shadow: 0 0 0 3px rgba(24,120,220,0.12), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.layer.state-done {
+  border-color: rgba(50,143,81,0.35);
+  background: #F2FAF4;
+}
+
+.layer.state-up {
+  border-color: #328F51;
+  background: #E8F7ED;
+  box-shadow: 0 0 0 3px rgba(50,143,81,0.12), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.layer-emoji { font-size: 18px; flex-shrink: 0; width: 28px; text-align: center; }
+
+.layer-body { flex: 1; min-width: 0; }
+
+.layer-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.layer-sub {
+  font-size: 13px;
+  color: rgba(0,0,0,0.45);
+  margin-top: 1px;
+}
+
+.layer-tag {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.25s, color 0.25s;
+  background: rgba(0,0,0,0.07);
+  color: rgba(0,0,0,0.45);
+}
+
+.layer.state-active .layer-tag { background: #1878DC; color: #FFF; }
+.layer.state-done .layer-tag { background: rgba(50,143,81,0.15); color: #328F51; }
+.layer.state-up .layer-tag { background: #328F51; color: #FFF; }
+
+/* ── Dependency box (sits between router + handler) ── */
+.dep-row { margin: 0 0 4px 36px; }
+
+.dep-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px dashed rgba(0,0,0,0.18);
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: #FAFAF9;
+  transition: border-color 0.25s, background 0.25s;
+}
+
+.dep-box.state-pending { border-color: rgba(0,0,0,0.18); background: #FAFAF9; }
+.dep-box.state-active  { border-color: #F48E00; background: #FFF8EC; }
+.dep-box.state-done    { border-color: rgba(50,143,81,0.35); background: #F2FAF4; }
+
+.dep-icon { font-size: 14px; }
+.dep-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.55);
+  flex: 1;
+}
+
+.dep-status {
+  font-size: 12px;
+  color: rgba(0,0,0,0.35);
+  transition: color 0.25s;
+}
+.dep-box.state-active .dep-status { color: #D35722; }
+.dep-box.state-done   .dep-status { color: #328F51; }
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.btn {
+  font-family: 'Suisse Intl', sans-serif;
+  font-size: 16px;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.btn-primary { background: #1A1A1A; color: #FFF; }
+.btn-primary:hover { opacity: 0.8; }
+
+.btn-ghost {
+  background: transparent;
+  color: #1A1A1A;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  box-shadow: none;
+}
+.btn-ghost:hover { background: #F2F1EE; }
+
+/* ── Step dots ── */
+.step-dots { display: flex; gap: 6px; align-items: center; }
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.25s, width 0.25s, border-radius 0.25s;
+}
+.dot.is-active  { background: #1878DC; width: 20px; border-radius: 4px; }
+.dot.is-done    { background: #328F51; }
+
+/* ── Response badge that appears on last step ── */
+.response-badge {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #E8F7ED;
+  border: 1.5px solid rgba(50,143,81,0.35);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #1A1A1A;
+  margin-bottom: 4px;
+}
+
+.response-badge.visible { display: flex; }
+
+.response-pill {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  background: #328F51;
+  color: #FFF;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+
+@media (max-width: 480px) {
+  .interactive { padding: 16px; }
+  .hint-header { padding: 16px 16px 12px; font-size: 16px; }
+  .btn { padding: 10px 18px; font-size: 15px; }
+  .layer-name { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Step through how a request flows through a FastAPI service
+  </div>
+
+  <div class="interactive">
+
+    <!-- Step info card -->
+    <div class="step-info" id="stepInfo">
+      <span class="step-label" id="siLabel"></span>
+      <span class="step-title" id="siTitle"></span>
+      <span class="step-desc"  id="siDesc"></span>
+    </div>
+
+    <!-- Request pill -->
+    <div class="request-row">
+      <div class="request-pill">
+        <span class="method-badge">GET</span>
+        /items/<span class="path-param" id="pathParam">42</span>
+      </div>
+    </div>
+
+    <!-- Response badge (appears on final step) -->
+    <div class="response-badge" id="responseBadge">
+      <span class="response-pill">200 OK</span>
+      <span style="font-family:'Suisse Intl Mono',monospace;font-size:13px">{"id": 42, "name": "Widget"}</span>
+    </div>
+
+    <!-- Layers diagram -->
+    <div class="layers" id="layers">
+
+      <!-- Router -->
+      <div class="layer-row">
+        <div class="layer state-idle" id="layer-router">
+          <span class="layer-emoji">🔀</span>
+          <div class="layer-body">
+            <div class="layer-name">Router layer</div>
+            <div class="layer-sub">matches the route, reads path / query / body</div>
+          </div>
+          <span class="layer-tag" id="tag-router">waiting</span>
+        </div>
+      </div>
+
+      <!-- Dependency (indented) -->
+      <div class="dep-row">
+        <div class="dep-box state-pending" id="depBox">
+          <span class="dep-icon">⚡</span>
+          <span class="dep-label">Depends(get_item_repository)</span>
+          <span class="dep-status" id="depStatus">not resolved</span>
+        </div>
+      </div>
+
+      <!-- Handler -->
+      <div class="layer-row">
+        <div class="layer state-idle" id="layer-handler">
+          <span class="layer-emoji">⚙️</span>
+          <div class="layer-body">
+            <div class="layer-name">Handler</div>
+            <div class="layer-sub">thin — receives inputs + resource, delegates work</div>
+          </div>
+          <span class="layer-tag" id="tag-handler">waiting</span>
+        </div>
+      </div>
+
+      <!-- Service -->
+      <div class="layer-row">
+        <div class="layer state-idle" id="layer-service">
+          <span class="layer-emoji">🧠</span>
+          <div class="layer-body">
+            <div class="layer-name">Service layer</div>
+            <div class="layer-sub">business logic — no HTTP knowledge here</div>
+          </div>
+          <span class="layer-tag" id="tag-service">waiting</span>
+        </div>
+      </div>
+
+      <!-- Data access -->
+      <div class="layer-row">
+        <div class="layer state-idle" id="layer-data">
+          <span class="layer-emoji">🗄️</span>
+          <div class="layer-body">
+            <div class="layer-name">Data access layer</div>
+            <div class="layer-sub">queries the database, returns raw records</div>
+          </div>
+          <span class="layer-tag" id="tag-data">waiting</span>
+        </div>
+      </div>
+
+    </div><!-- /layers -->
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-ghost" onclick="resetAll()">Restart</button>
+      <div class="step-dots" id="stepDots"></div>
+      <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Next →</button>
+    </div>
+
+  </div><!-- /interactive -->
+</div><!-- /container -->
+
+<script>
+var STEPS = [
+  {
+    label: "STEP 1 OF 6",
+    title: "HTTP request arrives",
+    desc: "A client sends <span class='code'>GET /items/42</span> to your FastAPI service. The <span class='code'>42</span> is a path parameter — a value embedded directly in the URL that FastAPI will extract and pass to your handler.",
+    layers: { router: "idle", handler: "idle", service: "idle", data: "idle" },
+    dep: "pending",
+    hlPath: false,
+    showResponse: false
+  },
+  {
+    label: "STEP 2 OF 6",
+    title: "Router matches the route",
+    desc: "FastAPI matches <span class='code'>GET /items/{item_id}</span>. The router layer reads the path parameter <span class='code'>item_id=42</span>. It also sees that the handler declares a <span class='code'>Depends(...)</span> and will resolve it before calling the handler.",
+    layers: { router: "active", handler: "idle", service: "idle", data: "idle" },
+    dep: "pending",
+    hlPath: true,
+    showResponse: false
+  },
+  {
+    label: "STEP 3 OF 6",
+    title: "Dependency supplies the repository",
+    desc: "Before the handler runs, FastAPI calls <span class='code'>get_item_repository()</span>. It builds an <span class='code'>ItemRepository</span> and yields it. The handler never constructs this object — it just receives it. This is what makes the handler easy to test.",
+    layers: { router: "done", handler: "active", service: "idle", data: "idle" },
+    dep: "active",
+    hlPath: true,
+    showResponse: false
+  },
+  {
+    label: "STEP 4 OF 6",
+    title: "Handler delegates to the service",
+    desc: "The handler is thin: it has <span class='code'>item_id=42</span> and <span class='code'>repo</span> from the dependency. It calls <span class='code'>get_item(item_id, repo)</span> and passes control to the service layer. No business logic lives here.",
+    layers: { router: "done", handler: "done", service: "active", data: "idle" },
+    dep: "done",
+    hlPath: true,
+    showResponse: false
+  },
+  {
+    label: "STEP 5 OF 6",
+    title: "Service calls the data access layer",
+    desc: "The service layer holds the business rule for fetching an item. It calls <span class='code'>repo.get(42)</span> on the data access layer. SQL and database details stay here — the service never writes raw queries, and the router never touches the database.",
+    layers: { router: "done", handler: "done", service: "done", data: "active" },
+    dep: "done",
+    hlPath: true,
+    showResponse: false
+  },
+  {
+    label: "STEP 6 OF 6",
+    title: "Response flows back up",
+    desc: "The record returns data layer → service → handler → router. Each layer did exactly one job. The handler returns the item; FastAPI serialises it to JSON and sends the HTTP response. Each layer can now be tested independently.",
+    layers: { router: "up", handler: "up", service: "up", data: "done" },
+    dep: "done",
+    hlPath: true,
+    showResponse: true
+  }
+];
+
+var TAG_TEXT = {
+  idle:   "waiting",
+  active: "active",
+  done:   "✓ done",
+  up:     "↑ returning"
+};
+
+var DEP_STATUS = {
+  pending: "not resolved",
+  active:  "resolving…",
+  done:    "✓ resolved"
+};
+
+var currentStep = 0;
+
+function applyStep(idx) {
+  var s = STEPS[idx];
+
+  document.getElementById("siLabel").textContent = s.label;
+  document.getElementById("siTitle").textContent = s.title;
+  document.getElementById("siDesc").innerHTML    = s.desc;
+
+  var pp = document.getElementById("pathParam");
+  pp.className = "path-param" + (s.hlPath ? " hl" : "");
+
+  var rb = document.getElementById("responseBadge");
+  rb.className = "response-badge" + (s.showResponse ? " visible" : "");
+
+  ["router", "handler", "service", "data"].forEach(function(id) {
+    var state = s.layers[id];
+    document.getElementById("layer-" + id).className = "layer state-" + state;
+    document.getElementById("tag-" + id).textContent = TAG_TEXT[state];
+  });
+
+  var depState = s.dep;
+  var depBox = document.getElementById("depBox");
+  depBox.className = "dep-box state-" + depState;
+  document.getElementById("depStatus").textContent = DEP_STATUS[depState];
+
+  var dotsEl = document.getElementById("stepDots");
+  dotsEl.innerHTML = "";
+  for (var i = 0; i < STEPS.length; i++) {
+    var d = document.createElement("div");
+    d.className = "dot" + (i < idx ? " is-done" : i === idx ? " is-active" : "");
+    dotsEl.appendChild(d);
+  }
+
+  document.getElementById("btnNext").textContent = (idx === STEPS.length - 1) ? "Restart" : "Next →";
+}
+
+function nextStep() {
+  if (currentStep === STEPS.length - 1) {
+    resetAll();
+  } else {
+    currentStep++;
+    applyStep(currentStep);
+  }
+}
+
+function resetAll() {
+  currentStep = 0;
+  applyStep(0);
+}
+
+applyStep(0);
+</script>
+</body>
+</html>

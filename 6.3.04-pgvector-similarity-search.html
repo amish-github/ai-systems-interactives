@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nearest-Neighbor Search — pgvector Vector Space</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400; font-display: swap;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400; font-display: swap;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #1A1A1A;
+      background: #fff;
+    }
+
+    #app {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #fff;
+    }
+
+    /* — Hint header — */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      font-size: 18px;
+    }
+    @keyframes cursor-wiggle {
+      0%,100% { transform: rotate(0deg); }
+      15%     { transform: rotate(-10deg); }
+      30%     { transform: rotate(10deg); }
+      45%     { transform: rotate(-8deg); }
+      60%     { transform: rotate(6deg); }
+      75%     { transform: rotate(-3deg); }
+    }
+    .hint svg { flex-shrink: 0; animation: cursor-wiggle 4s ease-in-out infinite; }
+
+    /* — Plot — */
+    .plot-wrap { padding: 20px 20px 12px; }
+    #vplot {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 12px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    /* — Legend — */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      padding: 4px 20px 16px;
+    }
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.55);
+    }
+    .leg-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* — Query buttons — */
+    .query-section { padding: 0 20px 16px; }
+    .query-lbl {
+      font-size: 13px;
+      color: rgba(0,0,0,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .query-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    @media (max-width: 440px) { .query-grid { grid-template-columns: 1fr; } }
+    .qbtn {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      background: #fff;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 15px;
+      color: #1A1A1A;
+      text-align: left;
+      line-height: 1.4;
+      transition: background 0.12s, border-color 0.12s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .qbtn:hover { background: #F2F1EE; }
+    .qbtn.active { border-color: #1878DC; background: #EEF5FD; }
+    .qbtn-em { font-size: 18px; flex-shrink: 0; margin-top: 1px; line-height: 1; }
+
+    /* — Results panel — */
+    .res-section { padding: 0 20px 16px; }
+    .res-panel {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .res-head {
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 12px;
+    }
+    .res-head code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      background: #1A1A1A;
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .res-empty {
+      font-size: 16px;
+      color: rgba(0,0,0,0.35);
+      text-align: center;
+      padding: 8px 0;
+    }
+    .res-list { display: flex; flex-direction: column; gap: 8px; }
+    .res-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      animation: card-in 0.2s ease-out both;
+    }
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .res-rank {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.35);
+      width: 20px;
+      flex-shrink: 0;
+    }
+    .res-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .res-txt { font-size: 15px; flex: 1; }
+    .res-dist {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.35);
+      white-space: nowrap;
+    }
+
+    /* — Caption — */
+    .caption {
+      padding: 0 20px 24px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      line-height: 1.6;
+    }
+    .caption strong { color: #1A1A1A; }
+    .cap-mono {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      background: #F2F1EE;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z"
+        stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Select a user question to see nearest-neighbor search
+  </div>
+
+  <div class="plot-wrap">
+    <svg id="vplot" viewBox="0 0 560 360" xmlns="http://www.w3.org/2000/svg">
+      <!-- Background -->
+      <rect width="560" height="360" rx="12" fill="#F2F1EE"/>
+
+      <!-- Faint grid dividers -->
+      <line x1="280" y1="20"  x2="280" y2="340" stroke="rgba(0,0,0,0.07)" stroke-width="1" stroke-dasharray="4 4"/>
+      <line x1="20"  y1="180" x2="540" y2="180" stroke="rgba(0,0,0,0.07)" stroke-width="1" stroke-dasharray="4 4"/>
+
+      <!-- Cluster halos -->
+      <ellipse cx="142" cy="112" rx="74" ry="62" fill="#1878DC" fill-opacity="0.08"/>
+      <ellipse cx="418" cy="112" rx="74" ry="62" fill="#328F51" fill-opacity="0.08"/>
+      <ellipse cx="418" cy="268" rx="74" ry="62" fill="#D35722" fill-opacity="0.08"/>
+      <ellipse cx="142" cy="268" rx="74" ry="62" fill="#8754FD" fill-opacity="0.08"/>
+
+      <!-- Cluster labels -->
+      <text x="142" y="38"  text-anchor="middle" font-family="'Suisse Intl',system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.35)">Auth &amp; Login</text>
+      <text x="418" y="38"  text-anchor="middle" font-family="'Suisse Intl',system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.35)">Billing</text>
+      <text x="418" y="352" text-anchor="middle" font-family="'Suisse Intl',system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.35)">API &amp; Technical</text>
+      <text x="142" y="352" text-anchor="middle" font-family="'Suisse Intl',system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.35)">Onboarding</text>
+
+      <!-- Distance lines layer (drawn below dots) -->
+      <g id="dl"></g>
+
+      <!-- Document dot layer -->
+      <g id="dd"></g>
+
+      <!-- Query marker (drawn above dots) -->
+      <g id="qm" visibility="hidden">
+        <circle id="qring" cx="0" cy="0" r="8" fill="#F48E00" fill-opacity="0">
+          <animate id="ar"  attributeName="r"            from="8"   to="34"  dur="0.85s" begin="indefinite" fill="freeze"/>
+          <animate id="ao"  attributeName="fill-opacity" from="0.5" to="0"   dur="0.85s" begin="indefinite" fill="freeze"/>
+        </circle>
+        <circle id="qdot" cx="0" cy="0" r="8" fill="#F48E00" stroke="#fff" stroke-width="2.5"/>
+      </g>
+
+      <!-- Tooltip layer (always on top) -->
+      <g id="tt" visibility="hidden">
+        <rect id="ttbg" rx="5" fill="rgba(26,26,26,0.88)" height="22"/>
+        <text id="tttx" font-family="'Suisse Intl',system-ui,sans-serif" font-size="11" fill="#fff"></text>
+      </g>
+    </svg>
+  </div>
+
+  <div class="legend">
+    <div class="leg"><div class="leg-dot" style="background:#1878DC"></div>Auth &amp; Login</div>
+    <div class="leg"><div class="leg-dot" style="background:#328F51"></div>Billing</div>
+    <div class="leg"><div class="leg-dot" style="background:#D35722"></div>API &amp; Technical</div>
+    <div class="leg"><div class="leg-dot" style="background:#8754FD"></div>Onboarding</div>
+    <div class="leg"><div class="leg-dot" style="background:#F48E00;outline:1.5px solid rgba(0,0,0,0.18);outline-offset:1px"></div>Your query</div>
+  </div>
+
+  <div class="query-section">
+    <div class="query-lbl">User question</div>
+    <div class="query-grid" id="qgrid"></div>
+  </div>
+
+  <div class="res-section">
+    <div class="res-panel">
+      <div class="res-head">Top matches via <code>&lt;-&gt;</code> nearest-neighbor</div>
+      <div class="res-empty" id="rempty">Select a question above to run the search</div>
+      <div class="res-list" id="rlist" style="display:none"></div>
+    </div>
+  </div>
+
+  <div class="caption" id="cap">
+    Documents cluster by meaning in vector space. A query lands near its semantic cluster — even when it shares <em>no exact words</em> with any document. The <span class="cap-mono">&lt;-&gt;</span> operator returns the closest vectors first.
+  </div>
+
+</div>
+<script>
+// ── Data ─────────────────────────────────────────────────────────
+const DOCS = [
+  // Auth & Login  (#1878DC)
+  { id: 0, text: "How do I reset my password?",        x: 122, y:  92, color: "#1878DC" },
+  { id: 1, text: "I forgot my login credentials",      x: 154, y: 108, color: "#1878DC" },
+  { id: 2, text: "Login not working after update",     x: 116, y: 128, color: "#1878DC" },
+  { id: 3, text: "Enable two-factor authentication",   x: 150, y: 142, color: "#1878DC" },
+  // Billing  (#328F51)
+  { id: 4, text: "How to upgrade my plan",             x: 402, y:  90, color: "#328F51" },
+  { id: 5, text: "Cancel my subscription",             x: 434, y: 108, color: "#328F51" },
+  { id: 6, text: "Change my payment method",           x: 396, y: 128, color: "#328F51" },
+  { id: 7, text: "Invoice not received",               x: 430, y: 144, color: "#328F51" },
+  // API & Technical  (#D35722)
+  { id: 8,  text: "API rate limit exceeded",           x: 406, y: 248, color: "#D35722" },
+  { id: 9,  text: "Setting up webhooks",               x: 436, y: 264, color: "#D35722" },
+  { id: 10, text: "OAuth 2.0 integration guide",       x: 400, y: 286, color: "#D35722" },
+  { id: 11, text: "API key not working",               x: 432, y: 290, color: "#D35722" },
+  // Onboarding  (#8754FD)
+  { id: 12, text: "Getting started with the app",      x: 122, y: 248, color: "#8754FD" },
+  { id: 13, text: "How to invite team members",        x: 152, y: 264, color: "#8754FD" },
+  { id: 14, text: "Create a new workspace",            x: 116, y: 286, color: "#8754FD" },
+  { id: 15, text: "Account setup tutorial",            x: 148, y: 290, color: "#8754FD" },
+];
+
+const QUERIES = [
+  {
+    id: 0, emoji: "🔐",
+    text: "I can't log in to my account",
+    qx: 130, qy: 74,
+    note: "\"Can't log in\" shares no exact words with any stored article — yet its vector lands squarely in the Auth cluster, matching the articles about login and credentials."
+  },
+  {
+    id: 1, emoji: "💳",
+    text: "I want to stop paying for this",
+    qx: 426, qy: 74,
+    note: "\"Stop paying\" has no words in common with \"Cancel my subscription\" — but the two vectors are close neighbors because they represent the same intent."
+  },
+  {
+    id: 2, emoji: "⚙️",
+    text: "My API requests keep returning errors",
+    qx: 412, qy: 232,
+    note: "The query lands in the API cluster even though it uses completely different phrasing from the stored articles — meaning-based search doesn't care about word overlap."
+  },
+  {
+    id: 3, emoji: "🚀",
+    text: "How do I begin using the platform?",
+    qx: 126, qy: 232,
+    note: "\"Begin using\" ≈ \"Getting started\" in vector space. Nearest-neighbor search bridges different words that share the same intent."
+  },
+];
+
+// ── SVG setup ─────────────────────────────────────────────────────
+const NS  = "http://www.w3.org/2000/svg";
+const $   = id => document.getElementById(id);
+
+function mk(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+const dlayer  = $("dl");
+const ddlayer = $("dd");
+const qmarker = $("qm");
+const qdot    = $("qdot");
+const qring   = $("qring");
+const ttGroup = $("tt");
+const ttBg    = $("ttbg");
+const ttTx    = $("tttx");
+
+// ── Draw document dots ────────────────────────────────────────────
+const circles = {};
+DOCS.forEach(d => {
+  const g = mk("g", { cursor: "pointer" });
+  const c = mk("circle", {
+    cx: d.x, cy: d.y, r: 7,
+    fill: d.color, stroke: "#fff", "stroke-width": 1.5, "fill-opacity": 0.85
+  });
+  c.style.transition = "r 0.15s, fill-opacity 0.15s";
+  g.appendChild(c);
+
+  g.addEventListener("mouseenter", () => showTip(d, c));
+  g.addEventListener("mouseleave", hideTip);
+
+  circles[d.id] = c;
+  ddlayer.appendChild(g);
+});
+
+// ── SVG tooltip ───────────────────────────────────────────────────
+function showTip(d, c) {
+  const prev = parseFloat(c.getAttribute("r"));
+  if (prev < 8) c.setAttribute("r", 8);
+
+  const label = d.text.length > 33 ? d.text.slice(0, 31) + "…" : d.text;
+  const charW = 6.4;
+  const padH  = 8;
+  const w     = label.length * charW + padH * 2;
+  let   tx    = d.x - w / 2;
+  let   ty    = d.y - 30;
+  if (tx < 6)        tx = 6;
+  if (tx + w > 554)  tx = 554 - w;
+  if (ty < 8)        ty = d.y + 16;
+
+  ttBg.setAttribute("x", tx);
+  ttBg.setAttribute("y", ty);
+  ttBg.setAttribute("width", w);
+  ttTx.setAttribute("x", tx + padH);
+  ttTx.setAttribute("y", ty + 15);
+  ttTx.textContent = label;
+  ttGroup.setAttribute("visibility", "visible");
+}
+function hideTip() {
+  ttGroup.setAttribute("visibility", "hidden");
+}
+
+// ── Build query buttons ───────────────────────────────────────────
+const qgrid = $("qgrid");
+const qbtns = {};
+QUERIES.forEach(q => {
+  const btn = document.createElement("button");
+  btn.className = "qbtn";
+  btn.dataset.id = q.id;
+  btn.innerHTML = `<span class="qbtn-em">${q.emoji}</span><span>"${q.text}"</span>`;
+  btn.addEventListener("click", () => activate(q.id));
+  qgrid.appendChild(btn);
+  qbtns[q.id] = btn;
+});
+
+// ── Activate a query ──────────────────────────────────────────────
+function dist2(ax, ay, bx, by) {
+  return Math.sqrt((ax - bx) ** 2 + (ay - by) ** 2);
+}
+
+function activate(qid) {
+  const q = QUERIES[qid];
+
+  Object.values(qbtns).forEach(b => b.classList.remove("active"));
+  qbtns[qid].classList.add("active");
+
+  qdot.setAttribute("cx",  q.qx);
+  qdot.setAttribute("cy",  q.qy);
+  qring.setAttribute("cx", q.qx);
+  qring.setAttribute("cy", q.qy);
+  qmarker.setAttribute("visibility", "visible");
+  $("ar").beginElement();
+  $("ao").beginElement();
+
+  const ranked = DOCS
+    .map(d => ({ d, dist: dist2(q.qx, q.qy, d.x, d.y) }))
+    .sort((a, b) => a.dist - b.dist);
+
+  Object.values(circles).forEach(c => {
+    c.setAttribute("fill-opacity", 0.18);
+    c.setAttribute("r", 6);
+  });
+
+  ranked.slice(0, 3).forEach(({ d }, i) => {
+    const c = circles[d.id];
+    c.setAttribute("fill-opacity", 1);
+    c.setAttribute("r", i === 0 ? 10 : 8);
+  });
+
+  dlayer.innerHTML = "";
+  ranked.slice(0, 3).forEach(({ d }, i) => {
+    const line = mk("line", {
+      x1: q.qx, y1: q.qy,
+      x2: d.x,  y2: d.y,
+      stroke: d.color,
+      "stroke-width": i === 0 ? 2.5 : 1.5,
+      "stroke-dasharray": "5 4",
+      "stroke-linecap": "round"
+    });
+    line.style.opacity = "0";
+    line.style.transition = `opacity 0.35s ease ${i * 110}ms`;
+    dlayer.appendChild(line);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      line.style.opacity = i === 0 ? "0.85" : "0.45";
+    }));
+  });
+
+  const rempty = $("rempty");
+  const rlist  = $("rlist");
+  rempty.style.display = "none";
+  rlist.style.display  = "flex";
+  rlist.innerHTML = "";
+
+  ranked.slice(0, 3).forEach(({ d, dist }, i) => {
+    const card = document.createElement("div");
+    card.className = "res-card";
+    card.style.animationDelay = `${i * 80}ms`;
+    const norm = Math.min(dist / 260, 1).toFixed(2);
+    card.innerHTML = `
+      <div class="res-rank">#${i + 1}</div>
+      <div class="res-dot" style="background:${d.color}"></div>
+      <div class="res-txt">${d.text}</div>
+      <div class="res-dist">dist&nbsp;${norm}</div>
+    `;
+    rlist.appendChild(card);
+  });
+
+  $("cap").innerHTML = `<strong>Key insight:</strong> ${q.note}`;
+}
+</script>
+</body>
+</html>

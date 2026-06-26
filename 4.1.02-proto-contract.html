@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Defining Contracts with Protocol Buffers</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ─────────────────────────────────────── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 24px 24px 0;
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      20%       { transform: rotate(-10deg); }
+      40%       { transform: rotate(10deg); }
+      55%       { transform: rotate(-8deg); }
+      70%       { transform: rotate(6deg); }
+      85%       { transform: rotate(-3deg); }
+    }
+
+    /* ── Progress bar ────────────────────────────────────── */
+    .progress-wrap {
+      display: flex;
+      gap: 6px;
+      padding: 20px 24px 0;
+    }
+
+    .prog-dot {
+      flex: 1;
+      height: 4px;
+      background: rgba(0,0,0,0.12);
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+    .prog-dot.active { background: #1878DC; }
+    .prog-dot.done   { background: #328F51; }
+
+    .step-lbl {
+      padding: 8px 24px 0;
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .divider {
+      height: 1px;
+      background: rgba(0,0,0,0.08);
+      margin: 16px 24px 0;
+    }
+
+    /* ── Content area ────────────────────────────────────── */
+    .content {
+      padding: 24px 24px 0;
+      min-height: 400px;
+    }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .step-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .step-desc {
+      font-size: 16px;
+      color: rgba(0,0,0,0.65);
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    .step-desc code {
+      font-family: 'Suisse Intl Mono', monospace;
+      background: #F2F1EE;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    /* ── Code blocks ─────────────────────────────────────── */
+    .code-block {
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      overflow-x: auto;
+    }
+
+    .file-label {
+      font-size: 11px;
+      color: rgba(255,255,255,0.32);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    /* Syntax colours */
+    .kw  { color: #8754FD; }  /* keyword */
+    .ty  { color: #1878DC; }  /* type */
+    .str { color: #328F51; }  /* string literal */
+    .cm  { color: rgba(255,255,255,0.28); } /* comment */
+    .nm  { color: #FFFFFF; }  /* identifier */
+    .me  { color: #D35722; }  /* method */
+    .nu  { color: #F48E00; }  /* number / tag */
+
+    /* ── Callouts ─────────────────────────────────────────── */
+    .callout {
+      padding: 16px 20px;
+      border-radius: 10px;
+      border-left: 3px solid #1878DC;
+      background: rgba(24,120,220,0.06);
+      font-size: 15px;
+      line-height: 1.55;
+      margin-top: 16px;
+    }
+    .callout.green  { border-left-color: #328F51; background: rgba(50,143,81,0.06); }
+    .callout.yellow { border-left-color: #F48E00; background: rgba(244,142,0,0.06); }
+    .callout.purple { border-left-color: #8754FD; background: rgba(135,84,253,0.06); }
+
+    /* ────────────────────────────────────────────────────────
+       STEP 2  —  Field anatomy hover chips
+    ──────────────────────────────────────────────────────── */
+    .anatomy-bg {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .anatomy-sub {
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      font-family: 'Suisse Intl Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chip {
+      position: relative;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 15px;
+      cursor: default;
+      transition: transform 0.15s;
+      user-select: none;
+    }
+
+    .chip:hover { transform: translateY(-3px); }
+
+    .chip.c-type {
+      background: rgba(24,120,220,0.11);
+      border: 1.5px solid rgba(24,120,220,0.32);
+      color: #1878DC;
+    }
+    .chip.c-name {
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.18);
+      color: #1A1A1A;
+    }
+    .chip.c-tag {
+      background: rgba(211,87,34,0.10);
+      border: 1.5px solid rgba(211,87,34,0.30);
+      color: #D35722;
+    }
+    .chip.c-punct {
+      background: none;
+      border: none;
+      color: rgba(0,0,0,0.32);
+      padding: 8px 2px;
+      font-size: 16px;
+      cursor: default;
+    }
+    .chip.c-punct:hover { transform: none; }
+
+    /* Tooltip */
+    .tip {
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) translateY(6px);
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.16s, transform 0.16s;
+      z-index: 30;
+      min-width: 180px;
+      max-width: 240px;
+      white-space: normal;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+    }
+    .tip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #1A1A1A;
+    }
+    .chip:hover .tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.60);
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ────────────────────────────────────────────────────────
+       STEP 3  —  Code generation flow diagram
+    ──────────────────────────────────────────────────────── */
+    .flow-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      margin-top: 8px;
+    }
+
+    .flow-node {
+      background: #F2F1EE;
+      border: 1.5px solid rgba(0,0,0,0.12);
+      border-radius: 12px;
+      padding: 16px 24px;
+      text-align: center;
+      min-width: 160px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .fn-icon  { font-size: 28px; margin-bottom: 4px; }
+    .fn-title { font-size: 15px; font-weight: 600; color: #1A1A1A; }
+    .fn-sub   { font-size: 12px; color: rgba(0,0,0,0.45); margin-top: 2px; font-family: 'Suisse Intl Mono', monospace; }
+
+    .flow-node.n-proto    { border-color: #F48E00; background: rgba(244,142,0,0.06); }
+    .flow-node.n-compiler { border-color: #8754FD; background: rgba(135,84,253,0.06); }
+    .flow-node.n-client   { border-color: #1878DC; background: rgba(24,120,220,0.06); }
+    .flow-node.n-server   { border-color: #328F51; background: rgba(50,143,81,0.06); }
+
+    .flow-arrow {
+      font-size: 20px;
+      color: rgba(0,0,0,0.25);
+      line-height: 1;
+      padding: 4px 0;
+      text-align: center;
+    }
+
+    .flow-branch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .branch-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    @media (max-width: 440px) {
+      .flow-branch { grid-template-columns: 1fr; max-width: 200px; }
+    }
+
+    /* ────────────────────────────────────────────────────────
+       STEP 4  —  Generated code side by side
+    ──────────────────────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .side-head {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 6px;
+    }
+    .side-head.client { color: #1878DC; }
+    .side-head.server { color: #328F51; }
+
+    .code-block.b-client { border: 2px solid rgba(24,120,220,0.45); }
+    .code-block.b-server { border: 2px solid rgba(50,143,81,0.45); }
+
+    @media (max-width: 480px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* ────────────────────────────────────────────────────────
+       STEP 5  —  Contrast cards
+    ──────────────────────────────────────────────────────── */
+    .contrast-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .contrast-card {
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .contrast-card.bad {
+      background: rgba(222,76,69,0.06);
+      border: 1.5px solid rgba(222,76,69,0.22);
+    }
+    .contrast-card.good {
+      background: rgba(50,143,81,0.06);
+      border: 1.5px solid rgba(50,143,81,0.22);
+    }
+
+    .contrast-head {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+    .contrast-head.bad  { color: #DE4C45; }
+    .contrast-head.good { color: #328F51; }
+
+    .contrast-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+    .pill-bad  { background: rgba(222,76,69,0.12); color: #DE4C45; }
+    .pill-good { background: rgba(50,143,81,0.12);  color: #328F51; }
+
+    @media (max-width: 480px) {
+      .contrast-row { grid-template-columns: 1fr; }
+    }
+
+    /* ── Navigation ──────────────────────────────────────── */
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 28px;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.82; transform: translateY(-1px); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.28; cursor: default; }
+
+    .btn-prev {
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.12);
+    }
+    .btn-next {
+      background: #1878DC;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .btn-restart {
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.12);
+    }
+
+    .step-count {
+      font-size: 14px;
+      color: rgba(0,0,0,0.38);
+      font-family: 'Suisse Intl Mono', monospace;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ── Hint header ───────────────────────────────────── -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Click Next to step through how a single <code style="font-family:'Suisse Intl Mono',monospace;background:#F2F1EE;padding:2px 6px;border-radius:4px;font-size:0.88em;">.proto</code> file becomes enforced code on both sides
+  </div>
+
+  <!-- ── Progress bar ───────────────────────────────────── -->
+  <div class="progress-wrap">
+    <div class="prog-dot active" id="pd-0"></div>
+    <div class="prog-dot"        id="pd-1"></div>
+    <div class="prog-dot"        id="pd-2"></div>
+    <div class="prog-dot"        id="pd-3"></div>
+    <div class="prog-dot"        id="pd-4"></div>
+  </div>
+  <div class="step-lbl" id="stepLbl">Step 1 of 5</div>
+
+  <div class="divider"></div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       STEPS
+  ═══════════════════════════════════════════════════════ -->
+  <div class="content">
+
+    <!-- ── Step 1: The proto file ─────────────────────── -->
+    <div class="step active" id="s0">
+      <div class="step-title">One file, two jobs</div>
+      <div class="step-desc">
+        A <code>.proto</code> file defines two things: the <strong>shape of data</strong> (messages) and the
+        <strong>operations a server offers</strong> (a service). Both the client and the server generate their
+        code from this single file — not from separate descriptions that have to stay in sync.
+      </div>
+      <div class="code-block">
+        <div class="file-label">orders.proto — single source of truth</div>
+        <span class="kw">syntax</span> = <span class="str">"proto3"</span>;<br>
+        <span class="kw">package</span> <span class="ty">orders.v1</span>;<br>
+        <br>
+        <span class="cm">// ① Messages — the shape of data</span><br>
+        <span class="kw">message</span> <span class="ty">Order</span> {<br>
+        &nbsp;&nbsp;<span class="ty">string</span>      <span class="nm">id</span>          = <span class="nu">1</span>;<br>
+        &nbsp;&nbsp;<span class="ty">string</span>      <span class="nm">customer_id</span> = <span class="nu">2</span>;<br>
+        &nbsp;&nbsp;<span class="ty">OrderStatus</span> <span class="nm">status</span>      = <span class="nu">3</span>;<br>
+        }<br>
+        <br>
+        <span class="cm">// ② Service — operations the server offers</span><br>
+        <span class="kw">service</span> <span class="ty">OrderService</span> {<br>
+        &nbsp;&nbsp;<span class="kw">rpc</span> <span class="me">GetOrder</span>(<span class="ty">GetOrderRequest</span>) returns (<span class="ty">GetOrderResponse</span>);<br>
+        }
+      </div>
+      <div class="callout">
+        This one file is the contract. Neither side writes its own description and hopes the two match —
+        both generate from the same source of truth.
+      </div>
+    </div>
+
+    <!-- ── Step 2: Field anatomy hover ───────────────── -->
+    <div class="step" id="s1">
+      <div class="step-title">Hover each part of a field</div>
+      <div class="step-desc">
+        Every message field has exactly three parts. Hover the colored chips to learn what each one does —
+        and which part is the most critical to get right.
+      </div>
+      <div class="code-block" style="margin-bottom: 20px;">
+        <div class="file-label">orders.proto — one field from message Order</div>
+        <span class="kw">message</span> <span class="ty">Order</span> {<br>
+        &nbsp;&nbsp;<span class="ty">string</span> &nbsp; <span class="nm">customer_id</span> &nbsp; = <span class="nu">2</span>;<br>
+        }
+      </div>
+      <div class="anatomy-bg">
+        <div class="anatomy-sub">Hover any chip</div>
+        <div class="chips">
+
+          <div class="chip c-type">
+            string
+            <div class="tip">
+              <strong>Field type</strong><br>
+              What data is allowed: string, int32, bool, an enum, or another message.
+              The type is checked by the compiler in the generated code.
+            </div>
+          </div>
+
+          <div class="chip c-name">
+            customer_id
+            <div class="tip">
+              <strong>Field name</strong><br>
+              Human-readable; used in generated code.
+              The name is <em>not</em> sent over the wire —
+              so you can rename it without breaking encoded messages.
+            </div>
+          </div>
+
+          <div class="chip c-punct">=</div>
+
+          <div class="chip c-tag">
+            2
+            <div class="tip">
+              <strong>Field tag</strong><br>
+              The permanent numeric ID used in the binary encoding.
+              This IS sent over the wire.
+              Never reassign a tag to a different field — doing so silently corrupts messages.
+            </div>
+          </div>
+
+          <div class="chip c-punct">;</div>
+
+        </div>
+        <div class="legend">
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#1878DC;"></div>
+            type — enforced in generated code
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#1A1A1A;"></div>
+            name — human-readable only
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#D35722;"></div>
+            tag — travels on the wire
+          </div>
+        </div>
+      </div>
+      <div class="callout yellow">
+        The tag number — not the name — is what gets transmitted. That is part of why proto encoding is
+        compact. It is also why reassigning a tag to a different field silently corrupts messages already in flight.
+      </div>
+    </div>
+
+    <!-- ── Step 3: Code generation flow ──────────────── -->
+    <div class="step" id="s2">
+      <div class="step-title">Run protoc: one file fans out to both sides</div>
+      <div class="step-desc">
+        You run the Protocol Buffers compiler (<code>protoc</code>) once.
+        It reads the proto file and emits typed source code for both the client
+        and the server in your language of choice.
+      </div>
+      <div class="flow-grid">
+
+        <div class="flow-node n-proto">
+          <div class="fn-icon">📄</div>
+          <div class="fn-title">orders.proto</div>
+          <div class="fn-sub">single source of truth</div>
+        </div>
+
+        <div class="flow-arrow">↓</div>
+
+        <div class="flow-node n-compiler">
+          <div class="fn-icon">⚙️</div>
+          <div class="fn-title">protoc</div>
+          <div class="fn-sub">code generator</div>
+        </div>
+
+        <div class="flow-arrow">↓</div>
+
+        <div class="flow-branch">
+          <div class="branch-col">
+            <div class="flow-node n-client" style="width:100%;">
+              <div class="fn-icon">🖥</div>
+              <div class="fn-title">Client stubs</div>
+              <div class="fn-sub">typed call methods</div>
+            </div>
+          </div>
+          <div class="branch-col">
+            <div class="flow-node n-server" style="width:100%;">
+              <div class="fn-icon">🗄</div>
+              <div class="fn-title">Server base class</div>
+              <div class="fn-sub">typed methods to implement</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="callout green" style="margin-top: 16px;">
+        Because both sides come from the same file, the compiler in each language enforces the contract.
+        A type mismatch or missing field is caught at compile time — not at runtime in production.
+      </div>
+    </div>
+
+    <!-- ── Step 4: Generated code ──────────────────────── -->
+    <div class="step" id="s3">
+      <div class="step-title">What the generated code looks like</div>
+      <div class="step-desc">
+        You do not write this code. The compiler writes it for you.
+        Both sides get the exact same types — derived from the single proto file.
+      </div>
+      <div class="two-col">
+        <div>
+          <div class="side-head client">Client (generated)</div>
+          <div class="code-block b-client" style="font-size: 12px; padding: 16px; line-height: 1.65;">
+            <span class="cm"># Auto-generated stub</span><br>
+            <span class="kw">class</span> <span class="ty">OrderServiceStub</span>:<br>
+            &nbsp;&nbsp;<span class="kw">def</span> <span class="me">get_order</span>(<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">self</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;req: <span class="ty">GetOrderRequest</span><br>
+            &nbsp;&nbsp;) -> <span class="ty">GetOrderResponse</span>:<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="cm"># calls server over gRPC</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;...
+          </div>
+        </div>
+        <div>
+          <div class="side-head server">Server (generated)</div>
+          <div class="code-block b-server" style="font-size: 12px; padding: 16px; line-height: 1.65;">
+            <span class="cm"># Auto-generated base class</span><br>
+            <span class="kw">class</span> <span class="ty">OrderServiceBase</span>:<br>
+            &nbsp;&nbsp;<span class="kw">def</span> <span class="me">get_order</span>(<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">self</span>,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;req: <span class="ty">GetOrderRequest</span><br>
+            &nbsp;&nbsp;) -> <span class="ty">GetOrderResponse</span>:<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;<span class="kw">raise</span> <span class="ty">NotImplementedError</span>
+          </div>
+        </div>
+      </div>
+      <div class="callout purple">
+        Both sides use the identical <span style="font-family:'Suisse Intl Mono',monospace;background:rgba(135,84,253,0.10);padding:2px 5px;border-radius:4px;font-size:0.9em;">GetOrderRequest</span>
+        and <span style="font-family:'Suisse Intl Mono',monospace;background:rgba(135,84,253,0.10);padding:2px 5px;border-radius:4px;font-size:0.9em;">GetOrderResponse</span> types
+        — generated from the same proto definitions. There is no way for one side to drift from the other silently.
+      </div>
+    </div>
+
+    <!-- ── Step 5: Enforced vs. convention ─────────────── -->
+    <div class="step" id="s4">
+      <div class="step-title">Enforced at compile time, not at runtime</div>
+      <div class="step-desc">
+        The proto file is not documentation that sits beside your code hoping to stay accurate.
+        It is the real input to the compiler — and that single fact changes when mismatches are caught.
+      </div>
+      <div class="contrast-row">
+        <div class="contrast-card bad">
+          <div class="contrast-head bad">JSON / REST (conventional)</div>
+          The agreement lives in a README, a doc, or people's memory. Client and server each write their own
+          description and hope the two match. Mismatches surface as errors
+          <span class="contrast-pill pill-bad">at runtime</span> —
+          in production, under real traffic.
+        </div>
+        <div class="contrast-card good">
+          <div class="contrast-head good">gRPC + Protobuf (enforced)</div>
+          Both sides generate from a single proto file. The compiler in each language checks the types. A missing
+          field or wrong type is caught
+          <span class="contrast-pill pill-good">at compile time</span> —
+          before any code ships.
+        </div>
+      </div>
+      <div class="callout green" style="margin-top: 16px;">
+        When you change a proto file you are changing the real agreement between every client and every server.
+        Treat it with the same care you would give to any shared interface.
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <div class="divider" style="margin-top: 20px;"></div>
+
+  <!-- ── Navigation ──────────────────────────────────── -->
+  <div class="nav-bar">
+    <button class="btn btn-prev" id="btnPrev" onclick="go(-1)" disabled>← Back</button>
+    <span class="step-count" id="stepCount">1 / 5</span>
+    <button class="btn btn-next" id="btnNext" onclick="go(1)">Next →</button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  const TOTAL = 5;
+  let cur = 0;
+
+  function go(dir) {
+    document.getElementById('s' + cur).classList.remove('active');
+
+    const dot = document.getElementById('pd-' + cur);
+    if (dir > 0) {
+      dot.classList.remove('active');
+      dot.classList.add('done');
+    } else {
+      dot.classList.remove('done', 'active');
+    }
+
+    cur = Math.max(0, Math.min(TOTAL - 1, cur + dir));
+
+    document.getElementById('s' + cur).classList.add('active');
+
+    // Sync all dots
+    for (let i = 0; i < TOTAL; i++) {
+      const d = document.getElementById('pd-' + i);
+      d.classList.remove('active', 'done');
+      if (i < cur)       d.classList.add('done');
+      else if (i === cur) d.classList.add('active');
+    }
+
+    document.getElementById('stepLbl').textContent  = 'Step ' + (cur + 1) + ' of ' + TOTAL;
+    document.getElementById('stepCount').textContent = (cur + 1) + ' / ' + TOTAL;
+
+    const prev = document.getElementById('btnPrev');
+    const next = document.getElementById('btnNext');
+
+    prev.disabled = cur === 0;
+
+    if (cur === TOTAL - 1) {
+      next.textContent = '↺ Restart';
+      next.className   = 'btn btn-restart';
+      next.onclick     = restart;
+    } else {
+      next.textContent = 'Next →';
+      next.className   = 'btn btn-next';
+      next.onclick     = function () { go(1); };
+    }
+  }
+
+  function restart() {
+    for (let i = 0; i < TOTAL; i++) {
+      document.getElementById('s' + i).classList.remove('active');
+      const d = document.getElementById('pd-' + i);
+      d.classList.remove('active', 'done');
+    }
+    cur = 0;
+    document.getElementById('s0').classList.add('active');
+    document.getElementById('pd-0').classList.add('active');
+    document.getElementById('stepLbl').textContent  = 'Step 1 of ' + TOTAL;
+    document.getElementById('stepCount').textContent = '1 / ' + TOTAL;
+
+    const prev = document.getElementById('btnPrev');
+    const next = document.getElementById('btnNext');
+    prev.disabled    = true;
+    next.textContent = 'Next →';
+    next.className   = 'btn btn-next';
+    next.onclick     = function () { go(1); };
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04. Where Session State Lives</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s infinite;
+  transform-origin: 12px 20px;
+}
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  10%  { transform: rotate(-10deg); }
+  25%  { transform: rotate(10deg); }
+  40%  { transform: rotate(-8deg); }
+  55%  { transform: rotate(6deg); }
+  70%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── Toggle ── */
+.toggle-section { padding: 20px 20px 0; }
+.toggle-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 8px;
+}
+.toggle-row { display: flex; gap: 8px; }
+.toggle-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: rgba(0,0,0,0.50);
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+  text-align: center;
+  line-height: 1.4;
+}
+.toggle-btn:hover {
+  border-color: rgba(0,0,0,0.30);
+  color: #1A1A1A;
+}
+.toggle-btn.active-bad {
+  border-color: #DE4C45; background: #FEF6F5; color: #DE4C45;
+}
+.toggle-btn.active-good {
+  border-color: #328F51; background: #F0FAF3; color: #328F51;
+}
+
+/* ── Stage header ── */
+.stage-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 20px 12px;
+  flex-wrap: wrap;
+}
+.stage-chip {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  background: #F2F1EE;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: rgba(0,0,0,0.50);
+  flex-shrink: 0;
+}
+.stage-title { font-size: 16px; font-weight: 500; color: #1A1A1A; }
+
+/* ── Diagram ── */
+.diagram-wrap { padding: 0 20px; }
+.diagram {
+  background: #F2F1EE;
+  border-radius: 12px;
+  position: relative;
+  height: 308px;
+  overflow: visible;
+}
+.diagram svg.lines {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* Nodes */
+.node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+}
+.node-box {
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+  transition: background 0.25s, border-color 0.25s, opacity 0.25s;
+}
+.node-icon { font-size: 20px; line-height: 1.2; }
+.node-lbl  {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.50);
+  white-space: nowrap;
+}
+
+/* Sub-label badges */
+.node-sub {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.25s, max-height 0.25s;
+}
+.node-sub.show    { opacity: 1; max-height: 24px; }
+.node-sub.local   { background: #FFF3CD; color: #856404; border: 1px solid #FDEAAA; }
+.node-sub.lost    { background: #FDEEED; color: #DE4C45; border: 1px solid #F5C1BE; }
+.node-sub.none    { background: #FDEEED; color: #DE4C45; border: 1px solid #F5C1BE; }
+.node-sub.found   { background: #D4EDDA; color: #328F51; border: 1px solid #A8D5B5; }
+
+.node-box.crashed {
+  background: #FEF6F5; border-color: #DE4C45; opacity: 0.75;
+}
+
+/* Store node */
+.store-wrap { opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+.store-wrap.show { opacity: 1; pointer-events: auto; }
+.store-wrap .node-box { border-color: #328F51; background: #F0FAF3; }
+
+/* ── Result banner ── */
+.result-wrap { padding: 12px 20px; min-height: 64px; }
+.result-banner {
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  border: 1.5px solid transparent;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.result-banner.show { opacity: 1; }
+.result-banner.bad  { background: #FDEEED; border-color: #DE4C45; color: #B83732; }
+.result-banner.good { background: #F0FAF3; border-color: #328F51; color: #266B3D; }
+
+/* ── Navigation ── */
+.nav {
+  padding: 4px 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: #F2F1EE; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn-primary { background: #1878DC; border-color: #1878DC; color: #FFFFFF; }
+.btn-primary:hover:not(:disabled) { background: #1365BF; }
+.dots { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(0,0,0,0.14); transition: background 0.2s; }
+.dot.on { background: #1878DC; }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .hint-header { padding: 12px 16px; font-size: 16px; }
+  .toggle-section, .stage-header, .diagram-wrap, .result-wrap, .nav {
+    padding-left: 12px; padding-right: 12px;
+  }
+  .toggle-btn { font-size: 15px; padding: 8px 12px; }
+  .diagram { height: 276px; }
+  .node-box { min-width: 60px; padding: 6px 8px; }
+  .node-icon { font-size: 16px; }
+  .node-lbl { font-size: 10px; }
+  .node-sub { font-size: 9px; }
+  .btn { padding: 8px 16px; font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Toggle a storage mode, then step through the crash to see what happens to the session.
+  </div>
+
+  <!-- Toggle -->
+  <div class="toggle-section">
+    <div class="toggle-label">Where is session state stored?</div>
+    <div class="toggle-row">
+      <button class="toggle-btn active-bad" id="btn-local"  onclick="setMode('local')">In service memory</button>
+      <button class="toggle-btn"            id="btn-shared" onclick="setMode('shared')">In a shared store</button>
+    </div>
+  </div>
+
+  <!-- Stage header -->
+  <div class="stage-header">
+    <span class="stage-chip"  id="stage-chip">Step 1 / 4</span>
+    <span class="stage-title" id="stage-title">Request arrives &#8212; user logs in</span>
+  </div>
+
+  <!-- Diagram -->
+  <div class="diagram-wrap">
+    <div class="diagram">
+
+      <!-- SVG connecting lines -->
+      <svg class="lines" aria-hidden="true">
+        <!-- User to LB -->
+        <line id="ln-user-lb"   x1="50%" y1="54"  x2="50%" y2="82"  stroke="rgba(0,0,0,0.14)" stroke-width="2" stroke-linecap="round"/>
+        <!-- LB to Copy 1 -->
+        <line id="ln-lb-s1"     x1="50%" y1="108" x2="27%" y2="148" stroke="rgba(0,0,0,0.14)" stroke-width="2" stroke-linecap="round"/>
+        <!-- LB to Copy 2 -->
+        <line id="ln-lb-s2"     x1="50%" y1="108" x2="73%" y2="148" stroke="rgba(0,0,0,0.14)" stroke-width="2" stroke-linecap="round"/>
+        <!-- Copy 1 to Store -->
+        <line id="ln-s1-store"  x1="27%" y1="200" x2="50%" y2="240" stroke="rgba(0,0,0,0.14)" stroke-width="2" stroke-linecap="round" style="display:none"/>
+        <!-- Copy 2 to Store -->
+        <line id="ln-s2-store"  x1="73%" y1="200" x2="50%" y2="240" stroke="rgba(0,0,0,0.14)" stroke-width="2" stroke-linecap="round" style="display:none"/>
+      </svg>
+
+      <!-- User -->
+      <div class="node" style="left:50%; top:8px;">
+        <div class="node-box">
+          <div class="node-icon">&#x1F464;</div>
+          <div class="node-lbl">User</div>
+        </div>
+      </div>
+
+      <!-- Load balancer -->
+      <div class="node" style="left:50%; top:82px;">
+        <div class="node-box">
+          <div class="node-icon">&#x2696;&#xFE0F;</div>
+          <div class="node-lbl">Load balancer</div>
+        </div>
+      </div>
+
+      <!-- Copy 1 -->
+      <div class="node" style="left:27%; top:148px;">
+        <div class="node-box" id="s1-box">
+          <div class="node-icon" id="s1-icon">&#x1F5A5;&#xFE0F;</div>
+          <div class="node-lbl">Copy 1</div>
+          <div class="node-sub" id="s1-sub"></div>
+        </div>
+      </div>
+
+      <!-- Copy 2 -->
+      <div class="node" style="left:73%; top:148px;">
+        <div class="node-box" id="s2-box">
+          <div class="node-icon">&#x1F5A5;&#xFE0F;</div>
+          <div class="node-lbl">Copy 2</div>
+          <div class="node-sub" id="s2-sub"></div>
+        </div>
+      </div>
+
+      <!-- Shared session store (shared mode only) -->
+      <div class="node store-wrap" id="store-wrap" style="left:50%; top:240px;">
+        <div class="node-box">
+          <div class="node-icon">&#x1F5C4;&#xFE0F;</div>
+          <div class="node-lbl">Session store</div>
+          <div class="node-sub found" id="store-sub"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Result banner -->
+  <div class="result-wrap">
+    <div class="result-banner" id="result-banner"></div>
+  </div>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <button class="btn"             id="btn-prev" onclick="prevStep()" disabled>&#8592; Back</button>
+    <button class="btn btn-primary" id="btn-next" onclick="nextStep()">Next &#8594;</button>
+    <div class="dots">
+      <div class="dot on" id="d0"></div>
+      <div class="dot"    id="d1"></div>
+      <div class="dot"    id="d2"></div>
+      <div class="dot"    id="d3"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+var mode = 'local';
+var step = 0;
+
+var TITLES = [
+  'Request arrives — user logs in',
+  'Session is stored',
+  'Copy 1 crashes',
+  'New request arrives'
+];
+
+function setMode(m) {
+  mode = m;
+  step = 0;
+  document.getElementById('btn-local').className =
+    'toggle-btn' + (m === 'local' ? ' active-bad' : '');
+  document.getElementById('btn-shared').className =
+    'toggle-btn' + (m === 'shared' ? ' active-good' : '');
+  render();
+}
+
+function nextStep() { if (step < 3) { step++; render(); } }
+function prevStep() { if (step > 0) { step--; render(); } }
+
+function setLine(id, active, show) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  if (show === false) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.setAttribute('stroke', active ? '#1878DC' : 'rgba(0,0,0,0.14)');
+}
+
+function setSub(el, cls, text, show) {
+  el.className = 'node-sub' + (cls ? ' ' + cls : '') + (show ? ' show' : '');
+  el.textContent = text;
+}
+
+function render() {
+  var isLocal = (mode === 'local');
+
+  document.getElementById('stage-chip').textContent  = 'Step ' + (step + 1) + ' / 4';
+  document.getElementById('stage-title').textContent = TITLES[step];
+
+  for (var i = 0; i < 4; i++) {
+    document.getElementById('d' + i).className = 'dot' + (i === step ? ' on' : '');
+  }
+
+  document.getElementById('btn-prev').disabled = (step === 0);
+  document.getElementById('btn-next').disabled = (step === 3);
+
+  /* Lines */
+  setLine('ln-user-lb',  step === 0 || step === 3);
+  setLine('ln-lb-s1',   step === 0);
+  setLine('ln-lb-s2',   step === 3);
+  setLine('ln-s1-store', !isLocal && step === 1,    !isLocal);
+  setLine('ln-s2-store', !isLocal && step === 3,    !isLocal);
+
+  /* Copy 1 */
+  var s1Box  = document.getElementById('s1-box');
+  var s1Icon = document.getElementById('s1-icon');
+  var s1Sub  = document.getElementById('s1-sub');
+
+  if (step >= 2) {
+    s1Box.className = 'node-box crashed';
+    s1Icon.textContent = '💥';
+  } else {
+    s1Box.className = 'node-box';
+    s1Icon.textContent = '🖥️';
+  }
+
+  if (isLocal) {
+    if (step === 1)       setSub(s1Sub, 'local', 'session: user42', true);
+    else if (step >= 2)   setSub(s1Sub, 'lost',  '✗ session lost', true);
+    else                  setSub(s1Sub, '', '', false);
+  } else {
+    setSub(s1Sub, '', '', false);
+  }
+
+  /* Copy 2 */
+  var s2Sub = document.getElementById('s2-sub');
+  if (step === 3) {
+    if (isLocal) setSub(s2Sub, 'none',  '✗ no session',     true);
+    else         setSub(s2Sub, 'found', '✓ session: user42', true);
+  } else {
+    setSub(s2Sub, '', '', false);
+  }
+
+  /* Store */
+  var storeWrap = document.getElementById('store-wrap');
+  var storeSub  = document.getElementById('store-sub');
+  if (!isLocal) {
+    storeWrap.className = 'node store-wrap' + (step >= 1 ? ' show' : '');
+    setSub(storeSub, 'found', 'session: user42', step >= 1);
+  } else {
+    storeWrap.className = 'node store-wrap';
+  }
+
+  /* Result banner */
+  var banner = document.getElementById('result-banner');
+  if (step === 3) {
+    banner.className = 'result-banner show ' + (isLocal ? 'bad' : 'good');
+    banner.textContent = isLocal
+      ? '✗  User is logged out. Copy 1’s memory is gone — no other copy ever had the session.'
+      : '✓  User stays logged in. Copy 2 reads the session from the shared store — the crash changed nothing.';
+  } else {
+    banner.className = 'result-banner';
+    banner.textContent = '';
+  }
+}
+
+render();
+</script>
+</body>
+</html>

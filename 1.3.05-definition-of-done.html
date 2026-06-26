@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Definition of Done — Spot the Verifiable Criterion</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-size: 18px;
+      line-height: 1.5;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* ---- HINT HEADER ---- */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      90%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    /* ---- QUIZ AREA ---- */
+    .quiz-area {
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ---- PROGRESS ---- */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 4px;
+      background: rgba(0,0,0,0.10);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #1878DC;
+      border-radius: 2px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* ---- DIMENSION BADGE ---- */
+    .dimension-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 6px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      transition: background 0.3s ease, color 0.3s ease;
+      align-self: flex-start;
+    }
+
+    /* ---- QUESTION ---- */
+    .question-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.55;
+    }
+
+    /* ---- CHOICE CARDS ---- */
+    .choices {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .choice-card {
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #1A1A1A;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+      text-align: left;
+      width: 100%;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+    }
+
+    .choice-card:hover:not([data-disabled]) {
+      border-color: rgba(0,0,0,0.28);
+      background: #F9F9F8;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 2px 8px 0 rgba(0,0,0,0.10);
+    }
+
+    .choice-card[data-state="correct"] {
+      border-color: #328F51;
+      background: #F1FAF4;
+      cursor: default;
+    }
+
+    .choice-card[data-state="wrong"] {
+      border-color: #DE4C45;
+      background: #FEF2F2;
+      cursor: default;
+    }
+
+    .choice-card[data-state="reveal"] {
+      border-color: #328F51;
+      background: #F1FAF4;
+      cursor: default;
+    }
+
+    .choice-card[data-disabled] {
+      cursor: default;
+    }
+
+    .choice-letter {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.40);
+      flex-shrink: 0;
+      min-width: 18px;
+      padding-top: 2px;
+      transition: color 0.16s ease;
+    }
+
+    .choice-card[data-state="correct"] .choice-letter,
+    .choice-card[data-state="reveal"] .choice-letter {
+      color: #328F51;
+    }
+
+    .choice-card[data-state="wrong"] .choice-letter {
+      color: #DE4C45;
+    }
+
+    /* ---- FEEDBACK ---- */
+    .feedback-box {
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 16px;
+      line-height: 1.65;
+      display: none;
+    }
+
+    .feedback-box.visible {
+      display: block;
+    }
+
+    .feedback-box.correct {
+      background: #F1FAF4;
+      border: 1px solid rgba(50,143,81,0.22);
+    }
+
+    .feedback-box.wrong {
+      background: #FEF2F2;
+      border: 1px solid rgba(222,76,69,0.22);
+    }
+
+    .feedback-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .feedback-label.correct { color: #328F51; }
+    .feedback-label.wrong   { color: #DE4C45; }
+
+    /* ---- NEXT BUTTON ---- */
+    .btn-row {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-next {
+      display: none;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .btn-next.visible { display: block; }
+    .btn-next:hover { opacity: 0.78; }
+
+    /* ---- RESULT SCREEN ---- */
+    .result-screen {
+      display: none;
+      padding: 40px 20px;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      text-align: center;
+    }
+
+    .result-screen.visible { display: flex; }
+
+    .score-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .score-fraction {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 52px;
+      color: #1A1A1A;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .score-sub {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .result-title {
+      font-size: 20px;
+      color: #1A1A1A;
+    }
+
+    .result-body {
+      font-size: 16px;
+      color: rgba(0,0,0,0.60);
+      max-width: 500px;
+      line-height: 1.65;
+    }
+
+    /* ---- RECAP ---- */
+    .recap {
+      width: 100%;
+      background: #F2F1EE;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .recap-heading {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 4px;
+    }
+
+    .recap-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .recap-dim {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+      padding-top: 3px;
+      min-width: 92px;
+    }
+
+    .btn-restart {
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-restart:hover { background: #E5E4E0; }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 480px) {
+      .hint-header { font-size: 16px; padding: 12px 16px; }
+      .quiz-area { padding: 20px 16px; gap: 16px; }
+      .choice-card { font-size: 15px; padding: 16px; }
+      .question-text { font-size: 16px; }
+      .result-screen { padding: 32px 16px; }
+      .recap { padding: 16px; }
+      .recap-dim { min-width: 76px; }
+    }
+
+    @media (max-width: 325px) {
+      .hint-header { font-size: 14px; padding: 12px; }
+      .quiz-area { padding: 16px 12px; }
+      .choice-card { font-size: 14px; padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Click the criterion that belongs on a Definition of Done.
+  </div>
+
+  <!-- Quiz -->
+  <div class="quiz-area" id="quiz-area">
+    <div class="progress-row">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <span class="progress-label" id="progress-label">1 of 4</span>
+    </div>
+
+    <span class="dimension-badge" id="dim-badge"></span>
+
+    <p class="question-text">One of these is verifiable — it names exactly what to measure and how to check it. The other is an aspiration dressed as a criterion. Which is which?</p>
+
+    <div class="choices">
+      <button class="choice-card" id="card-a">
+        <span class="choice-letter">A</span>
+        <span id="text-a"></span>
+      </button>
+      <button class="choice-card" id="card-b">
+        <span class="choice-letter">B</span>
+        <span id="text-b"></span>
+      </button>
+    </div>
+
+    <div class="feedback-box" id="feedback-box">
+      <div class="feedback-label" id="feedback-label"></div>
+      <span id="feedback-text"></span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-next" id="btn-next"></button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-screen" id="result-screen">
+    <div class="score-display">
+      <span class="score-fraction" id="score-fraction">0/4</span>
+      <span class="score-sub">correct</span>
+    </div>
+    <p class="result-title" id="result-title"></p>
+    <p class="result-body" id="result-body"></p>
+    <div class="recap" id="recap"></div>
+    <button class="btn-restart" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+
+<script>
+  var ROUNDS = [
+    {
+      dim: 'RELIABLE',
+      dimColor: '#1878DC',
+      dimBg: 'rgba(24,120,220,0.10)',
+      a: 'The service should be reliable.',
+      b: '95% of requests respond in under 200 ms at expected load, confirmed by a load test.',
+      correct: 'b',
+      feedbackCorrect: 'Correct. This criterion names the measurement (response time), the threshold (200 ms), the coverage (95%), the context (expected load), and the check (a load test). Nothing is left to interpretation.',
+      feedbackWrong: '"Reliable" sounds meaningful but cannot be checked. Two engineers can disagree about whether the service is reliable without either being wrong, because the word has no agreed measurement here.',
+    },
+    {
+      dim: 'SECURE',
+      dimColor: '#D35722',
+      dimBg: 'rgba(211,87,34,0.10)',
+      a: 'No secrets appear in the source code, confirmed by a secret-scanning tool; unauthenticated requests are refused.',
+      b: 'The feature should handle authentication and keep credentials safe.',
+      correct: 'a',
+      feedbackCorrect: 'Correct. Two specific, executable checks: run the scanning tool and attempt a request without credentials. Either each check passes or it does not — there is no room to disagree.',
+      feedbackWrong: '"Should handle" and "keep safe" are aspirations with no attached check. You cannot verify them, which means you cannot agree on whether they are met.',
+    },
+    {
+      dim: 'OBSERVABLE',
+      dimColor: '#8754FD',
+      dimBg: 'rgba(135,84,253,0.10)',
+      a: 'A deliberately triggered error can be traced from a dashboard back to the exact request using its logged ID.',
+      b: 'The service has good logging and monitoring in place.',
+      correct: 'a',
+      feedbackCorrect: 'Correct. The check is executable: trigger an error, open the dashboard, follow the request ID. The criterion passes or fails with no room for debate.',
+      feedbackWrong: '"Good" is subjective. There is no measurement and no described procedure, so two people can reach opposite conclusions about whether the logging is adequate.',
+    },
+    {
+      dim: 'DOCUMENTED',
+      dimColor: '#328F51',
+      dimBg: 'rgba(50,143,81,0.10)',
+      a: 'The feature is thoroughly documented and easy for anyone to understand.',
+      b: 'A teammate unfamiliar with the feature follows the docs and runs, operates, and troubleshoots it without asking for help.',
+      correct: 'b',
+      feedbackCorrect: 'Correct. The verification is clear: find a real person, have them follow the docs, observe the outcome. Either they succeed unaided or they do not.',
+      feedbackWrong: '"Thoroughly" and "easy to understand" have no agreed meaning. The right criterion names a concrete check involving a real person and a definite outcome.',
+    },
+  ];
+
+  var idx = 0;
+  var score = 0;
+
+  function loadRound(i) {
+    var r = ROUNDS[i];
+
+    var badge = document.getElementById('dim-badge');
+    badge.textContent = r.dim;
+    badge.style.background = r.dimBg;
+    badge.style.color = r.dimColor;
+
+    document.getElementById('progress-fill').style.width = ((i / ROUNDS.length) * 100) + '%';
+    document.getElementById('progress-label').textContent = (i + 1) + ' of ' + ROUNDS.length;
+
+    document.getElementById('text-a').textContent = r.a;
+    document.getElementById('text-b').textContent = r.b;
+
+    ['a', 'b'].forEach(function(k) {
+      var card = document.getElementById('card-' + k);
+      card.removeAttribute('data-state');
+      card.removeAttribute('data-disabled');
+      card.onclick = function() { pick(k); };
+    });
+
+    var fb = document.getElementById('feedback-box');
+    fb.className = 'feedback-box';
+    document.getElementById('btn-next').className = 'btn-next';
+  }
+
+  function pick(choice) {
+    var r = ROUNDS[idx];
+    var isCorrect = choice === r.correct;
+    if (isCorrect) score++;
+
+    ['a', 'b'].forEach(function(k) {
+      var c = document.getElementById('card-' + k);
+      c.setAttribute('data-disabled', '');
+      c.onclick = null;
+    });
+
+    var chosen = document.getElementById('card-' + choice);
+    chosen.setAttribute('data-state', isCorrect ? 'correct' : 'wrong');
+
+    if (!isCorrect) {
+      document.getElementById('card-' + r.correct).setAttribute('data-state', 'reveal');
+    }
+
+    var fb = document.getElementById('feedback-box');
+    var lbl = document.getElementById('feedback-label');
+    var txt = document.getElementById('feedback-text');
+    lbl.textContent = isCorrect ? 'Correct' : 'Not quite';
+    lbl.className = 'feedback-label ' + (isCorrect ? 'correct' : 'wrong');
+    txt.textContent = isCorrect ? r.feedbackCorrect : r.feedbackWrong;
+    fb.className = 'feedback-box visible ' + (isCorrect ? 'correct' : 'wrong');
+
+    var btn = document.getElementById('btn-next');
+    btn.textContent = idx < ROUNDS.length - 1 ? 'Next →' : 'See results →';
+    btn.className = 'btn-next visible';
+    btn.onclick = advance;
+  }
+
+  function advance() {
+    idx++;
+    if (idx >= ROUNDS.length) {
+      showResult();
+    } else {
+      loadRound(idx);
+    }
+  }
+
+  function showResult() {
+    document.getElementById('quiz-area').style.display = 'none';
+    var rs = document.getElementById('result-screen');
+    rs.className = 'result-screen visible';
+
+    document.getElementById('score-fraction').textContent = score + '/' + ROUNDS.length;
+
+    var messages = [
+      { title: 'Keep going.', body: 'A Definition of Done only works when every criterion names a specific measurement and a named check. Try again — look for the option that gives you something concrete to measure.' },
+      { title: 'A start.', body: 'The distinction is checkability: a vague adjective like “reliable” is an aspiration, not a criterion. A criterion must name what to measure and how to confirm it.' },
+      { title: 'Almost there.', body: 'You are getting the idea. The verifiable criterion is the one where you can describe the exact check you would run and the result that counts as a pass.' },
+      { title: 'Well done.', body: 'Three out of four. The key question to ask is always: “How would I prove this?” If you cannot name a test or measurement, the criterion is not finished yet.' },
+      { title: 'Exactly right.', body: 'A criterion without a named check is an opinion. Every item on a Definition of Done must state what to measure and how to confirm it — and you recognised all four.' },
+    ];
+
+    var msg = messages[score];
+    document.getElementById('result-title').textContent = msg.title;
+    document.getElementById('result-body').textContent = msg.body;
+
+    var recap = document.getElementById('recap');
+    recap.innerHTML = '<span class="recap-heading">THE VERIFIABLE CRITERIA</span>';
+    ROUNDS.forEach(function(r) {
+      var text = r.correct === 'a' ? r.a : r.b;
+      var item = document.createElement('div');
+      item.className = 'recap-item';
+      item.innerHTML = '<span class="recap-dim" style="color:' + r.dimColor + '">' + r.dim + '</span><span>' + text + '</span>';
+      recap.appendChild(item);
+    });
+  }
+
+  function restart() {
+    idx = 0;
+    score = 0;
+    document.getElementById('quiz-area').style.display = '';
+    document.getElementById('result-screen').className = 'result-screen';
+    loadRound(0);
+  }
+
+  loadRound(0);
+</script>
+</body>
+</html>

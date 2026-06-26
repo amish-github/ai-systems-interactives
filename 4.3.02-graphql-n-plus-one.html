@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The N+1 Query Problem — Interactive</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .outer { display: flex; justify-content: center; }
+
+    .container { width: 100%; max-width: 700px; }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon { animation: cursor-wiggle 4s infinite; flex-shrink: 0; }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text { font-size: 16px; color: #1A1A1A; line-height: 1.4; }
+
+    /* ── Main layout ── */
+    .main { padding: 24px 20px; display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── GraphQL query box ── */
+    .query-box {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .box-label { font-size: 14px; color: rgba(0,0,0,0.50); margin-bottom: 8px; }
+
+    pre.gql {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #1A1A1A;
+      white-space: pre;
+    }
+
+    /* ── Controls row ── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .slider-label { font-size: 16px; white-space: nowrap; color: rgba(0,0,0,0.70); }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.14);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #1878DC;
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .n-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      background: #1878DC;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 6px;
+      min-width: 28px;
+      text-align: center;
+    }
+
+    /* ── Mode toggle ── */
+    .mode-toggle {
+      display: flex;
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .mode-btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      padding: 6px 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: transparent;
+      color: rgba(0,0,0,0.50);
+      transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+
+    .mode-btn.active {
+      background: #FFFFFF;
+      color: #1A1A1A;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .mode-btn:hover:not(.active) { color: #1A1A1A; }
+
+    /* ── Execution card ── */
+    .exec-card {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .exec-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .exec-title { font-size: 16px; }
+
+    .counter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .db-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      padding: 2px 10px;
+      border-radius: 6px;
+      min-width: 32px;
+      text-align: center;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .db-chip.zero   { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.40); }
+    .db-chip.good   { background: #328F51; color: #FFFFFF; }
+    .db-chip.warn   { background: #F48E00; color: #FFFFFF; }
+    .db-chip.bad    { background: #DE4C45; color: #FFFFFF; }
+
+    /* ── Steps list ── */
+    .steps-wrap {
+      padding: 12px 16px;
+      min-height: 160px;
+      max-height: 340px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scroll-behavior: smooth;
+    }
+
+    .empty-msg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      color: rgba(0,0,0,0.28);
+      font-size: 16px;
+    }
+
+    .step {
+      display: flex;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.10);
+      border-radius: 10px;
+      animation: appear 0.22s ease-out;
+    }
+
+    @keyframes appear {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-badge {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.6;
+      align-self: flex-start;
+    }
+
+    .badge-blue   { background: rgba(24,120,220,0.12); color: #1878DC; }
+    .badge-orange { background: rgba(211,87,34,0.12);  color: #D35722; }
+    .badge-purple { background: rgba(135,84,253,0.12); color: #8754FD; }
+    .badge-green  { background: rgba(50,143,81,0.12);  color: #328F51; }
+
+    .step-body { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+
+    .step-desc { font-size: 14px; color: rgba(0,0,0,0.50); }
+
+    .step-sql {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: #1A1A1A;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    /* ── Button row ── */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(0,0,0,0.14);
+      background: #FAFAFA;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+
+    .btn-run   { background: #1878DC; color: #FFFFFF; }
+    .btn-play  { background: #328F51; color: #FFFFFF; }
+    .btn-reset { background: #F2F1EE; color: #1A1A1A; border: 1px solid rgba(0,0,0,0.14); }
+
+    .btn:disabled { opacity: 0.35; cursor: default; }
+
+    /* ── Summary ── */
+    .summary {
+      border-radius: 12px;
+      padding: 16px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .summary.show   { display: flex; }
+    .naive-sum  { background: rgba(222,76,69,0.05);  border: 1px solid rgba(222,76,69,0.25); }
+    .batch-sum  { background: rgba(50,143,81,0.05);  border: 1px solid rgba(50,143,81,0.25); }
+
+    .sum-head { font-size: 16px; }
+    .sum-head.red   { color: #DE4C45; }
+    .sum-head.green { color: #328F51; }
+
+    .sum-body { font-size: 14px; color: rgba(0,0,0,0.60); line-height: 1.6; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hint-header { padding: 12px 16px; }
+      .main { padding: 16px; gap: 16px; }
+      .hint-text { font-size: 14px; }
+      .controls { flex-direction: column; align-items: stretch; }
+      .mode-toggle { align-self: flex-start; }
+    }
+
+    @media (max-width: 325px) {
+      .btn { font-size: 14px; padding: 8px 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="outer">
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Step through the resolver and watch database queries pile up — then switch to Batched to compare.</span>
+  </div>
+
+  <div class="main">
+
+    <!-- GraphQL query -->
+    <div class="query-box">
+      <div class="box-label">GraphQL query (one request from the client)</div>
+      <pre class="gql">query {
+  authors {
+    name
+    books { title }
+  }
+}</pre>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="slider-group">
+        <span class="slider-label">Authors&nbsp;N&nbsp;=</span>
+        <input type="range" id="slider" min="3" max="8" value="5" />
+        <span class="n-chip" id="nLabel">5</span>
+      </div>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="naiveBtn" onclick="setMode('naive')">Naive</button>
+        <button class="mode-btn"        id="batchedBtn" onclick="setMode('batched')">Batched</button>
+      </div>
+    </div>
+
+    <!-- Execution card -->
+    <div class="exec-card">
+      <div class="exec-header">
+        <span class="exec-title" id="execTitle">Naive resolver</span>
+        <div class="counter-group">
+          <span>DB queries:</span>
+          <span class="db-chip zero" id="dbChip">0</span>
+        </div>
+      </div>
+
+      <div class="steps-wrap" id="stepsWrap">
+        <div class="empty-msg" id="emptyMsg">Press "Next Step" to begin execution</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-run"   id="nextBtn" onclick="nextStep()">Next Step</button>
+        <button class="btn btn-play"  id="playBtn" onclick="autoPlay()">Auto-play</button>
+        <button class="btn btn-reset" onclick="reset()">Reset</button>
+      </div>
+    </div>
+
+    <!-- Summary (revealed on completion) -->
+    <div class="summary" id="summary">
+      <div class="sum-head" id="sumHead"></div>
+      <div class="sum-body" id="sumBody"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var NAMES = ['Alice','Bob','Carol','Dave','Eve','Frank','Grace','Hank'];
+
+  var mode      = 'naive';
+  var steps     = [];
+  var stepIdx   = 0;
+  var dbCount   = 0;
+  var playTimer = null;
+
+  var slider    = document.getElementById('slider');
+  var nLabel    = document.getElementById('nLabel');
+  var execTitle = document.getElementById('execTitle');
+  var wrap      = document.getElementById('stepsWrap');
+  var dbChip    = document.getElementById('dbChip');
+  var nextBtn   = document.getElementById('nextBtn');
+  var playBtn   = document.getElementById('playBtn');
+  var summaryEl = document.getElementById('summary');
+  var sumHead   = document.getElementById('sumHead');
+  var sumBody   = document.getElementById('sumBody');
+
+  slider.addEventListener('input', function () {
+    nLabel.textContent = slider.value;
+    reset();
+  });
+
+  function setMode(m) {
+    mode = m;
+    document.getElementById('naiveBtn').classList.toggle('active', m === 'naive');
+    document.getElementById('batchedBtn').classList.toggle('active', m === 'batched');
+    execTitle.textContent = m === 'naive'
+      ? 'Naive resolver'
+      : 'Batched resolver (DataLoader)';
+    reset();
+  }
+
+  function buildSteps() {
+    var n = parseInt(slider.value, 10);
+    var names = NAMES.slice(0, n);
+    var s = [];
+
+    // Step 1 is always the same: fetch the author list
+    s.push({
+      badge: 'DB #1', badgeClass: 'badge-blue',
+      desc:  'authors resolver — fetches all authors',
+      sql:   'SELECT id, name FROM authors',
+      isDB:  true
+    });
+
+    if (mode === 'naive') {
+      // One DB hit per author
+      names.forEach(function (name, i) {
+        s.push({
+          badge: 'DB #' + (i + 2), badgeClass: 'badge-orange',
+          desc:  'books resolver fires for "' + name + '"',
+          sql:   'SELECT title FROM books WHERE author_id = ' + (i + 1),
+          isDB:  true
+        });
+      });
+    } else {
+      // DataLoader pattern
+      s.push({
+        badge: 'batch', badgeClass: 'badge-purple',
+        desc:  'DataLoader collects all book-lookup requests',
+        sql:   'queued ids: [ ' + names.map(function (_, i) { return (i + 1); }).join(', ') + ' ]',
+        isDB:  false
+      });
+      s.push({
+        badge: 'DB #2', badgeClass: 'badge-green',
+        desc:  'DataLoader dispatches one batched query',
+        sql:   'SELECT title, author_id FROM books\nWHERE author_id IN (' +
+               names.map(function (_, i) { return (i + 1); }).join(', ') + ')',
+        isDB:  true
+      });
+    }
+    return s;
+  }
+
+  function reset() {
+    clearAuto();
+    steps   = buildSteps();
+    stepIdx = 0;
+    dbCount = 0;
+    wrap.innerHTML = '<div class="empty-msg" id="emptyMsg">Press "Next Step" to begin execution</div>';
+    updateChip(0);
+    nextBtn.disabled = false;
+    playBtn.disabled = false;
+    playBtn.textContent = 'Auto-play';
+    summaryEl.className = 'summary';
+  }
+
+  function updateChip(n) {
+    dbChip.textContent = n;
+    if      (n === 0) dbChip.className = 'db-chip zero';
+    else if (n <= 2)  dbChip.className = 'db-chip good';
+    else if (n <= 4)  dbChip.className = 'db-chip warn';
+    else              dbChip.className = 'db-chip bad';
+  }
+
+  function nextStep() {
+    if (stepIdx >= steps.length) return;
+
+    var emptyMsg = document.getElementById('emptyMsg');
+    if (emptyMsg) emptyMsg.remove();
+
+    var s = steps[stepIdx++];
+
+    if (s.isDB) {
+      dbCount++;
+      updateChip(dbCount);
+    }
+
+    var div = document.createElement('div');
+    div.className = 'step';
+
+    var badge = document.createElement('span');
+    badge.className = 'step-badge ' + s.badgeClass;
+    badge.textContent = s.badge;
+
+    var body = document.createElement('div');
+    body.className = 'step-body';
+
+    var desc = document.createElement('div');
+    desc.className = 'step-desc';
+    desc.textContent = s.desc;
+
+    var sql = document.createElement('div');
+    sql.className = 'step-sql';
+    sql.textContent = s.sql;
+
+    body.appendChild(desc);
+    body.appendChild(sql);
+    div.appendChild(badge);
+    div.appendChild(body);
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+
+    if (stepIdx >= steps.length) {
+      nextBtn.disabled = true;
+      clearAuto();
+      playBtn.disabled = true;
+      playBtn.textContent = 'Auto-play';
+      showSummary();
+    }
+  }
+
+  function autoPlay() {
+    if (playTimer) {
+      clearAuto();
+      return;
+    }
+    playBtn.textContent = 'Pause';
+    playTimer = setInterval(function () {
+      if (stepIdx >= steps.length) { clearAuto(); return; }
+      nextStep();
+    }, 700);
+  }
+
+  function clearAuto() {
+    if (playTimer) { clearInterval(playTimer); playTimer = null; }
+    if (playBtn)   playBtn.textContent = 'Auto-play';
+  }
+
+  function showSummary() {
+    var n = parseInt(slider.value, 10);
+    if (mode === 'naive') {
+      sumHead.className   = 'sum-head red';
+      sumHead.textContent = 'N+1 problem: ' + dbCount + ' DB queries for ' + n + ' authors';
+      sumBody.textContent = '1 query to fetch all ' + n + ' authors, then 1 query per author '
+        + 'for their books — ' + dbCount + ' total. With 100 authors that is 101 queries. '
+        + 'Database load grows linearly with N.';
+      summaryEl.className = 'summary naive-sum show';
+    } else {
+      sumHead.className   = 'sum-head green';
+      sumHead.textContent = 'Batched: 2 DB queries regardless of how many authors';
+      sumBody.textContent = 'DataLoader collected all ' + n + ' book-lookup requests and fired '
+        + 'a single IN (...) query. The total stays at 2 even with 100 or 1 000 authors.';
+      summaryEl.className = 'summary batch-sum show';
+    }
+  }
+
+  // Expose to global scope for inline onclick handlers
+  window.setMode  = setMode;
+  window.nextStep = nextStep;
+  window.autoPlay = autoPlay;
+  window.reset    = reset;
+
+  // Initialise
+  reset();
+}());
+</script>
+</body>
+</html>

@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirming a Bottleneck with Telemetry</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.3;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* Progress bar */
+    .progress-bar {
+      display: flex;
+      gap: 4px;
+      padding: 16px 24px 0;
+    }
+
+    .progress-pip {
+      height: 4px;
+      flex: 1;
+      border-radius: 2px;
+      background: rgba(0,0,0,0.12);
+      transition: background 0.3s;
+    }
+
+    .progress-pip.active {
+      background: #1878DC;
+    }
+
+    .progress-pip.done {
+      background: #328F51;
+    }
+
+    /* Scenario area */
+    .scenario {
+      padding: 20px 24px 0;
+    }
+
+    .scenario-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 12px;
+    }
+
+    .claim-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .claim-eyebrow {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 8px;
+    }
+
+    .claim-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.45;
+    }
+
+    .signals-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 12px;
+    }
+
+    .signals-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Signal chips */
+    .signal-chip {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.45;
+      text-align: left;
+      width: 100%;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+      user-select: none;
+    }
+
+    .signal-chip:hover:not(:disabled) {
+      border-color: rgba(0,0,0,0.28);
+      background: #F7F6F4;
+    }
+
+    .signal-chip.selected {
+      border-color: #1878DC;
+      background: #EBF3FD;
+      box-shadow: 0 0 0.5px 0 rgba(24,120,220,0.40), 0 1px 3px 0 rgba(24,120,220,0.20);
+    }
+
+    .signal-chip.correct {
+      border-color: #328F51;
+      background: #EBF6EE;
+      cursor: default;
+      box-shadow: 0 0 0.5px 0 rgba(50,143,81,0.40), 0 1px 3px 0 rgba(50,143,81,0.20);
+    }
+
+    .signal-chip.wrong {
+      border-color: #DE4C45;
+      background: #FDEBEA;
+      cursor: default;
+      box-shadow: 0 0 0.5px 0 rgba(222,76,69,0.40), 0 1px 3px 0 rgba(222,76,69,0.20);
+    }
+
+    .signal-chip.missed {
+      border-color: #F48E00;
+      background: #FEF5E6;
+      cursor: default;
+      box-shadow: 0 0 0.5px 0 rgba(244,142,0,0.40), 0 1px 3px 0 rgba(244,142,0,0.20);
+    }
+
+    .signal-chip.neutral-after {
+      cursor: default;
+      opacity: 0.55;
+    }
+
+    .chip-indicator {
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,0.20);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 2px;
+      transition: all 0.15s;
+      background: transparent;
+    }
+
+    .signal-chip.selected .chip-indicator {
+      background: #1878DC;
+      border-color: #1878DC;
+    }
+
+    .signal-chip.correct .chip-indicator {
+      background: #328F51;
+      border-color: #328F51;
+    }
+
+    .signal-chip.wrong .chip-indicator {
+      background: #DE4C45;
+      border-color: #DE4C45;
+    }
+
+    .signal-chip.missed .chip-indicator {
+      background: #F48E00;
+      border-color: #F48E00;
+    }
+
+    .chip-indicator svg {
+      display: none;
+    }
+
+    .signal-chip.selected .chip-indicator svg,
+    .signal-chip.correct .chip-indicator svg,
+    .signal-chip.wrong .chip-indicator svg,
+    .signal-chip.missed .chip-indicator svg {
+      display: block;
+    }
+
+    .chip-text {
+      flex: 1;
+    }
+
+    /* Feedback */
+    .feedback {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 16px;
+      line-height: 1.5;
+      display: none;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.f-perfect {
+      background: #EBF6EE;
+      color: #1A5530;
+      border: 1px solid rgba(50, 143, 81, 0.25);
+    }
+
+    .feedback.f-partial {
+      background: #FEF5E6;
+      color: #7A4500;
+      border: 1px solid rgba(244, 142, 0, 0.25);
+    }
+
+    /* Legend */
+    .legend {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 0 24px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Actions */
+    .actions {
+      padding: 16px 24px 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+      line-height: 1;
+    }
+
+    .btn:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background: #1A1A1A;
+      color: #FFFFFF;
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.30;
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(0,0,0,0.14);
+    }
+
+    .btn-ghost:hover {
+      border-color: rgba(0,0,0,0.28);
+      color: #1A1A1A;
+    }
+
+    .step-counter {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.40);
+      margin-left: auto;
+    }
+
+    /* Complete screen */
+    .complete-screen {
+      display: none;
+      padding: 40px 24px 36px;
+    }
+
+    .complete-screen.show {
+      display: block;
+    }
+
+    .complete-check {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .complete-check.green { background: #EBF6EE; }
+    .complete-check.orange { background: #FEF5E6; }
+    .complete-check.red { background: #FDEBEA; }
+
+    .complete-title {
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: 8px;
+    }
+
+    .score-badge {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 28px;
+      margin: 12px 0;
+      display: block;
+    }
+
+    .complete-sub {
+      font-size: 16px;
+      color: rgba(0,0,0,0.55);
+      line-height: 1.55;
+      max-width: 540px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 480px) {
+      .hint-header {
+        padding: 16px 16px 12px;
+        font-size: 16px;
+      }
+      .progress-bar {
+        padding: 12px 16px 0;
+      }
+      .scenario {
+        padding: 16px 16px 0;
+      }
+      .actions {
+        padding: 12px 16px 20px;
+      }
+      .legend {
+        padding: 0 16px;
+      }
+      .complete-screen {
+        padding: 32px 16px 28px;
+      }
+      .signal-chip {
+        font-size: 15px;
+      }
+      .step-counter {
+        margin-left: 0;
+        order: -1;
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 325px) {
+      .hint-header { font-size: 15px; }
+      .claim-text { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Select every signal that confirms the bottleneck claim
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-pip" id="pip-0"></div>
+    <div class="progress-pip" id="pip-1"></div>
+    <div class="progress-pip" id="pip-2"></div>
+  </div>
+
+  <!-- Scenario -->
+  <div class="scenario" id="scenarioArea">
+    <div class="scenario-label" id="scenarioLabel"></div>
+    <div class="claim-card">
+      <div class="claim-eyebrow">Bottleneck claim</div>
+      <div class="claim-text" id="claimText"></div>
+    </div>
+    <div class="signals-label">Which telemetry signals confirm this claim? Select all that apply.</div>
+    <div class="signals-grid" id="signalsGrid"></div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <!-- Legend (shown after check) -->
+  <div class="legend" id="legend" style="display:none;">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#328F51;"></div>
+      Correctly selected
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#F48E00;"></div>
+      Missed
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#DE4C45;"></div>
+      Wrongly selected
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions" id="actionsArea">
+    <button class="btn btn-primary" id="checkBtn" onclick="checkAnswers()" disabled>Check</button>
+    <button class="btn btn-ghost" id="nextBtn" style="display:none;" onclick="advance()">Next scenario →</button>
+    <span class="step-counter" id="stepCounter">0 selected</span>
+  </div>
+
+  <!-- Complete screen -->
+  <div class="complete-screen" id="completeScreen">
+    <div class="complete-check" id="completeCheck">
+      <!-- SVG injected by JS -->
+    </div>
+    <div class="complete-title">All three scenarios complete</div>
+    <span class="score-badge" id="scoreBadge"></span>
+    <p class="complete-sub" id="completeSub"></p>
+    <button class="btn btn-ghost" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+
+<script>
+  const CHECK_SVG = {
+    green: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M5 11L9 15L17 7" stroke="#328F51" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    orange: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 7V11M11 15H11.01" stroke="#F48E00" stroke-width="2" stroke-linecap="round"/></svg>`,
+    red: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M7 7L15 15M15 7L7 15" stroke="#DE4C45" stroke-width="2" stroke-linecap="round"/></svg>`
+  };
+
+  const CHIP_ICONS = {
+    selected: `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.8 7L9 1" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    correct:  `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.8 7L9 1" stroke="white" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    wrong:    `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 2L8 8M8 2L2 8" stroke="white" stroke-width="1.75" stroke-linecap="round"/></svg>`,
+    missed:   `<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2V5.5M5 8H5.01" stroke="white" stroke-width="1.75" stroke-linecap="round"/></svg>`
+  };
+
+  const scenarios = [
+    {
+      claim: "The database is the bottleneck — it is the first component to reach its limit as load grows.",
+      signals: [
+        { text: "Connection pool usage is approaching its configured maximum", confirms: true },
+        { text: "Query latency rises in step with increasing request volume", confirms: true },
+        { text: "Traces show requests spending most of their elapsed time waiting inside the database", confirms: true },
+        { text: "CPU usage on service instances is near its ceiling", confirms: false },
+        { text: "Timeout rate on calls to an external API is climbing under load", confirms: false }
+      ]
+    },
+    {
+      claim: "The service tier saturates before the database or any downstream dependency — it is the first component to give out.",
+      signals: [
+        { text: "CPU usage on service instances is near or at its ceiling", confirms: true },
+        { text: "The request queue on the service is growing as load increases", confirms: true },
+        { text: "Latency is rising while database query times and downstream services stay healthy", confirms: true },
+        { text: "Database connection pool is approaching its maximum", confirms: false },
+        { text: "Traces show long spans on external API calls", confirms: false }
+      ]
+    },
+    {
+      claim: "A downstream external service is the constraint — it limits throughput before any internal component reaches its limit.",
+      signals: [
+        { text: "Traces show unusually long spans on the external service call", confirms: true },
+        { text: "Error and timeout rates for that external dependency are rising under load", confirms: true },
+        { text: "Retries to the external service are accumulating", confirms: true },
+        { text: "Database query latency is rising with load", confirms: false },
+        { text: "Service instance CPU is near its ceiling", confirms: false }
+      ]
+    }
+  ];
+
+  let currentIndex = 0;
+  let selected = new Set();
+  let checked = false;
+  let scores = [];
+  let shuffledSignals = [];
+
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function render() {
+    const s = scenarios[currentIndex];
+    shuffledSignals = shuffle(s.signals);
+    selected = new Set();
+    checked = false;
+
+    document.getElementById('scenarioLabel').textContent = `Scenario ${currentIndex + 1} of ${scenarios.length}`;
+    document.getElementById('claimText').textContent = s.claim;
+
+    for (let i = 0; i < scenarios.length; i++) {
+      const pip = document.getElementById(`pip-${i}`);
+      pip.className = 'progress-pip' +
+        (i < currentIndex ? ' done' : i === currentIndex ? ' active' : '');
+    }
+
+    const grid = document.getElementById('signalsGrid');
+    grid.innerHTML = '';
+    shuffledSignals.forEach((sig, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'signal-chip';
+      btn.setAttribute('data-idx', i);
+      btn.addEventListener('click', () => toggleSignal(i));
+      btn.innerHTML = `
+        <div class="chip-indicator"></div>
+        <div class="chip-text">${sig.text}</div>
+      `;
+      grid.appendChild(btn);
+    });
+
+    const fb = document.getElementById('feedback');
+    fb.className = 'feedback';
+    fb.textContent = '';
+
+    document.getElementById('legend').style.display = 'none';
+
+    document.getElementById('checkBtn').style.display = 'inline-block';
+    document.getElementById('checkBtn').disabled = true;
+    document.getElementById('nextBtn').style.display = 'none';
+    document.getElementById('stepCounter').textContent = '0 selected';
+
+    document.getElementById('scenarioArea').style.display = '';
+    document.getElementById('actionsArea').style.display = '';
+    document.getElementById('progressBar').style.display = '';
+  }
+
+  function toggleSignal(i) {
+    if (checked) return;
+    if (selected.has(i)) {
+      selected.delete(i);
+    } else {
+      selected.add(i);
+    }
+    const chip = document.querySelector(`[data-idx="${i}"]`);
+    const indicator = chip.querySelector('.chip-indicator');
+    if (selected.has(i)) {
+      chip.className = 'signal-chip selected';
+      indicator.innerHTML = CHIP_ICONS.selected;
+    } else {
+      chip.className = 'signal-chip';
+      indicator.innerHTML = '';
+    }
+    const count = selected.size;
+    document.getElementById('stepCounter').textContent =
+      count === 0 ? '0 selected' : count === 1 ? '1 selected' : `${count} selected`;
+    document.getElementById('checkBtn').disabled = (count === 0);
+  }
+
+  function checkAnswers() {
+    checked = true;
+
+    let correctHits = 0;
+    const totalConfirming = shuffledSignals.filter(s => s.confirms).length;
+
+    shuffledSignals.forEach((sig, i) => {
+      const chip = document.querySelector(`[data-idx="${i}"]`);
+      const indicator = chip.querySelector('.chip-indicator');
+      if (sig.confirms && selected.has(i)) {
+        chip.className = 'signal-chip correct';
+        indicator.innerHTML = CHIP_ICONS.correct;
+        correctHits++;
+      } else if (!sig.confirms && selected.has(i)) {
+        chip.className = 'signal-chip wrong';
+        indicator.innerHTML = CHIP_ICONS.wrong;
+      } else if (sig.confirms && !selected.has(i)) {
+        chip.className = 'signal-chip missed';
+        indicator.innerHTML = CHIP_ICONS.missed;
+      } else {
+        chip.className = 'signal-chip neutral-after';
+        indicator.innerHTML = '';
+      }
+    });
+
+    const missed = totalConfirming - correctHits;
+    const wrongSel = selected.size - correctHits;
+    scores.push({ correct: correctHits, total: totalConfirming });
+
+    const fb = document.getElementById('feedback');
+    const perfect = (correctHits === totalConfirming && wrongSel === 0);
+
+    if (perfect) {
+      fb.className = 'feedback show f-perfect';
+      fb.textContent = `All ${totalConfirming} confirming signals identified with no false positives. That is what a well-supported bottleneck finding looks like.`;
+    } else {
+      let parts = [];
+      if (missed > 0) parts.push(`${missed} confirming signal${missed > 1 ? 's' : ''} missed`);
+      if (wrongSel > 0) parts.push(`${wrongSel} non-confirming signal${wrongSel > 1 ? 's' : ''} selected`);
+      fb.className = 'feedback show f-partial';
+      fb.textContent = parts.join(' and ') + '. Each bottleneck type has specific confirming signals — the key is that they must point to the claimed component reaching its limit, not to a different component.';
+    }
+
+    document.getElementById('legend').style.display = 'flex';
+    document.getElementById('checkBtn').style.display = 'none';
+
+    const nextBtn = document.getElementById('nextBtn');
+    if (currentIndex < scenarios.length - 1) {
+      nextBtn.textContent = 'Next scenario →';
+    } else {
+      nextBtn.textContent = 'See results →';
+    }
+    nextBtn.style.display = 'inline-block';
+  }
+
+  function advance() {
+    if (currentIndex < scenarios.length - 1) {
+      currentIndex++;
+      render();
+    } else {
+      showComplete();
+    }
+  }
+
+  function showComplete() {
+    document.getElementById('scenarioArea').style.display = 'none';
+    document.getElementById('actionsArea').style.display = 'none';
+    document.getElementById('progressBar').style.display = 'none';
+    document.getElementById('legend').style.display = 'none';
+
+    const totalCorrect = scores.reduce((sum, s) => sum + s.correct, 0);
+    const totalPossible = scores.reduce((sum, s) => sum + s.total, 0);
+    const pct = Math.round(totalCorrect / totalPossible * 100);
+
+    const badge = document.getElementById('scoreBadge');
+    const sub = document.getElementById('completeSub');
+    const check = document.getElementById('completeCheck');
+
+    badge.textContent = `${totalCorrect} / ${totalPossible} signals correct`;
+
+    if (pct === 100) {
+      badge.style.color = '#328F51';
+      check.className = 'complete-check green';
+      check.innerHTML = CHECK_SVG.green;
+      sub.textContent = 'Every confirming signal identified across all three scenarios with no false positives. You can match a bottleneck claim to its specific telemetry evidence — the core skill for the Sprint 2 analysis.';
+    } else if (pct >= 67) {
+      badge.style.color = '#F48E00';
+      check.className = 'complete-check orange';
+      check.innerHTML = CHECK_SVG.orange;
+      sub.textContent = 'Solid. The key to avoiding errors: confirming signals must be specific to the component in question. A claim that the database is the bottleneck needs database signals — not generic indicators that the system is slow.';
+    } else {
+      badge.style.color = '#DE4C45';
+      check.className = 'complete-check red';
+      check.innerHTML = CHECK_SVG.red;
+      sub.textContent = 'Each bottleneck component — database, service tier, external dependency — has a distinct signal set. Review the table in the lesson and try again. A finding without matching telemetry is just a guess.';
+    }
+
+    document.getElementById('completeScreen').className = 'complete-screen show';
+  }
+
+  function restart() {
+    currentIndex = 0;
+    scores = [];
+    document.getElementById('completeScreen').className = 'complete-screen';
+    render();
+  }
+
+  render();
+</script>
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 — Cache Stampede</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  background: #fff;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+}
+
+@keyframes cursor-wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+}
+
+.hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 12px;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.hint-cursor {
+  animation: cursor-wiggle 4s ease-in-out infinite;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.mode-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  font-family: inherit;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.mode-btn:hover:not(.active) {
+  background: #e8e7e4;
+  color: #1A1A1A;
+}
+
+.mode-btn.active {
+  background: #1878DC;
+  color: #fff;
+  border-color: #1878DC;
+}
+
+.scene-card {
+  margin: 0 16px;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.scene {
+  position: relative;
+  width: 100%;
+  height: 308px;
+  background: #F2F1EE;
+}
+
+.scene svg.arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.req-node {
+  position: absolute;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+}
+
+.req-chip {
+  width: 56px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 2px 0 rgba(0,0,0,0.10);
+  transition: background 0.25s, border-color 0.25s, color 0.25s;
+  user-select: none;
+}
+
+.infra-node {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.redis-node { top: 112px; }
+.db-node    { top: 220px; }
+
+.infra-chip {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.12);
+  transition: background 0.25s, border-color 0.25s;
+  min-width: 100px;
+  user-select: none;
+}
+
+.node-lbl {
+  font-size: 11px;
+  color: rgba(0,0,0,0.40);
+  text-align: center;
+  transition: color 0.25s;
+  white-space: nowrap;
+}
+
+.status-bar {
+  background: #fff;
+  border-top: 1px solid rgba(0,0,0,0.10);
+  padding: 12px 16px 14px;
+}
+
+.step-lbl {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.40);
+  margin-bottom: 4px;
+}
+
+.step-desc {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #1A1A1A;
+  min-height: 52px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 16px;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.2s;
+}
+
+.dot.on { background: #1878DC; }
+
+.ctrl-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1A1A1A;
+  cursor: pointer;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 2px 0 rgba(0,0,0,0.10);
+  transition: background 0.12s;
+}
+
+.ctrl-btn:hover:not(:disabled) { background: #F2F1EE; }
+
+.ctrl-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  box-shadow: none;
+}
+
+.ctrl-btn.primary {
+  background: #1878DC;
+  color: #fff;
+  border-color: #1878DC;
+}
+
+.ctrl-btn.primary:hover:not(:disabled) { background: #1568c4; }
+
+@media (max-width: 420px) {
+  .req-chip   { width: 44px; font-size: 10px; }
+  .infra-chip { min-width: 80px; padding: 0 12px; font-size: 13px; }
+  .hint-bar   { font-size: 16px; }
+  .step-desc  { font-size: 14px; }
+  .mode-btn   { font-size: 13px; padding: 8px 12px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-bar">
+    <span class="hint-cursor">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Toggle a protection mode, then step through what happens when the TTL expires.
+  </div>
+
+  <div class="mode-row">
+    <button class="mode-btn active" id="btn-unprotected" onclick="setMode('unprotected')">Without protection</button>
+    <button class="mode-btn"        id="btn-protected"   onclick="setMode('protected')">With single-flight lock</button>
+  </div>
+
+  <div class="scene-card">
+    <div class="scene" id="scene">
+
+      <!-- 4 request chips -->
+      <div class="req-node" style="left:10%">
+        <div class="req-chip" id="chip-r1">Req 1</div>
+      </div>
+      <div class="req-node" style="left:35%">
+        <div class="req-chip" id="chip-r2">Req 2</div>
+      </div>
+      <div class="req-node" style="left:65%">
+        <div class="req-chip" id="chip-r3">Req 3</div>
+      </div>
+      <div class="req-node" style="left:90%">
+        <div class="req-chip" id="chip-r4">Req 4</div>
+      </div>
+
+      <!-- Redis -->
+      <div class="infra-node redis-node">
+        <div class="infra-chip" id="chip-redis">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect width="16" height="16" rx="3" fill="#D35722"/>
+            <text x="3" y="12" font-size="10" fill="white" font-family="monospace" font-weight="bold">R</text>
+          </svg>
+          <span>Redis</span>
+        </div>
+        <div class="node-lbl" id="redis-lbl">hot key cached</div>
+      </div>
+
+      <!-- Database -->
+      <div class="infra-node db-node">
+        <div class="infra-chip" id="chip-db">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect width="16" height="16" rx="3" fill="#1878DC"/>
+            <text x="1.5" y="12" font-size="9" fill="white" font-family="monospace" font-weight="bold">DB</text>
+          </svg>
+          <span>Database</span>
+        </div>
+        <div class="node-lbl" id="db-lbl">idle</div>
+      </div>
+
+      <svg class="arrows" id="arrows-svg" aria-hidden="true"></svg>
+    </div>
+
+    <div class="status-bar">
+      <div class="step-lbl" id="step-lbl">Step 1 of 5</div>
+      <div class="step-desc" id="step-desc"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn"         id="btn-back" onclick="prevStep()" disabled>&#8592; Back</button>
+    <div class="dots" id="dots"></div>
+    <button class="ctrl-btn primary" id="btn-next" onclick="nextStep()">Next &#8594;</button>
+  </div>
+
+</div>
+<script>
+'use strict';
+
+let mode = 'unprotected';
+let step = 0;
+const N = 5;
+
+// ── Data ───────────────────────────────────────────────────────────────────
+
+const STEPS = [
+  {
+    desc: {
+      unprotected: 'The hot key is cached with a 60-second TTL. All four requests get fast hits from Redis — the database is barely touched.',
+      protected:   'The hot key is cached with a 60-second TTL. All four requests get fast hits from Redis — the database is barely touched.'
+    },
+    redis: { state: 'warm',  label: 'hot key cached' },
+    db:    { state: 'idle',  label: 'idle' },
+    chips: {},
+    arrows: {
+      unprotected: [
+        { f:'r1', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r2', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r3', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r4', t:'redis', color:'#328F51', tag:'HIT' }
+      ],
+      protected: [
+        { f:'r1', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r2', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r3', t:'redis', color:'#328F51', tag:'HIT' },
+        { f:'r4', t:'redis', color:'#328F51', tag:'HIT' }
+      ]
+    }
+  },
+  {
+    desc: {
+      unprotected: 'The 60-second TTL expires and the key is evicted from Redis. Four requests are about to arrive at the same instant.',
+      protected:   'The 60-second TTL expires and the key is evicted from Redis. Four requests are about to arrive at the same instant.'
+    },
+    redis: { state: 'empty', label: 'key evicted' },
+    db:    { state: 'idle',  label: 'idle' },
+    chips: {},
+    arrows: { unprotected: [], protected: [] }
+  },
+  {
+    desc: {
+      unprotected: 'Four concurrent requests arrive and all find the key missing — four cache misses in the same instant.',
+      protected:   'Four concurrent requests arrive and all find the key missing — four cache misses in the same instant.'
+    },
+    redis: { state: 'empty', label: 'key evicted' },
+    db:    { state: 'idle',  label: 'idle' },
+    chips: {},
+    arrows: {
+      unprotected: [
+        { f:'r1', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r2', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r3', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r4', t:'redis', color:'#DE4C45', tag:'MISS' }
+      ],
+      protected: [
+        { f:'r1', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r2', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r3', t:'redis', color:'#DE4C45', tag:'MISS' },
+        { f:'r4', t:'redis', color:'#DE4C45', tag:'MISS' }
+      ]
+    }
+  },
+  {
+    desc: {
+      unprotected: 'Without protection, all four immediately query the database with identical expensive requests — four times the load in the same moment.',
+      protected:   'Req 1 wins a Redis lock and goes to the database. Requests 2–4 see the lock is held and wait at Redis — they do not touch the DB at all.'
+    },
+    redis: {
+      unprotected: { state: 'empty', label: 'key evicted' },
+      protected:   { state: 'lock',  label: 'lock held by Req 1' }
+    },
+    db: {
+      unprotected: { state: 'stressed', label: '4 queries!' },
+      protected:   { state: 'active',   label: '1 query (Req 1)' }
+    },
+    chips: {
+      unprotected: {},
+      protected: { r1: 'blue', r2: 'orange', r3: 'orange', r4: 'orange' }
+    },
+    arrows: {
+      unprotected: [
+        { f:'r1', t:'db', color:'#DE4C45', tag:'query' },
+        { f:'r2', t:'db', color:'#DE4C45', tag:'query' },
+        { f:'r3', t:'db', color:'#DE4C45', tag:'query' },
+        { f:'r4', t:'db', color:'#DE4C45', tag:'query' }
+      ],
+      protected: [
+        { f:'r1', t:'db',    color:'#1878DC', tag:'lock ✓', bold: true },
+        { f:'r2', t:'redis', color:'#F48E00', tag:'wait', dash: true },
+        { f:'r3', t:'redis', color:'#F48E00', tag:'wait', dash: true },
+        { f:'r4', t:'redis', color:'#F48E00', tag:'wait', dash: true }
+      ]
+    }
+  },
+  {
+    desc: {
+      unprotected: 'The database absorbs four identical expensive queries simultaneously. Under load this overwhelms it — the stampede. The cache meant to protect the DB has endangered it.',
+      protected:   'Req 1 writes the rebuilt value to Redis. Requests 2–4 read it as cache hits. The database saw exactly one query. One rebuild instead of four.'
+    },
+    redis: {
+      unprotected: { state: 'empty', label: 'still empty' },
+      protected:   { state: 'warm',  label: 'key rebuilt' }
+    },
+    db: {
+      unprotected: { state: 'stressed', label: 'overloaded!' },
+      protected:   { state: 'idle',     label: 'idle again' }
+    },
+    chips: {
+      unprotected: { r1: 'red', r2: 'red', r3: 'red', r4: 'red' },
+      protected:   { r1: 'blue', r2: 'green', r3: 'green', r4: 'green' }
+    },
+    arrows: {
+      unprotected: [
+        { f:'db', t:'r1', color:'#DE4C45', tag:'slow' },
+        { f:'db', t:'r2', color:'#DE4C45', tag:'slow' },
+        { f:'db', t:'r3', color:'#DE4C45', tag:'slow' },
+        { f:'db', t:'r4', color:'#DE4C45', tag:'slow' }
+      ],
+      protected: [
+        { f:'db',    t:'redis', color:'#1878DC', tag:'write' },
+        { f:'redis', t:'r2',   color:'#328F51', tag:'HIT' },
+        { f:'redis', t:'r3',   color:'#328F51', tag:'HIT' },
+        { f:'redis', t:'r4',   color:'#328F51', tag:'HIT' }
+      ]
+    }
+  }
+];
+
+const CHIP_PALETTE = {
+  blue:   { bg: '#EBF3FF', border: '#1878DC', color: '#1878DC' },
+  orange: { bg: '#FFF9EC', border: '#F48E00', color: '#F48E00' },
+  green:  { bg: '#EDFAF2', border: '#328F51', color: '#328F51' },
+  red:    { bg: '#FFF0F0', border: '#DE4C45', color: '#DE4C45' }
+};
+
+const REDIS_STYLE = {
+  warm:  { bg: '#fff',    border: '#328F51',          lc: 'rgba(0,0,0,0.40)' },
+  empty: { bg: '#F2F1EE', border: 'rgba(0,0,0,0.14)', lc: 'rgba(0,0,0,0.40)' },
+  lock:  { bg: '#FFF9EC', border: '#F48E00',           lc: '#F48E00' }
+};
+
+const DB_STYLE = {
+  idle:     { bg: '#fff',    border: 'rgba(0,0,0,0.14)', lc: 'rgba(0,0,0,0.40)' },
+  active:   { bg: '#EBF3FF', border: '#1878DC',           lc: '#1878DC' },
+  stressed: { bg: '#FFF0F0', border: '#DE4C45',           lc: '#DE4C45' }
+};
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function modeVal(obj) {
+  if (obj && (obj.unprotected !== undefined || obj.protected !== undefined)) {
+    return obj[mode] || {};
+  }
+  return obj || {};
+}
+
+function chipCenter(id) {
+  const el = document.getElementById('chip-' + id);
+  if (!el) return null;
+  const scene = document.getElementById('scene');
+  const sr = scene.getBoundingClientRect();
+  const er = el.getBoundingClientRect();
+  return {
+    x: er.left - sr.left + er.width  / 2,
+    y: er.top  - sr.top  + er.height / 2,
+    hw: er.width  / 2,
+    hh: er.height / 2
+  };
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function drawArrow(svg, f, t, color, tag, dash, bold) {
+  const fc = chipCenter(f);
+  const tc = chipCenter(t);
+  if (!fc || !tc) return;
+
+  const dx = tc.x - fc.x, dy = tc.y - fc.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = dx / len, ny = dy / len;
+
+  const horizontal = Math.abs(nx) >= Math.abs(ny);
+  const fGap = (horizontal ? fc.hw : fc.hh) + 3;
+  const tGap = (horizontal ? tc.hw : tc.hh) + 10;
+
+  const x1 = fc.x + nx * fGap, y1 = fc.y + ny * fGap;
+  const x2 = tc.x - nx * tGap, y2 = tc.y - ny * tGap;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+
+  let defs = svg.querySelector('defs');
+  if (!defs) {
+    defs = document.createElementNS(SVG_NS, 'defs');
+    svg.appendChild(defs);
+  }
+
+  const mId = 'mk-' + f + '-' + t;
+  let mk = defs.querySelector('#' + mId);
+  if (!mk) {
+    mk = document.createElementNS(SVG_NS, 'marker');
+    mk.setAttribute('id', mId);
+    mk.setAttribute('markerWidth', '8');
+    mk.setAttribute('markerHeight', '6');
+    mk.setAttribute('refX', '7');
+    mk.setAttribute('refY', '3');
+    mk.setAttribute('orient', 'auto');
+    const poly = document.createElementNS(SVG_NS, 'polygon');
+    poly.setAttribute('points', '0 0,8 3,0 6');
+    mk.appendChild(poly);
+    defs.appendChild(mk);
+  }
+  defs.querySelector('#' + mId + ' polygon').setAttribute('fill', color);
+
+  const line = document.createElementNS(SVG_NS, 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', bold ? '2.5' : '1.5');
+  if (dash) line.setAttribute('stroke-dasharray', '5 4');
+  line.setAttribute('marker-end', 'url(#' + mId + ')');
+  svg.appendChild(line);
+
+  if (tag) {
+    const tw = tag.length * 7.2 + 12;
+    const th = 16;
+    const bg = document.createElementNS(SVG_NS, 'rect');
+    bg.setAttribute('x', mx - tw / 2); bg.setAttribute('y', my - th / 2);
+    bg.setAttribute('width', tw);      bg.setAttribute('height', th);
+    bg.setAttribute('rx', '4');        bg.setAttribute('fill', '#F2F1EE');
+    svg.appendChild(bg);
+
+    const txt = document.createElementNS(SVG_NS, 'text');
+    txt.setAttribute('x', mx); txt.setAttribute('y', my);
+    txt.setAttribute('text-anchor', 'middle');
+    txt.setAttribute('dominant-baseline', 'middle');
+    txt.setAttribute('fill', color);
+    txt.setAttribute('font-size', '11');
+    txt.setAttribute('font-family', "'Suisse Intl Mono',monospace");
+    if (bold) txt.setAttribute('font-weight', '700');
+    txt.textContent = tag;
+    svg.appendChild(txt);
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+
+function render() {
+  const s = STEPS[step];
+
+  document.getElementById('step-lbl').textContent = 'Step ' + (step + 1) + ' of ' + N;
+  document.getElementById('step-desc').textContent = s.desc[mode] || '';
+
+  const dotsEl = document.getElementById('dots');
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < N; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === step ? ' on' : '');
+    dotsEl.appendChild(d);
+  }
+
+  document.getElementById('btn-back').disabled = (step === 0);
+  document.getElementById('btn-next').textContent = (step === N - 1) ? '↩ Restart' : 'Next →';
+
+  const ri = modeVal(s.redis);
+  const rs = REDIS_STYLE[ri.state] || REDIS_STYLE.empty;
+  const redisChip = document.getElementById('chip-redis');
+  redisChip.style.background  = rs.bg;
+  redisChip.style.borderColor = rs.border;
+  const redisLbl = document.getElementById('redis-lbl');
+  redisLbl.textContent = ri.label || '';
+  redisLbl.style.color = rs.lc;
+
+  const di = modeVal(s.db);
+  const ds = DB_STYLE[di.state] || DB_STYLE.idle;
+  const dbChip = document.getElementById('chip-db');
+  dbChip.style.background  = ds.bg;
+  dbChip.style.borderColor = ds.border;
+  const dbLbl = document.getElementById('db-lbl');
+  dbLbl.textContent = di.label || '';
+  dbLbl.style.color = ds.lc;
+
+  const chipMap = modeVal(s.chips) || {};
+  for (const id of ['r1', 'r2', 'r3', 'r4']) {
+    const chip = document.getElementById('chip-' + id);
+    const pal  = CHIP_PALETTE[chipMap[id]];
+    if (pal) {
+      chip.style.background  = pal.bg;
+      chip.style.borderColor = pal.border;
+      chip.style.color       = pal.color;
+    } else {
+      chip.style.background  = '#fff';
+      chip.style.borderColor = 'rgba(0,0,0,0.14)';
+      chip.style.color       = '#1A1A1A';
+    }
+  }
+
+  requestAnimationFrame(function() {
+    const svg = document.getElementById('arrows-svg');
+    svg.innerHTML = '';
+    const list = s.arrows[mode] || [];
+    for (const a of list) {
+      drawArrow(svg, a.f, a.t, a.color, a.tag, a.dash, a.bold);
+    }
+  });
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-unprotected').classList.toggle('active', m === 'unprotected');
+  document.getElementById('btn-protected').classList.toggle('active',   m === 'protected');
+  render();
+}
+
+function nextStep() {
+  step = (step < N - 1) ? step + 1 : 0;
+  render();
+}
+
+function prevStep() {
+  if (step > 0) { step--; render(); }
+}
+
+window.addEventListener('load', render);
+window.addEventListener('resize', render);
+</script>
+</body>
+</html>

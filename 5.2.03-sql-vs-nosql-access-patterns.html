@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL vs NoSQL: Match the Access Pattern</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* Progress */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px 0;
+    }
+
+    .progress-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .dot.active {
+      background: #1878DC;
+      transform: scale(1.25);
+    }
+
+    .dot.correct {
+      background: #328F51;
+    }
+
+    .dot.wrong {
+      background: #DE4C45;
+    }
+
+    .progress-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    /* Scenario */
+    .scenario-area {
+      padding: 20px 24px 24px;
+    }
+
+    .scenario-eyebrow {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.40);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .scenario-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .scenario-title {
+      font-size: 18px;
+      color: #1A1A1A;
+      margin-bottom: 14px;
+    }
+
+    .ap-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ap-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.45;
+    }
+
+    .ap-tag {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 4px;
+      padding: 2px 7px;
+      color: rgba(0,0,0,0.55);
+      white-space: nowrap;
+      flex-shrink: 0;
+      margin-top: 2px;
+      line-height: 1.6;
+    }
+
+    /* Store grid */
+    .store-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .store-btn {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      background: #FFFFFF;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.16s, background 0.16s, transform 0.1s, box-shadow 0.16s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .store-btn:hover:not(:disabled) {
+      border-color: #1878DC;
+      background: #F0F7FF;
+      transform: translateY(-1px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 3px 8px 0 rgba(24,120,220,0.18);
+    }
+
+    .store-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .store-btn:disabled {
+      cursor: default;
+    }
+
+    .store-btn.selected-correct {
+      border-color: #328F51;
+      background: #EEF9F2;
+    }
+
+    .store-btn.selected-wrong {
+      border-color: #DE4C45;
+      background: #FEF0F0;
+      opacity: 0.85;
+    }
+
+    .store-btn.reveal-correct {
+      border-color: #328F51;
+      background: #EEF9F2;
+    }
+
+    .store-btn.dimmed {
+      opacity: 0.4;
+    }
+
+    .store-icon {
+      font-size: 22px;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .store-name {
+      font-size: 15px;
+      color: #1A1A1A;
+      display: block;
+      margin-bottom: 4px;
+      line-height: 1.35;
+    }
+
+    .store-eg {
+      font-size: 12px;
+      color: rgba(0,0,0,0.45);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    /* Feedback */
+    .feedback {
+      display: none;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .feedback.show { display: block; }
+
+    .feedback.correct {
+      background: #EEF9F2;
+      border: 1.5px solid #328F51;
+    }
+
+    .feedback.wrong {
+      background: #FEF0F0;
+      border: 1.5px solid #DE4C45;
+    }
+
+    .feedback-verdict {
+      font-size: 15px;
+      font-family: 'Suisse Intl Mono', monospace;
+      margin-bottom: 6px;
+      color: #1A1A1A;
+    }
+
+    .feedback-verdict.v-correct { color: #328F51; }
+    .feedback-verdict.v-wrong   { color: #DE4C45; }
+
+    .feedback-body {
+      color: #1A1A1A;
+      font-size: 16px;
+    }
+
+    /* Next button */
+    .next-btn {
+      display: none;
+      width: 100%;
+      padding: 14px;
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      cursor: pointer;
+      transition: background 0.16s;
+    }
+
+    .next-btn.show { display: block; }
+
+    .next-btn:hover { background: #1262BA; }
+
+    /* Summary */
+    .summary {
+      display: none;
+      text-align: center;
+      padding: 40px 24px 48px;
+    }
+
+    .summary.show { display: block; }
+
+    .summary-score {
+      font-size: 52px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #1878DC;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+
+    .summary-heading {
+      font-size: 20px;
+      color: #1A1A1A;
+      margin-bottom: 12px;
+    }
+
+    .summary-msg {
+      font-size: 16px;
+      color: rgba(0,0,0,0.55);
+      max-width: 480px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    .restart-btn {
+      padding: 12px 28px;
+      background: #F2F1EE;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      font-size: 16px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.16s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.10);
+    }
+
+    .restart-btn:hover { background: #E5E4E1; }
+
+    @media (max-width: 500px) {
+      .hint-header  { padding: 12px 16px; }
+      .progress-row { padding: 16px 16px 0; }
+      .scenario-area { padding: 16px 16px 20px; }
+      .store-grid   { grid-template-columns: 1fr; gap: 8px; }
+    }
+
+    @media (max-width: 325px) {
+      .hint-text    { font-size: 15px; }
+      .scenario-title { font-size: 16px; }
+      .ap-item      { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Read the access pattern, then pick the best-fit store.</span>
+  </div>
+
+  <!-- Quiz area -->
+  <div id="quiz-area">
+    <div class="progress-row">
+      <div class="progress-dots" id="progress-dots"></div>
+      <span class="progress-label" id="progress-label">1 / 4</span>
+    </div>
+
+    <div class="scenario-area">
+      <div class="scenario-eyebrow">Access pattern</div>
+      <div class="scenario-card" id="scenario-card"></div>
+
+      <div class="store-grid" id="store-grid"></div>
+
+      <div class="feedback" id="feedback">
+        <div class="feedback-verdict" id="feedback-verdict"></div>
+        <div class="feedback-body" id="feedback-body"></div>
+      </div>
+
+      <button class="next-btn" id="next-btn">Next scenario &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summary">
+    <div class="summary-score" id="summary-score"></div>
+    <div class="summary-heading" id="summary-heading"></div>
+    <div class="summary-msg" id="summary-msg"></div>
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+
+<script>
+  const SCENARIOS = [
+    {
+      title: "Payments service",
+      patterns: [
+        { tag: "reads",       text: "Fetch a charge record together with its ledger entry and account balance" },
+        { tag: "writes",      text: "A charge, a ledger entry, and an account balance must all succeed together — or all roll back" },
+        { tag: "queries",     text: "Finance runs new ad-hoc reports every quarter, using columns in different combinations" },
+        { tag: "scale",       text: "Thousands of transactions per minute; one regional deployment" }
+      ],
+      correct: "sql",
+      explanation: {
+        right: "Correct. The access pattern needs transactions (all-or-nothing), consistency across related records, and flexible ad-hoc queries — all core SQL strengths. No specific pressure pushes away from relational here.",
+        wrong:  "This pattern needs transactions (all-or-nothing writes), consistency across related records, and ad-hoc reporting. Those are exactly what SQL is built for. Treat relational as the default when no specific pressure demands otherwise."
+      }
+    },
+    {
+      title: "User-profile cache",
+      patterns: [
+        { tag: "reads",       text: "Read a single profile by user ID — always one key in, one value out" },
+        { tag: "throughput",  text: "Hundreds of millions of reads per second across a global fleet" },
+        { tag: "writes",      text: "Overwrite the full profile value whenever the source of truth changes" },
+        { tag: "durability",  text: "Cache can be rebuilt from source of truth if lost; no financial records here" }
+      ],
+      correct: "kv",
+      explanation: {
+        right: "Correct. Single-key access at very high throughput with no joins or complex queries is exactly what a key-value store is built for. The store follows from how the data is used.",
+        wrong:  "The defining pressure is simple, high-throughput single-key lookup with no joins or ad-hoc queries. A key-value store is optimized for exactly this pattern — fast access by key with minimal overhead."
+      }
+    },
+    {
+      title: "E-commerce product catalog",
+      patterns: [
+        { tag: "reads",       text: "Fetch a single product by ID; occasionally filter by category" },
+        { tag: "shape",       text: "A laptop has CPU/RAM/storage; a t-shirt has size/color/material — no shared fixed fields" },
+        { tag: "evolution",   text: "New product types are added every few months, each with different attributes" },
+        { tag: "consistency", text: "Eventual consistency is fine; no financial transactions involved" }
+      ],
+      correct: "doc",
+      explanation: {
+        right: "Correct. When records have genuinely varied, rapidly evolving shapes, a document store reduces friction by accepting different fields without a rigid up-front schema.",
+        wrong:  "The pressure here is varied, rapidly changing shape — laptops and t-shirts share almost no fields, and new types keep arriving. A document store accepts different shapes per record without a rigid schema, which fits this pattern."
+      }
+    },
+    {
+      title: "Global activity feed",
+      patterns: [
+        { tag: "scale",        text: "800 million users; billions of events written per day across multiple data centers" },
+        { tag: "reads",        text: "Fetch the 50 most recent events for a user; always partitioned by user ID" },
+        { tag: "distribution", text: "A single machine cannot hold this; data must spread across many nodes in multiple regions" },
+        { tag: "consistency",  text: "Feed items can lag by a few seconds; no financial records" }
+      ],
+      correct: "wide",
+      explanation: {
+        right: "Correct. When volume exceeds what a single relational instance can serve, a horizontally scaled store designed to spread data and load across many machines is the fit.",
+        wrong:  "The dominant pressure is scale that no single machine can handle — billions of events, multiple regions, partition by user ID. That points to a wide-column store built to spread across many nodes."
+      }
+    }
+  ];
+
+  const STORES = [
+    { id: "sql",  icon: "🗄️",  name: "Relational (SQL)",       eg: "PostgreSQL · MySQL"      },
+    { id: "doc",  icon: "📄",  name: "Document store",         eg: "MongoDB · Firestore"     },
+    { id: "kv",   icon: "⚡",  name: "Key-value store",        eg: "Redis · DynamoDB"        },
+    { id: "wide", icon: "📊",  name: "Wide-column store",      eg: "Cassandra · Bigtable"    }
+  ];
+
+  let current  = 0;
+  let score    = 0;
+  let answered = false;
+  let results  = [];
+
+  function init() {
+    results  = SCENARIOS.map(() => null);
+    current  = 0;
+    score    = 0;
+    answered = false;
+    renderDots();
+    renderScenario();
+  }
+
+  function renderDots() {
+    const wrap = document.getElementById('progress-dots');
+    wrap.innerHTML = '';
+    results.forEach((r, i) => {
+      const d = document.createElement('div');
+      d.className = 'dot'
+        + (r === 'correct' ? ' correct'
+           : r === 'wrong' ? ' wrong'
+           : i === current ? ' active' : '');
+      wrap.appendChild(d);
+    });
+    document.getElementById('progress-label').textContent = `${current + 1} / ${SCENARIOS.length}`;
+  }
+
+  function renderScenario() {
+    answered = false;
+    const s = SCENARIOS[current];
+
+    document.getElementById('scenario-card').innerHTML =
+      `<div class="scenario-title">${s.title}</div>` +
+      `<ul class="ap-list">${s.patterns.map(p =>
+        `<li class="ap-item"><span class="ap-tag">${p.tag}</span><span>${p.text}</span></li>`
+      ).join('')}</ul>`;
+
+    const grid = document.getElementById('store-grid');
+    grid.innerHTML = '';
+    STORES.forEach(st => {
+      const btn = document.createElement('button');
+      btn.className   = 'store-btn';
+      btn.dataset.id  = st.id;
+      btn.innerHTML   =
+        `<span class="store-icon">${st.icon}</span>` +
+        `<span class="store-name">${st.name}</span>` +
+        `<span class="store-eg">${st.eg}</span>`;
+      btn.addEventListener('click', () => pick(st.id));
+      grid.appendChild(btn);
+    });
+
+    document.getElementById('feedback').className = 'feedback';
+    document.getElementById('next-btn').className = 'next-btn';
+  }
+
+  function pick(storeId) {
+    if (answered) return;
+    answered = true;
+
+    const s         = SCENARIOS[current];
+    const isCorrect = storeId === s.correct;
+    results[current] = isCorrect ? 'correct' : 'wrong';
+    if (isCorrect) score++;
+
+    document.querySelectorAll('.store-btn').forEach(btn => {
+      btn.disabled = true;
+      const id = btn.dataset.id;
+      if (id === storeId && isCorrect)       btn.className = 'store-btn selected-correct';
+      else if (id === storeId && !isCorrect) btn.className = 'store-btn selected-wrong';
+      else if (id === s.correct)             btn.className = 'store-btn reveal-correct';
+      else                                   btn.className = 'store-btn dimmed';
+    });
+
+    const fb = document.getElementById('feedback');
+    fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+    const verdict = document.getElementById('feedback-verdict');
+    verdict.className = 'feedback-verdict ' + (isCorrect ? 'v-correct' : 'v-wrong');
+    verdict.textContent = isCorrect ? '✓  Correct' : '✗  Not quite';
+    document.getElementById('feedback-body').textContent =
+      isCorrect ? s.explanation.right : s.explanation.wrong;
+
+    const nb = document.getElementById('next-btn');
+    nb.textContent = (current < SCENARIOS.length - 1) ? 'Next scenario →' : 'See results';
+    nb.className   = 'next-btn show';
+
+    renderDots();
+  }
+
+  document.getElementById('next-btn').addEventListener('click', () => {
+    current++;
+    if (current >= SCENARIOS.length) {
+      showSummary();
+    } else {
+      renderDots();
+      renderScenario();
+    }
+  });
+
+  function showSummary() {
+    document.getElementById('quiz-area').style.display = 'none';
+    document.getElementById('summary').className = 'summary show';
+    document.getElementById('summary-score').textContent = `${score} / ${SCENARIOS.length}`;
+
+    let heading, msg;
+    if (score === SCENARIOS.length) {
+      heading = 'Perfect — you read access patterns well.';
+      msg = 'You matched every workload to the store that serves it. The store follows from how the data is used, not from what is fashionable.';
+    } else if (score >= Math.ceil(SCENARIOS.length / 2)) {
+      heading = 'Good instincts. A few worth revisiting.';
+      msg = 'For each one you missed, go back to the three questions: how is the data read and written, at what scale, and what consistency does it need?';
+    } else {
+      heading = 'Keep practicing the decision.';
+      msg = 'Start each scenario with the three access-pattern questions. Let the answers — not the technology name — lead you to the right store.';
+    }
+    document.getElementById('summary-heading').textContent = heading;
+    document.getElementById('summary-msg').textContent     = msg;
+  }
+
+  function restart() {
+    document.getElementById('quiz-area').style.display = '';
+    document.getElementById('summary').className = 'summary';
+    init();
+  }
+
+  init();
+</script>
+</body>
+</html>

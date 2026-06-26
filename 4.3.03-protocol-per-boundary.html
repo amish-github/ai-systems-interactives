@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03. Choosing a Protocol Across the System</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  padding: 32px 24px;
+}
+
+/* Hint header */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+  font-size: 18px;
+  color: #1A1A1A;
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Progress */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.progress-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  white-space: nowrap;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 4px;
+  background: rgba(0,0,0,0.14);
+  border-radius: 4px;
+}
+
+.progress-fill {
+  height: 4px;
+  background: #1878DC;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+/* Card */
+.card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  margin-bottom: 16px;
+}
+
+.boundary-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.50);
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 20px;
+}
+
+/* Diagram */
+.diagram {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.d-node {
+  padding: 8px 14px;
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  font-size: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  line-height: 1.35;
+}
+
+.d-connector {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.d-label {
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.06);
+  color: rgba(0,0,0,0.40);
+  border: 1px solid rgba(0,0,0,0.12);
+  transition: background 0.3s, color 0.3s, border-color 0.3s;
+  white-space: nowrap;
+}
+
+.d-line {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.d-line-bar {
+  flex: 1;
+  height: 2px;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.3s;
+}
+
+.d-arrow {
+  font-size: 14px;
+  color: rgba(0,0,0,0.30);
+  line-height: 1;
+  margin-left: 1px;
+  transition: color 0.3s;
+}
+
+/* Context */
+.context {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1A1A1A;
+  margin-bottom: 24px;
+}
+
+/* Protocol buttons */
+.picker {
+  display: flex;
+  gap: 12px;
+}
+
+.p-btn {
+  flex: 1;
+  padding: 12px 8px;
+  border-radius: 10px;
+  border: 2px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 15px;
+  color: #1A1A1A;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.15s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.p-btn:hover:not([disabled]) {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.30);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 3px 8px 0 rgba(0,0,0,0.12);
+}
+
+.p-btn:active:not([disabled]) {
+  transform: translateY(0);
+}
+
+.p-btn[disabled] { cursor: default; opacity: 0.45; }
+
+.p-btn.correct {
+  background: #328F51;
+  border-color: #328F51;
+  color: #FFFFFF;
+  opacity: 1 !important;
+}
+
+.p-btn.wrong {
+  background: #DE4C45;
+  border-color: #DE4C45;
+  color: #FFFFFF;
+  opacity: 1 !important;
+}
+
+/* Feedback */
+.feedback {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  display: none;
+}
+
+.feedback.ok {
+  display: block;
+  background: rgba(50,143,81,0.08);
+  border: 1px solid rgba(50,143,81,0.30);
+}
+
+.feedback.bad {
+  display: block;
+  background: rgba(222,76,69,0.08);
+  border: 1px solid rgba(222,76,69,0.30);
+}
+
+/* Next / finish button */
+.next-btn {
+  display: none;
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 10px;
+  border: none;
+  background: #1878DC;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.next-btn.show { display: block; }
+.next-btn:hover { background: #1060B8; transform: translateY(-1px); }
+
+/* Summary */
+.summary { display: none; }
+.summary.show { display: block; }
+
+.summary-heading {
+  font-size: 18px;
+  color: #1A1A1A;
+  margin-bottom: 8px;
+}
+
+.summary-sub {
+  font-size: 16px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.sys-diagram {
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  margin-bottom: 24px;
+}
+
+.sys-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.sys-row:last-child { margin-bottom: 0; }
+
+.sys-node {
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.tag {
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  padding: 3px 10px;
+  border-radius: 4px;
+  color: #FFFFFF;
+  flex-shrink: 0;
+}
+
+.tag-rest    { background: #1878DC; }
+.tag-grpc    { background: #328F51; }
+.tag-graphql { background: #8754FD; }
+
+.sys-arrow { font-size: 14px; color: rgba(0,0,0,0.30); }
+
+.sys-indent {
+  padding-left: 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+}
+
+.sys-divider {
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.14);
+  margin: 16px 0;
+}
+
+.rules {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.14);
+  margin: 24px 0;
+}
+
+.restart-btn {
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.restart-btn:hover { background: #F2F1EE; }
+
+@media (max-width: 480px) {
+  .container { padding: 20px 16px; }
+  .card { padding: 20px 16px; }
+  .picker { flex-direction: column; }
+  .d-connector { min-width: 60px; }
+  .diagram { flex-wrap: nowrap; }
+}
+
+@media (max-width: 360px) {
+  .diagram { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .d-connector { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Click a protocol to assign it to each boundary</span>
+  </div>
+
+  <!-- Progress row -->
+  <div class="progress-row">
+    <span class="progress-label" id="progressLabel">1 / 4</span>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Quiz area -->
+  <div id="quizArea">
+    <div class="card">
+      <div class="boundary-tag" id="bTag"></div>
+
+      <div class="diagram">
+        <div class="d-node" id="dLeft"></div>
+        <div class="d-connector">
+          <div class="d-label" id="dLabel">?</div>
+          <div class="d-line">
+            <div class="d-line-bar" id="dBar"></div>
+            <span class="d-arrow" id="dArrow">&#8594;</span>
+          </div>
+        </div>
+        <div class="d-node" id="dRight"></div>
+      </div>
+
+      <p class="context" id="contextText"></p>
+
+      <div class="picker">
+        <button class="p-btn" id="btnREST"    onclick="pick('REST')">REST</button>
+        <button class="p-btn" id="btnGRPC"    onclick="pick('gRPC')">gRPC</button>
+        <button class="p-btn" id="btnGraphQL" onclick="pick('GraphQL')">GraphQL</button>
+      </div>
+
+      <div class="feedback" id="feedbackBox"></div>
+    </div>
+
+    <button class="next-btn" id="nextBtn" onclick="advance()">Next boundary &#8594;</button>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary" id="summary">
+    <div class="summary-heading">The same system, with all three protocols in place</div>
+    <div class="summary-sub">Mixing protocols is not inconsistency. It is matching each connection to the protocol that fits it.</div>
+
+    <div class="sys-diagram">
+      <div class="sys-row">
+        <div class="sys-node">Web &#183; Mobile &#183; Partner</div>
+        <span class="tag tag-rest">REST</span>
+        <span class="sys-arrow">&#8594;</span>
+        <div class="sys-node">Public API Edge</div>
+      </div>
+      <div class="sys-indent">&#8595; internal calls</div>
+      <div class="sys-row">
+        <div class="sys-node">Orders Service</div>
+        <span class="tag tag-grpc">gRPC</span>
+        <span class="sys-arrow">&#8594;</span>
+        <div class="sys-node">Inventory &#183; Pricing</div>
+      </div>
+      <hr class="sys-divider">
+      <div class="sys-row">
+        <div class="sys-node">Backend</div>
+        <span class="tag tag-graphql">GraphQL</span>
+        <span class="sys-arrow">&#8594;</span>
+        <div class="sys-node">Web &#183; iOS &#183; Android</div>
+      </div>
+      <div style="font-size:13px; color:rgba(0,0,0,0.40); margin-top:4px; padding-left:4px;">Each client queries exactly the fields it needs</div>
+    </div>
+
+    <div class="rules">
+      <div class="rule">
+        <span class="tag tag-rest" style="align-self:center;">REST</span>
+        <span>Public or broadly consumed interfaces &#8212; plain HTTP, caches well, familiar to every outside developer and tool</span>
+      </div>
+      <div class="rule">
+        <span class="tag tag-grpc" style="align-self:center;">gRPC</span>
+        <span>Internal high-throughput or streaming calls &#8212; compact binary, strongly typed, fast, streaming supported</span>
+      </div>
+      <div class="rule">
+        <span class="tag tag-graphql" style="align-self:center;">GraphQL</span>
+        <span>Rich, diverse clients needing different data shapes &#8212; each client asks for exactly the fields it needs in one query</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+<script>
+const SCENARIOS = [
+  {
+    tag: 'BOUNDARY 1 · PUBLIC EDGE',
+    left: 'Web · Mobile · Partner',
+    right: 'Public API Edge',
+    context: 'This boundary faces the open internet. Outside developers, third-party partners, and client apps all call it. The team wants it easy to reach from any tool or language, and ordinary HTTP caching matters here.',
+    correct: 'REST',
+    okMsg: '<strong>Correct.</strong> REST runs on plain HTTP, caches naturally, and is familiar to almost every outside developer and tool. For a public, broadly consumed interface, that wide reach and low barrier matter more than raw speed.',
+    badMsg: {
+      gRPC: '<strong>Not quite.</strong> gRPC requires code generation and a shared schema — awkward for outside consumers who do not own the schema. REST fits a public, broadly consumed boundary.',
+      GraphQL: '<strong>Not quite.</strong> GraphQL works well when diverse clients need different slices of the same data — that is not the shape here. A public edge with broad, simple access points to REST.'
+    }
+  },
+  {
+    tag: 'BOUNDARY 2 · INTERNAL HIGH-THROUGHPUT',
+    left: 'Orders Service',
+    right: 'Inventory Service',
+    context: 'The Orders service calls Inventory thousands of times per second. Both services are owned by the same team, traffic is steady and high, and strong typing matters. No outside developer will ever call this boundary directly.',
+    correct: 'gRPC',
+    okMsg: '<strong>Correct.</strong> gRPC\'s compact binary format and shared schema make this high-throughput internal call fast and strongly typed. Both ends are owned by your team, so the lower friendliness to outside consumers costs nothing here.',
+    badMsg: {
+      REST: '<strong>Not quite.</strong> REST familiarity matters most at a public edge with outside consumers. This is a high-throughput internal call where speed and type safety come first. gRPC is the fit.',
+      GraphQL: '<strong>Not quite.</strong> GraphQL fits a backend serving many diverse clients with varied data needs — not a single high-volume call between two of your own services.'
+    }
+  },
+  {
+    tag: 'BOUNDARY 3 · DIVERSE CLIENT DATA NEEDS',
+    left: 'Backend',
+    right: 'Web · iOS · Android',
+    context: 'One backend serves a web dashboard, an iOS app, and an Android app. All three read the same underlying data, but each needs a different set of fields in a different shape. The team keeps adding narrow one-off endpoints to satisfy each client.',
+    correct: 'GraphQL',
+    okMsg: '<strong>Correct.</strong> GraphQL lets each client ask for exactly the fields it needs in a single query, removing both over-fetching and the growing sprawl of one-off endpoints. Varied client data needs are precisely the shape that justifies it.',
+    badMsg: {
+      REST: '<strong>Not quite.</strong> More one-off endpoints is the very problem described. REST is excellent for a broadly consumed public interface but does not solve many diverse clients each wanting different slices of the same data.',
+      gRPC: '<strong>Not quite.</strong> gRPC fits internal high-throughput calls between services you own. It does not address the core issue here, which is diverse clients needing flexible queries over the same data.'
+    }
+  },
+  {
+    tag: 'BOUNDARY 4 · SIMPLE INTERNAL LOW-TRAFFIC',
+    left: 'Auth Service',
+    right: 'Config Service',
+    context: 'Two internal services exchange a small number of simple requests per minute. Your team owns both, traffic is light, latency is not a concern, and the team already has REST tooling in place. A teammate wants to switch to gRPC for consistency with boundary 2.',
+    correct: 'REST',
+    okMsg: '<strong>Correct.</strong> For a simple, low-traffic internal call the familiarity and low tooling cost of REST outweigh the speed advantage gRPC would add. gRPC\'s speed pays off at high throughput — this light path does not need it.',
+    badMsg: {
+      gRPC: '<strong>Not quite.</strong> gRPC\'s speed advantage pays off at high throughput. For a simple, low-traffic call the setup cost — code generation, shared schema — is not justified. REST fits this light path.',
+      GraphQL: '<strong>Not quite.</strong> GraphQL fits when diverse clients need different slices of data. A simple internal call between two services has no such need, and the extra setup and caching complexity is not worth it.'
+    }
+  }
+];
+
+const COLORS = { REST: '#1878DC', gRPC: '#328F51', GraphQL: '#8754FD' };
+const BTN_IDS = { REST: 'btnREST', gRPC: 'btnGRPC', GraphQL: 'btnGraphQL' };
+
+let current = 0;
+let answered = false;
+
+function render() {
+  const s = SCENARIOS[current];
+
+  document.getElementById('bTag').textContent = s.tag;
+  document.getElementById('dLeft').textContent = s.left;
+  document.getElementById('dRight').textContent = s.right;
+
+  const lbl = document.getElementById('dLabel');
+  lbl.textContent = '?';
+  lbl.style.background = 'rgba(0,0,0,0.06)';
+  lbl.style.color = 'rgba(0,0,0,0.40)';
+  lbl.style.borderColor = 'rgba(0,0,0,0.12)';
+
+  document.getElementById('dBar').style.background = 'rgba(0,0,0,0.14)';
+  document.getElementById('dArrow').style.color = 'rgba(0,0,0,0.30)';
+  document.getElementById('contextText').textContent = s.context;
+
+  Object.values(BTN_IDS).forEach(id => {
+    const b = document.getElementById(id);
+    b.disabled = false;
+    b.className = 'p-btn';
+  });
+
+  const fb = document.getElementById('feedbackBox');
+  fb.className = 'feedback';
+  fb.innerHTML = '';
+
+  const nb = document.getElementById('nextBtn');
+  nb.className = 'next-btn';
+  nb.textContent = current < SCENARIOS.length - 1 ? 'Next boundary →' : 'See the system map →';
+
+  const pct = (current / SCENARIOS.length) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = (current + 1) + ' / ' + SCENARIOS.length;
+
+  answered = false;
+}
+
+function pick(proto) {
+  if (answered) return;
+  answered = true;
+
+  const s = SCENARIOS[current];
+  const isOk = proto === s.correct;
+
+  ['REST', 'gRPC', 'GraphQL'].forEach(p => {
+    const b = document.getElementById(BTN_IDS[p]);
+    b.disabled = true;
+    if (p === proto && isOk)  b.classList.add('correct');
+    if (p === proto && !isOk) b.classList.add('wrong');
+    if (p === s.correct && !isOk) b.classList.add('correct');
+  });
+
+  const c = COLORS[s.correct];
+  const lbl = document.getElementById('dLabel');
+  lbl.textContent = s.correct;
+  lbl.style.background = c + '1a';
+  lbl.style.color = c;
+  lbl.style.borderColor = c + '55';
+  document.getElementById('dBar').style.background = c;
+  document.getElementById('dArrow').style.color = c;
+
+  const fb = document.getElementById('feedbackBox');
+  fb.className = isOk ? 'feedback ok' : 'feedback bad';
+  fb.innerHTML = isOk ? s.okMsg : s.badMsg[proto];
+
+  document.getElementById('nextBtn').classList.add('show');
+}
+
+function advance() {
+  current++;
+  if (current >= SCENARIOS.length) {
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressLabel').textContent = 'complete';
+    document.getElementById('summary').classList.add('show');
+  } else {
+    render();
+  }
+}
+
+function restart() {
+  current = 0;
+  document.getElementById('summary').classList.remove('show');
+  document.getElementById('quizArea').style.display = '';
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cache-Aside, TTLs, and Invalidation</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.outer { width: 100%; max-width: 700px; }
+
+/* Hint header */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,.14);
+  font-size: 18px;
+}
+.cursor-icon { flex-shrink: 0; animation: wiggle 4s infinite; }
+@keyframes wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+  90%     { transform: rotate(0deg); }
+}
+
+/* Phase pills */
+.phases {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px;
+}
+.phase-pill {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  text-align: center;
+  background: #F2F1EE;
+  color: rgba(0,0,0,.50);
+  border: 1px solid rgba(0,0,0,.14);
+  transition: background .2s, color .2s, border-color .2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.phase-pill.active { background: #1878DC; color: #FFFFFF; border-color: #1878DC; }
+.phase-pill.done   { color: #328F51; }
+
+/* Diagram area */
+.diagram-area { padding: 20px 20px 0; }
+
+.components {
+  display: flex;
+  gap: 8px;
+}
+
+.comp-box {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0,0,0,.14);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,.30), 0 1px 3px 0 rgba(0,0,0,.15);
+  transition: border-color .25s, box-shadow .25s;
+}
+.comp-box.hi-app   { border-color: #1878DC; box-shadow: 0 0 0 3px rgba(24,120,220,.12), 0 1px 3px rgba(0,0,0,.15); }
+.comp-box.hi-cache { border-color: #8754FD; box-shadow: 0 0 0 3px rgba(135,84,253,.12), 0 1px 3px rgba(0,0,0,.15); }
+.comp-box.hi-db    { border-color: #328F51; box-shadow: 0 0 0 3px rgba(50,143,81,.12), 0 1px 3px rgba(0,0,0,.15); }
+
+.comp-icon-wrap { line-height: 1; }
+.comp-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,.50);
+  margin-top: 2px;
+}
+.comp-sub {
+  font-size: 11px;
+  color: rgba(0,0,0,.35);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+.cache-state-box {
+  margin-top: 6px;
+  width: 100%;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #F2F1EE;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 10px;
+  color: rgba(0,0,0,.38);
+  font-style: italic;
+  word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  min-height: 32px;
+  transition: background .25s, color .25s;
+}
+.cache-state-box.filled {
+  background: rgba(135,84,253,.08);
+  color: #8754FD;
+  font-style: normal;
+}
+.cache-state-box.stale {
+  background: rgba(211,87,34,.08);
+  color: #D35722;
+  font-style: normal;
+}
+
+/* Arrow row */
+.arrow-row { height: 48px; margin-top: 4px; }
+.arrow-row svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* Command chip */
+.cmd-area {
+  padding: 8px 20px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: flex-start;
+}
+.cmd-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,.14);
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: #1A1A1A;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .2s, transform .2s;
+  max-width: 100%;
+  word-break: break-all;
+}
+.cmd-chip.vis        { opacity: 1; transform: none; }
+.cmd-chip.t-get      { background: rgba(24,120,220,.07);  border-color: rgba(24,120,220,.22);  color: #1878DC; }
+.cmd-chip.t-set      { background: rgba(135,84,253,.07);  border-color: rgba(135,84,253,.22);  color: #8754FD; }
+.cmd-chip.t-del      { background: rgba(222,76,69,.07);   border-color: rgba(222,76,69,.22);   color: #DE4C45; }
+.cmd-chip.t-db       { background: rgba(50,143,81,.07);   border-color: rgba(50,143,81,.22);   color: #328F51; }
+.cmd-chip.t-ok       { background: rgba(50,143,81,.07);   border-color: rgba(50,143,81,.22);   color: #328F51; }
+.cmd-chip.t-miss     { background: rgba(211,87,34,.07);   border-color: rgba(211,87,34,.22);   color: #D35722; }
+.cmd-chip.t-hit      { background: rgba(50,143,81,.07);   border-color: rgba(50,143,81,.22);   color: #328F51; }
+
+/* Callout boxes */
+.callout {
+  display: none;
+  margin: 8px 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.callout code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+}
+.callout.c-hit  { background: rgba(50,143,81,.08); border: 1px solid rgba(50,143,81,.2); }
+.callout.c-inv  { background: rgba(222,76,69,.08);  border: 1px solid rgba(222,76,69,.2); }
+.callout.show   { display: block; }
+
+/* Step info */
+.step-info { padding: 12px 20px; }
+.step-desc {
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 52px;
+}
+.step-desc code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  background: #F2F1EE;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.step-counter {
+  margin-top: 6px;
+  font-size: 13px;
+  color: rgba(0,0,0,.38);
+}
+
+/* Progress track */
+.progress-track {
+  height: 4px;
+  background: rgba(0,0,0,.08);
+  border-radius: 4px;
+  margin: 8px 20px 0;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #1878DC;
+  border-radius: 4px;
+  transition: width .3s ease;
+}
+
+/* Controls */
+.controls {
+  padding: 12px 20px 28px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,.30), 0 1px 3px 0 rgba(0,0,0,.15);
+  transition: background .15s, transform .1s;
+}
+.btn:active { transform: scale(.97); }
+.btn-next  { background: #1878DC; color: #FFFFFF; }
+.btn-next:hover { background: #1365BD; }
+.btn-next:disabled { background: rgba(0,0,0,.10); color: rgba(0,0,0,.32); cursor: not-allowed; box-shadow: none; }
+.btn-reset { background: #FFFFFF; color: rgba(0,0,0,.6); border: 1.5px solid rgba(0,0,0,.14); }
+.btn-reset:hover { background: #F2F1EE; }
+
+/* Responsive */
+@media (max-width: 440px) {
+  .hint-header  { font-size: 16px; }
+  .comp-label   { font-size: 11px; }
+  .comp-sub     { display: none; }
+  .phase-pill   { font-size: 11px; padding: 3px 4px; }
+}
+@media (max-width: 340px) {
+  .comp-icon-wrap svg { width: 22px; height: 22px; }
+  .cache-state-box { font-size: 9px; }
+}
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <span class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span>Click <strong>Next</strong> to step through the cache-aside pattern</span>
+  </div>
+
+  <!-- Phase pills -->
+  <div class="phases">
+    <div class="phase-pill" id="ph0">Read — Miss</div>
+    <div class="phase-pill" id="ph1">Read — Hit</div>
+    <div class="phase-pill" id="ph2">Write + Invalidate</div>
+  </div>
+
+  <!-- Diagram -->
+  <div class="diagram-area">
+    <div class="components">
+
+      <!-- App -->
+      <div class="comp-box" id="comp-app">
+        <div class="comp-icon-wrap">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="5" width="22" height="18" rx="3" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5"/>
+            <path d="M8.5 11.5L5.5 14l3 2.5M13.5 9.5L12 18.5M19.5 11.5L22.5 14l-3 2.5" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="comp-label">App</div>
+        <div class="comp-sub">service</div>
+      </div>
+
+      <!-- Cache (Redis) -->
+      <div class="comp-box" id="comp-cache">
+        <div class="comp-icon-wrap">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <path d="M14 3L8 15h5.5L12 25l10-14h-6L14 3z" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="comp-label">Cache</div>
+        <div class="comp-sub">Redis</div>
+        <div class="cache-state-box" id="cache-state-box">empty</div>
+      </div>
+
+      <!-- Database -->
+      <div class="comp-box" id="comp-db">
+        <div class="comp-icon-wrap">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <ellipse cx="14" cy="8" rx="9" ry="3.5" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5"/>
+            <path d="M5 8v12c0 1.93 4.03 3.5 9 3.5s9-1.57 9-3.5V8" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5"/>
+            <path d="M5 14c0 1.93 4.03 3.5 9 3.5s9-1.57 9-3.5" stroke="#1A1A1A" stroke-opacity=".38" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div class="comp-label">Database</div>
+        <div class="comp-sub">Postgres</div>
+      </div>
+
+    </div>
+
+    <!-- Arrow SVG row -->
+    <div class="arrow-row">
+      <svg id="arrow-svg" aria-hidden="true">
+        <defs>
+          <marker id="mh-blue"   markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#1878DC"/></marker>
+          <marker id="mh-purple" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#8754FD"/></marker>
+          <marker id="mh-green"  markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#328F51"/></marker>
+          <marker id="mh-orange" markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#D35722"/></marker>
+          <marker id="mh-red"    markerWidth="9" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0,0 9,3 0,6" fill="#DE4C45"/></marker>
+        </defs>
+        <g id="arrow-g"></g>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Command chip -->
+  <div class="cmd-area">
+    <div class="cmd-chip" id="cmd-chip"></div>
+  </div>
+
+  <!-- Callout: hit -->
+  <div class="callout c-hit" id="callout-hit">
+    <strong>Cache hit —</strong> the database was never queried. This is the payoff of cache-aside: repeated reads cost microseconds, not milliseconds. The slow miss path ran exactly once.
+  </div>
+
+  <!-- Callout: invalidate -->
+  <div class="callout c-inv" id="callout-inv">
+    <strong>Cache cleared immediately.</strong> The TTL still had ~40 s left, but we did not wait. The next read will miss, reload from DB, and find <code>{name: "Grace"}</code> — immediately correct, not eventually correct.
+  </div>
+
+  <!-- Progress track -->
+  <div class="progress-track">
+    <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+  </div>
+
+  <!-- Step info -->
+  <div class="step-info">
+    <div class="step-desc" id="step-desc"></div>
+    <div class="step-counter" id="step-counter"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-next" id="btn-next">Next →</button>
+    <button class="btn btn-reset" id="btn-reset">↺ Restart</button>
+  </div>
+
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Step definitions
+   from / to : 'app' | 'cache' | 'db' | null
+   type      : 'get'|'set'|'del'|'db'|'ok'|'miss'|'hit' | null
+--------------------------------------------------------------- */
+const STEPS = [
+  {
+    phase: 0, from: null, to: null, type: null, cmd: null,
+    desc: 'A read request arrives for <code>user:1</code>. The cache is empty. Click <strong>Next</strong> to trace every step.',
+    cache: { empty: true }, hi: [],
+  },
+  {
+    phase: 0, from: 'app', to: 'cache', type: 'get', cmd: 'GET user:1',
+    desc: 'App checks the cache first — always.',
+    cache: { empty: true }, hi: ['app','cache'],
+  },
+  {
+    phase: 0, from: 'cache', to: 'app', type: 'miss', cmd: '(nil)  ← cache miss',
+    desc: 'Cache miss. Key <code>user:1</code> is not in Redis.',
+    cache: { empty: true }, hi: ['cache','app'],
+  },
+  {
+    phase: 0, from: 'app', to: 'db', type: 'db', cmd: 'SELECT * FROM users WHERE id = 1',
+    desc: 'On a miss the app falls through to the database.',
+    cache: { empty: true }, hi: ['app','db'],
+  },
+  {
+    phase: 0, from: 'db', to: 'app', type: 'ok', cmd: '← { id: 1, name: "Ada" }',
+    desc: 'The database returns the record.',
+    cache: { empty: true }, hi: ['db','app'],
+  },
+  {
+    phase: 0, from: 'app', to: 'cache', type: 'set', cmd: 'SET user:1 {…} EX 60',
+    desc: 'App stores the value in cache with a 60-second TTL. <code>EX 60</code> means the entry auto-expires after 60 s.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" }', ttl: '60 s' }, hi: ['app','cache'],
+  },
+  {
+    phase: 0, from: null, to: null, type: null, cmd: null,
+    desc: 'Response returned. The cache is now warm. The slow miss path ran once — every subsequent read for this key will be a fast hit until the TTL expires.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" }', ttl: '~55 s' }, hi: [],
+  },
+  // Phase 1 — Hit
+  {
+    phase: 1, from: 'app', to: 'cache', type: 'get', cmd: 'GET user:1',
+    desc: 'Same key requested again. App checks the cache first.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" }', ttl: '~50 s' }, hi: ['app','cache'],
+  },
+  {
+    phase: 1, from: 'cache', to: 'app', type: 'hit', cmd: '← { id: 1, name: "Ada" }  ✓ hit',
+    desc: 'Cache hit. Value returned immediately. The database is never contacted.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" }', ttl: '~50 s' }, hi: ['cache','app'],
+    showHit: true,
+  },
+  // Phase 2 — Write + Invalidate
+  {
+    phase: 2, from: 'app', to: 'db', type: 'db', cmd: "UPDATE users SET name = 'Grace' WHERE id = 1",
+    desc: 'A write request arrives. Update the database <em>first</em> — it is the source of truth.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" }', ttl: '~40 s', stale: true }, hi: ['app','db'],
+  },
+  {
+    phase: 2, from: 'db', to: 'app', type: 'ok', cmd: '← OK',
+    desc: 'Database updated. Notice: the cache still holds the old value <code>"Ada"</code>.',
+    cache: { key: 'user:1', val: '{ id:1, name:"Ada" } ⚠ stale', ttl: '~40 s', stale: true }, hi: ['db','app'],
+  },
+  {
+    phase: 2, from: 'app', to: 'cache', type: 'del', cmd: 'DEL user:1',
+    desc: 'Invalidate the cache entry immediately — do not wait for the TTL to expire on its own.',
+    cache: { empty: true }, hi: ['app','cache'],
+  },
+  {
+    phase: 2, from: null, to: null, type: null, cmd: null,
+    desc: 'Cache cleared. TTL had ~40 s left, but we did not wait. The next read will be a miss, reload <code>{ name:"Grace" }</code> from the database, and be immediately correct.',
+    cache: { empty: true }, hi: [],
+    showInv: true, final: true,
+  },
+];
+
+const COLOR = { get:'#1878DC', set:'#8754FD', del:'#DE4C45', db:'#328F51', ok:'#328F51', miss:'#D35722', hit:'#328F51' };
+const MK    = { get:'mh-blue', set:'mh-purple', del:'mh-red', db:'mh-green', ok:'mh-green', miss:'mh-orange', hit:'mh-green' };
+
+let cur = 0;
+const TOTAL = STEPS.length - 1;
+
+function compCenterX(id) {
+  const svg = document.getElementById('arrow-svg');
+  const el  = document.getElementById(id);
+  const sr  = svg.getBoundingClientRect();
+  const er  = el.getBoundingClientRect();
+  return er.left + er.width / 2 - sr.left;
+}
+
+function render(i) {
+  const s = STEPS[i];
+
+  // Phase pills
+  ['ph0','ph1','ph2'].forEach((id, pi) => {
+    const el = document.getElementById(id);
+    el.className = 'phase-pill' + (pi < s.phase ? ' done' : pi === s.phase ? ' active' : '');
+  });
+
+  // Component highlights
+  ['app','cache','db'].forEach(name => {
+    document.getElementById('comp-' + name).className =
+      'comp-box' + (s.hi.includes(name) ? ' hi-' + name : '');
+  });
+
+  // Cache state display
+  const cs = document.getElementById('cache-state-box');
+  if (s.cache.empty) {
+    cs.textContent  = 'empty';
+    cs.className    = 'cache-state-box';
+  } else {
+    cs.textContent  = s.cache.key + '\n' + s.cache.val + '\nTTL: ' + s.cache.ttl;
+    cs.className    = 'cache-state-box ' + (s.cache.stale ? 'stale' : 'filled');
+  }
+
+  // Arrow
+  const g = document.getElementById('arrow-g');
+  g.innerHTML = '';
+  if (s.from && s.to) {
+    const x1  = compCenterX('comp-' + s.from);
+    const x2  = compCenterX('comp-' + s.to);
+    const y   = 24;
+    const col = COLOR[s.type] || '#1A1A1A';
+    const mk  = MK[s.type]    || 'mh-blue';
+    const rightward = x2 > x1;
+    // Pull line ends inward so arrows sit in the gap between boxes
+    const gap = 12;
+    const lx1 = rightward ? x1 + gap : x1 - gap;
+    const lx2 = rightward ? x2 - gap : x2 + gap;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', lx1);
+    line.setAttribute('y1', y);
+    line.setAttribute('x2', lx2);
+    line.setAttribute('y2', y);
+    line.setAttribute('stroke', col);
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('marker-end', 'url(#' + mk + ')');
+    g.appendChild(line);
+  }
+
+  // Command chip
+  const chip = document.getElementById('cmd-chip');
+  if (s.cmd) {
+    chip.textContent = s.cmd;
+    chip.className   = 'cmd-chip vis' + (s.type ? ' t-' + s.type : '');
+  } else {
+    chip.textContent = '';
+    chip.className   = 'cmd-chip';
+  }
+
+  // Callouts
+  document.getElementById('callout-hit').className = 'callout c-hit' + (s.showHit ? ' show' : '');
+  document.getElementById('callout-inv').className = 'callout c-inv' + (s.showInv ? ' show' : '');
+
+  // Description (inner HTML to support <code>/<em>)
+  document.getElementById('step-desc').innerHTML   = s.desc;
+  document.getElementById('step-counter').textContent = 'Step ' + i + ' of ' + TOTAL;
+
+  // Progress bar
+  document.getElementById('progress-fill').style.width = (i / TOTAL * 100) + '%';
+
+  // Next button
+  const btn = document.getElementById('btn-next');
+  if (s.final) {
+    btn.textContent = '✓ Complete';
+    btn.disabled    = true;
+  } else {
+    btn.textContent = 'Next →';
+    btn.disabled    = false;
+  }
+}
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  if (cur < TOTAL) { cur++; render(cur); }
+});
+document.getElementById('btn-reset').addEventListener('click', () => {
+  cur = 0; render(0);
+});
+
+// Re-draw arrows on resize (positions are live DOM measurements)
+let _rt;
+window.addEventListener('resize', () => {
+  clearTimeout(_rt);
+  _rt = setTimeout(() => render(cur), 80);
+});
+
+render(0);
+</script>
+</body>
+</html>

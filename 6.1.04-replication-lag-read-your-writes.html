@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Replication Lag and Read-Your-Writes</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* Scene */
+    .scene {
+      padding: 24px;
+    }
+
+    /* Step label + description */
+    .step-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .step-desc {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px 20px;
+      font-size: 16px;
+      color: #1A1A1A;
+      min-height: 60px;
+      margin-bottom: 24px;
+      transition: background 0.3s ease;
+    }
+
+    /* Nodes row */
+    .nodes {
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .node {
+      flex: 1;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      padding: 16px 12px;
+      text-align: center;
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: border-color 0.3s ease, background 0.3s ease;
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .node-icon { font-size: 28px; line-height: 1; }
+    .node-label { font-size: 14px; font-weight: 600; color: #1A1A1A; }
+
+    .node-value {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.14);
+      transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+
+    .node-status {
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+      transition: color 0.3s ease;
+    }
+
+    /* Node highlight states */
+    .node.highlight-write  { border-color: #1878DC; background: rgba(24,120,220,0.05); }
+    .node.highlight-ok     { border-color: #328F51; background: rgba(50,143,81,0.05); }
+    .node.highlight-stale  { border-color: #D35722; background: rgba(211,87,34,0.05); }
+    .node.highlight-lag    { border-color: #F48E00; background: rgba(244,142,0,0.05); }
+
+    .node-value.val-fresh  { background: rgba(50,143,81,0.12); border-color: #328F51; color: #1A6637; }
+    .node-value.val-stale  { background: rgba(211,87,34,0.12); border-color: #D35722; color: #A83D0E; }
+
+    /* Lag indicator inside Primary node */
+    .lag-wrap { width: 100%; margin-top: 4px; }
+    .lag-head  { display: flex; justify-content: space-between; font-size: 11px; color: rgba(0,0,0,0.50); margin-bottom: 3px; }
+    .lag-track { height: 6px; background: rgba(0,0,0,0.08); border-radius: 3px; overflow: hidden; }
+    .lag-fill  { height: 100%; border-radius: 3px; background: #D35722; transition: width 0.6s ease; }
+
+    /* Arrow message band */
+    .arrow-band {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    .arrow-msg {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      color: #1A1A1A;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .arrow-msg.visible { opacity: 1; transform: translateY(0); }
+    .arrow-msg.msg-write   { border-color: #1878DC; color: #1878DC; background: rgba(24,120,220,0.08); }
+    .arrow-msg.msg-ok      { border-color: #328F51; color: #328F51; background: rgba(50,143,81,0.08); }
+    .arrow-msg.msg-stale   { border-color: #D35722; color: #D35722; background: rgba(211,87,34,0.08); }
+    .arrow-msg.msg-lag     { border-color: #F48E00; color: #F48E00; background: rgba(244,142,0,0.08); }
+
+    /* Nav row */
+    .nav-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 20px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 15px;
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.18s ease, opacity 0.18s ease;
+    }
+    .btn:hover:not(:disabled) { background: #333; }
+    .btn:disabled { background: rgba(0,0,0,0.10); color: rgba(0,0,0,0.35); cursor: not-allowed; box-shadow: none; }
+
+    .btn-ghost {
+      background: #FFFFFF;
+      color: #1A1A1A;
+    }
+    .btn-ghost:hover:not(:disabled) { background: #F2F1EE; }
+
+    .step-counter {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-left: auto;
+    }
+
+    /* Strategy section */
+    .strategy-section {
+      margin-top: 24px;
+      border-top: 1px solid rgba(0,0,0,0.14);
+      padding-top: 20px;
+    }
+
+    .strategy-title {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .strategy-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .strat-btn {
+      width: 100%;
+      text-align: left;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 15px;
+      color: #1A1A1A;
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.18s ease, border-color 0.18s ease;
+      line-height: 1.4;
+    }
+    .strat-btn:hover { background: #F2F1EE; border-color: rgba(0,0,0,0.24); }
+
+    .strat-btn .strat-sub {
+      display: block;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-top: 2px;
+    }
+
+    .strat-btn.sel-primary { border-color: #1878DC; background: rgba(24,120,220,0.07); color: #1A1A1A; }
+    .strat-btn.sel-wait    { border-color: #8754FD; background: rgba(135,84,253,0.07); color: #1A1A1A; }
+    .strat-btn.sel-accept  { border-color: #F48E00; background: rgba(244,142,0,0.07); color: #1A1A1A; }
+
+    /* Result panel */
+    .result-panel {
+      margin-top: 12px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      display: none;
+      line-height: 1.5;
+    }
+    .result-panel.show { display: block; }
+    .result-panel.res-ok   { background: rgba(50,143,81,0.08);  border-color: #328F51; }
+    .result-panel.res-warn { background: rgba(244,142,0,0.08);  border-color: #F48E00; }
+
+    .result-title {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .res-ok   .result-title { color: #1A6637; }
+    .res-warn .result-title { color: #8C5200; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .hint-header { padding: 16px 16px 12px; }
+      .scene { padding: 16px; }
+      .nodes { gap: 8px; }
+      .node { padding: 12px 8px; min-height: 100px; }
+      .node-icon { font-size: 22px; }
+    }
+    @media (max-width: 360px) {
+      .node-label { font-size: 12px; }
+      .node-value { font-size: 11px; }
+      .btn { padding: 10px 16px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Step through the scenario, then choose a fix strategy.</span>
+  </div>
+
+  <!-- Scene -->
+  <div class="scene">
+
+    <div class="step-label" id="stepLabel">STEP 1 OF 5 — THE WRITE</div>
+    <div class="step-desc" id="stepDesc">
+      A user updates their display name to "Alex" and hits save. The write is sent to the Primary DB.
+    </div>
+
+    <!-- Three nodes -->
+    <div class="nodes">
+      <div class="node" id="nodeUser">
+        <div class="node-icon">👤</div>
+        <div class="node-label">User</div>
+        <div class="node-value" id="userVal">Saving…</div>
+      </div>
+
+      <div class="node" id="nodePrimary">
+        <div class="node-icon">🗄️</div>
+        <div class="node-label">Primary DB</div>
+        <div class="node-value" id="primaryVal">name = Jordan</div>
+        <div class="lag-wrap">
+          <div class="lag-head">
+            <span>Replica lag</span>
+            <span id="lagMs">~80 ms</span>
+          </div>
+          <div class="lag-track">
+            <div class="lag-fill" id="lagFill" style="width:15%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="node" id="nodeReplica">
+        <div class="node-icon">📋</div>
+        <div class="node-label">Replica DB</div>
+        <div class="node-value" id="replicaVal">name = Jordan</div>
+        <div class="node-status" id="replicaStatus">In sync</div>
+      </div>
+    </div>
+
+    <!-- Arrow message -->
+    <div class="arrow-band">
+      <div class="arrow-msg" id="arrowMsg"></div>
+    </div>
+
+    <!-- Nav -->
+    <div class="nav-row">
+      <button class="btn btn-ghost" id="btnBack" onclick="prevStep()" disabled>← Back</button>
+      <button class="btn" id="btnNext" onclick="nextStep()">Next →</button>
+      <span class="step-counter" id="stepCounter">1 / 5</span>
+    </div>
+
+    <!-- Strategy section — hidden until step 5 -->
+    <div class="strategy-section" id="strategySection" style="display:none">
+      <div class="strategy-title">How would you fix this?</div>
+      <div class="strategy-list">
+        <button class="strat-btn" id="sBtnPrimary" onclick="pickStrategy('primary')">
+          Route this read to the Primary
+          <span class="strat-sub">Send the post-write read directly to the source of truth</span>
+        </button>
+        <button class="strat-btn" id="sBtnWait" onclick="pickStrategy('wait')">
+          Wait for the replica to catch up
+          <span class="strat-sub">Hold the read on the replica until it has applied the write</span>
+        </button>
+        <button class="strat-btn" id="sBtnAccept" onclick="pickStrategy('accept')">
+          Accept the staleness
+          <span class="strat-sub">Tolerate a slightly old value — fine for some reads, not this one</span>
+        </button>
+      </div>
+      <div class="result-panel" id="resultPanel"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Step definitions
+  const STEPS = [
+    {
+      label:         'STEP 1 OF 5 — THE WRITE',
+      desc:          'A user updates their display name to "Alex" and hits save. The write is sent to the Primary DB.',
+      userVal:       'Saving name…',
+      userClass:     '',
+      primaryVal:    'name = Jordan',
+      primaryClass:  'highlight-write',
+      primaryValClass: '',
+      replicaVal:    'name = Jordan',
+      replicaClass:  '',
+      replicaValClass: '',
+      replicaStatus: 'In sync',
+      lagWidth:      '15%',
+      lagMs:         '~80 ms',
+      arrowText:     '→  Write: name = "Alex"',
+      arrowClass:    'msg-write',
+    },
+    {
+      label:         'STEP 2 OF 5 — WRITE CONFIRMED',
+      desc:          'The Primary accepts the write and now holds "Alex". It sends an OK back to the user and begins forwarding the change to the Replica.',
+      userVal:       'Write confirmed ✓',
+      userClass:     '',
+      primaryVal:    'name = Alex',
+      primaryClass:  'highlight-ok',
+      primaryValClass: 'val-fresh',
+      replicaVal:    'name = Jordan',
+      replicaClass:  '',
+      replicaValClass: '',
+      replicaStatus: 'Catching up…',
+      lagWidth:      '60%',
+      lagMs:         '~600 ms',
+      arrowText:     '← Write OK (name saved on Primary)',
+      arrowClass:    'msg-ok',
+    },
+    {
+      label:         'STEP 3 OF 5 — REPLICA LAGS',
+      desc:          'The change is in transit. Under load the Replica can be hundreds of milliseconds — or more — behind the Primary. The old name "Jordan" is still there.',
+      userVal:       'Reloading page…',
+      userClass:     '',
+      primaryVal:    'name = Alex',
+      primaryClass:  '',
+      primaryValClass: 'val-fresh',
+      replicaVal:    'name = Jordan',
+      replicaClass:  'highlight-lag',
+      replicaValClass: 'val-stale',
+      replicaStatus: 'Still lagging',
+      lagWidth:      '60%',
+      lagMs:         '~600 ms',
+      arrowText:     '⚠  Change in transit — not yet applied to Replica',
+      arrowClass:    'msg-lag',
+    },
+    {
+      label:         'STEP 4 OF 5 — THE READ',
+      desc:          'The user\'s profile page reloads. The app routes the read to a Replica to spread load — but that Replica is still behind.',
+      userVal:       'Reading profile…',
+      userClass:     '',
+      primaryVal:    'name = Alex',
+      primaryClass:  '',
+      primaryValClass: 'val-fresh',
+      replicaVal:    'name = Jordan',
+      replicaClass:  'highlight-stale',
+      replicaValClass: 'val-stale',
+      replicaStatus: 'Stale!',
+      lagWidth:      '60%',
+      lagMs:         '~600 ms',
+      arrowText:     '→  Read my profile (routed to Replica)',
+      arrowClass:    'msg-write',
+    },
+    {
+      label:         'STEP 5 OF 5 — THE BUG',
+      desc:          'The Replica returns the old name "Jordan". The user sees their change disappear. The data is safe on the Primary — but the experience is broken. This is the read-your-writes problem.',
+      userVal:       '❌  Sees "Jordan" — wrong!',
+      userClass:     '',
+      primaryVal:    'name = Alex',
+      primaryClass:  '',
+      primaryValClass: 'val-fresh',
+      replicaVal:    'name = Jordan',
+      replicaClass:  'highlight-stale',
+      replicaValClass: 'val-stale',
+      replicaStatus: 'Returned stale data',
+      lagWidth:      '60%',
+      lagMs:         '~600 ms',
+      arrowText:     '← Returns "Jordan" — stale read!',
+      arrowClass:    'msg-stale',
+    },
+  ];
+
+  const STRATEGIES = {
+    primary: {
+      btnId:      'sBtnPrimary',
+      btnClass:   'sel-primary',
+      panelClass: 'res-ok',
+      title:      'Route to Primary — correct for this case',
+      body:       'The Primary always holds the latest committed data. Routing this one read there guarantees the user sees "Alex". All other reads can still use replicas, so you keep the scaling benefit everywhere it is safe to do so.',
+    },
+    wait: {
+      btnId:      'sBtnWait',
+      btnClass:   'sel-wait',
+      panelClass: 'res-ok',
+      title:      'Wait for catch-up — also correct',
+      body:       'The read stays on the Replica, but is held until the Replica has applied the write. The user waits a moment longer, then sees "Alex". This protects Primary capacity while still guaranteeing freshness for the post-write read.',
+    },
+    accept: {
+      btnId:      'sBtnAccept',
+      btnClass:   'sel-accept',
+      panelClass: 'res-warn',
+      title:      'Accept staleness — wrong choice here',
+      body:       'Accepting staleness is valid when a short delay truly does not matter — counts, feeds, trending lists. For a user\'s own profile edit, seeing the old name is alarming and erodes trust. Accepting staleness here ships the read-your-writes bug.',
+    },
+  };
+
+  let currentStep = 0;
+
+  function render() {
+    const s = STEPS[currentStep];
+
+    document.getElementById('stepLabel').textContent   = s.label;
+    document.getElementById('stepDesc').textContent    = s.desc;
+    document.getElementById('userVal').textContent     = s.userVal;
+    document.getElementById('primaryVal').textContent  = s.primaryVal;
+    document.getElementById('replicaVal').textContent  = s.replicaVal;
+    document.getElementById('replicaStatus').textContent = s.replicaStatus;
+    document.getElementById('lagFill').style.width     = s.lagWidth;
+    document.getElementById('lagMs').textContent       = s.lagMs;
+    document.getElementById('stepCounter').textContent = `${currentStep + 1} / ${STEPS.length}`;
+
+    // Node classes
+    setNodeClass('nodeUser',    s.userClass);
+    setNodeClass('nodePrimary', s.primaryClass);
+    setNodeClass('nodeReplica', s.replicaClass);
+    document.getElementById('primaryVal').className  = 'node-value ' + s.primaryValClass;
+    document.getElementById('replicaVal').className  = 'node-value ' + s.replicaValClass;
+
+    // Arrow animation
+    const arrow = document.getElementById('arrowMsg');
+    arrow.classList.remove('visible');
+    arrow.className = 'arrow-msg ' + s.arrowClass;
+    arrow.textContent = s.arrowText;
+    requestAnimationFrame(() => requestAnimationFrame(() => arrow.classList.add('visible')));
+
+    // Buttons
+    document.getElementById('btnBack').disabled = currentStep === 0;
+    document.getElementById('btnNext').disabled = currentStep === STEPS.length - 1;
+
+    // Show / hide strategy section
+    const stratSec = document.getElementById('strategySection');
+    if (currentStep === STEPS.length - 1) {
+      stratSec.style.display = 'block';
+    } else {
+      stratSec.style.display = 'none';
+      clearStrategy();
+    }
+  }
+
+  function setNodeClass(id, extra) {
+    document.getElementById(id).className = 'node' + (extra ? ' ' + extra : '');
+  }
+
+  function nextStep() {
+    if (currentStep < STEPS.length - 1) { currentStep++; render(); }
+  }
+
+  function prevStep() {
+    if (currentStep > 0) { currentStep--; render(); }
+  }
+
+  function clearStrategy() {
+    ['sBtnPrimary','sBtnWait','sBtnAccept'].forEach(id => {
+      document.getElementById(id).className = 'strat-btn';
+    });
+    const panel = document.getElementById('resultPanel');
+    panel.className = 'result-panel';
+    panel.innerHTML = '';
+  }
+
+  function pickStrategy(key) {
+    clearStrategy();
+    const strat = STRATEGIES[key];
+    document.getElementById(strat.btnId).className = 'strat-btn ' + strat.btnClass;
+    const panel = document.getElementById('resultPanel');
+    panel.className = 'result-panel show ' + strat.panelClass;
+    panel.innerHTML = `<div class="result-title">${strat.title}</div><div>${strat.body}</div>`;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  render();
+</script>
+</body>
+</html>

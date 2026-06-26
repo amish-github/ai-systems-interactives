@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Which signal answers the question?</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%, 60%, 100% { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* ── Main layout ── */
+    .main {
+      padding: 24px;
+    }
+
+    /* ── Progress ── */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .progress-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .score-chip {
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .progress-bar {
+      height: 4px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 2px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #1878DC;
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Scenario card ── */
+    .scenario-card {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .scenario-eyebrow {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    .scenario-question {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.55;
+      margin-bottom: 12px;
+      font-style: italic;
+    }
+
+    .scenario-context {
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      line-height: 1.6;
+    }
+
+    /* ── Signal buttons ── */
+    .signals {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .signal-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 12px 16px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      background: #FFFFFF;
+      cursor: pointer;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      color: #1A1A1A;
+      transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      text-align: center;
+    }
+
+    .signal-btn:hover:not(:disabled) {
+      border-color: rgba(0,0,0,0.30);
+      transform: translateY(-2px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 4px 10px 0 rgba(0,0,0,0.10);
+    }
+
+    .signal-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .signal-btn:disabled {
+      cursor: default;
+    }
+
+    .signal-btn.correct {
+      border-color: #328F51;
+      background: rgba(50,143,81,0.06);
+    }
+
+    .signal-btn.incorrect {
+      border-color: #DE4C45;
+      background: rgba(222,76,69,0.05);
+    }
+
+    .signal-btn.reveal {
+      border-color: #328F51;
+      background: rgba(50,143,81,0.06);
+    }
+
+    .signal-icon {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .signal-name {
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .signal-desc {
+      font-size: 13px;
+      color: rgba(0,0,0,0.45);
+      line-height: 1.35;
+    }
+
+    /* ── Feedback ── */
+    .feedback {
+      display: none;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .feedback.correct-fb {
+      background: rgba(50,143,81,0.08);
+      border: 1px solid rgba(50,143,81,0.25);
+    }
+
+    .feedback.incorrect-fb {
+      background: rgba(222,76,69,0.07);
+      border: 1px solid rgba(222,76,69,0.22);
+    }
+
+    .feedback-label {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .feedback-label.correct-fb  { color: #328F51; }
+    .feedback-label.incorrect-fb { color: #DE4C45; }
+
+    .feedback-text {
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.65;
+    }
+
+    /* ── Next button ── */
+    .next-btn {
+      display: none;
+      width: 100%;
+      padding: 16px 24px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .next-btn:hover {
+      opacity: 0.75;
+    }
+
+    /* ── Summary ── */
+    .summary {
+      display: none;
+    }
+
+    .summary-top {
+      text-align: center;
+      padding: 8px 0 28px;
+    }
+
+    .summary-score {
+      font-size: 52px;
+      font-family: 'Suisse Intl Mono', monospace;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .summary-score.perfect { color: #328F51; }
+    .summary-score.good    { color: #1878DC; }
+    .summary-score.ok      { color: #F48E00; }
+
+    .summary-sub {
+      font-size: 16px;
+      color: rgba(0,0,0,0.5);
+    }
+
+    .rules-heading {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(0,0,0,0.4);
+      margin-bottom: 12px;
+    }
+
+    .rules-box {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .rule-row {
+      display: flex;
+      gap: 16px;
+      padding: 16px 20px;
+      align-items: flex-start;
+    }
+
+    .rule-row + .rule-row {
+      border-top: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .rule-chip {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    .rule-chip.logs    { background: rgba(24,120,220,0.10);  color: #1878DC; }
+    .rule-chip.metrics { background: rgba(50,143,81,0.10);   color: #328F51; }
+    .rule-chip.traces  { background: rgba(211,87,34,0.10);   color: #D35722; }
+
+    .rule-text {
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.55;
+    }
+
+    .restart-btn {
+      display: block;
+      width: 100%;
+      padding: 14px 24px;
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      text-align: center;
+    }
+
+    .restart-btn:hover {
+      background: rgba(0,0,0,0.06);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      .hint-header { padding: 12px 16px; }
+      .main        { padding: 16px; }
+      .signal-btn  { padding: 16px 8px 12px; }
+      .signal-name { font-size: 14px; }
+      .signal-desc { font-size: 11px; }
+    }
+
+    @media (max-width: 360px) {
+      .signals { grid-template-columns: 1fr; gap: 8px; }
+      .signal-btn { flex-direction: row; justify-content: flex-start; padding: 12px 16px; border-radius: 10px; }
+      .signal-desc { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hint header -->
+    <div class="hint-header">
+      <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="hint-text">Pick the right signal for each engineer's question</span>
+    </div>
+
+    <div class="main">
+
+      <!-- Progress -->
+      <div class="progress-row">
+        <span class="progress-label" id="progress-label">Question 1 of 5</span>
+        <span class="score-chip" id="score-chip">0 correct</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+
+      <!-- Quiz -->
+      <div id="quiz">
+
+        <div class="scenario-card">
+          <div class="scenario-eyebrow">Scenario <span id="scenario-num">1</span></div>
+          <div class="scenario-question" id="scenario-question"></div>
+          <div class="scenario-context" id="scenario-context"></div>
+        </div>
+
+        <div class="signals">
+
+          <button class="signal-btn" id="btn-logs" onclick="selectSignal('logs')">
+            <!-- Document / lines icon -->
+            <svg class="signal-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="4.75" y="2.75" width="18.5" height="22.5" rx="2.5" stroke="#1A1A1A" stroke-opacity="0.65" stroke-width="1.5"/>
+              <line x1="8" y1="9" x2="20" y2="9" stroke="#1A1A1A" stroke-opacity="0.45" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="13" x2="20" y2="13" stroke="#1A1A1A" stroke-opacity="0.45" stroke-width="1.5" stroke-linecap="round"/>
+              <line x1="8" y1="17" x2="15" y2="17" stroke="#1A1A1A" stroke-opacity="0.45" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span class="signal-name">Logs</span>
+            <span class="signal-desc">One specific event</span>
+          </button>
+
+          <button class="signal-btn" id="btn-metrics" onclick="selectSignal('metrics')">
+            <!-- Bar chart icon -->
+            <svg class="signal-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3"  y="17" width="5" height="7" rx="1.5" fill="#1A1A1A" fill-opacity="0.55"/>
+              <rect x="11.5" y="11" width="5" height="13" rx="1.5" fill="#1A1A1A" fill-opacity="0.55"/>
+              <rect x="20" y="5"  width="5" height="19" rx="1.5" fill="#1A1A1A" fill-opacity="0.55"/>
+              <line x1="2" y1="24.25" x2="26" y2="24.25" stroke="#1A1A1A" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span class="signal-name">Metrics</span>
+            <span class="signal-desc">Aggregate trend or rate</span>
+          </button>
+
+          <button class="signal-btn" id="btn-traces" onclick="selectSignal('traces')">
+            <!-- Connected nodes icon -->
+            <svg class="signal-icon" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="5"  cy="7"  r="2.75" stroke="#1A1A1A" stroke-opacity="0.65" stroke-width="1.5"/>
+              <circle cx="14" cy="14" r="2.75" stroke="#1A1A1A" stroke-opacity="0.65" stroke-width="1.5"/>
+              <circle cx="23" cy="7"  r="2.75" stroke="#1A1A1A" stroke-opacity="0.65" stroke-width="1.5"/>
+              <circle cx="23" cy="21" r="2.75" stroke="#1A1A1A" stroke-opacity="0.65" stroke-width="1.5"/>
+              <line x1="7.5"  y1="8.5"  x2="11.5" y2="12.5" stroke="#1A1A1A" stroke-opacity="0.35" stroke-width="1.5"/>
+              <line x1="16.5" y1="12.5" x2="20.5" y2="8.5"  stroke="#1A1A1A" stroke-opacity="0.35" stroke-width="1.5"/>
+              <line x1="16.5" y1="15.5" x2="20.5" y2="19.5" stroke="#1A1A1A" stroke-opacity="0.35" stroke-width="1.5"/>
+            </svg>
+            <span class="signal-name">Traces</span>
+            <span class="signal-desc">Path across services</span>
+          </button>
+
+        </div>
+
+        <div class="feedback" id="feedback">
+          <div class="feedback-label" id="feedback-label"></div>
+          <div class="feedback-text"  id="feedback-text"></div>
+        </div>
+
+        <button class="next-btn" id="next-btn" onclick="nextScenario()">Next question →</button>
+
+      </div><!-- /quiz -->
+
+      <!-- Summary -->
+      <div class="summary" id="summary">
+        <div class="summary-top">
+          <div class="summary-score" id="summary-score"></div>
+          <div class="summary-sub">signals matched correctly</div>
+        </div>
+
+        <div class="rules-heading">The three rules</div>
+        <div class="rules-box">
+          <div class="rule-row">
+            <span class="rule-chip logs">Logs</span>
+            <span class="rule-text">A specific single case — what exactly happened for one user, one request, one moment. High-cardinality detail (user id, request id) belongs here.</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-chip metrics">Metrics</span>
+            <span class="rule-text">Aggregate trends and rates — how many, how often, how fast across all traffic. Labels must stay low-cardinality (status code, endpoint name — not user id).</span>
+          </div>
+          <div class="rule-row">
+            <span class="rule-chip traces">Traces</span>
+            <span class="rule-text">A cross-service path — where did one request go and where did it spend its time across services. Sample at high volume to keep storage costs manageable.</span>
+          </div>
+        </div>
+
+        <button class="restart-btn" onclick="restart()">Try again</button>
+      </div><!-- /summary -->
+
+    </div><!-- /main -->
+  </div><!-- /container -->
+
+  <script>
+    var scenarios = [
+      {
+        question: "How many checkout requests failed per error code in the last hour?",
+        context: "The team is building a health dashboard for the checkout service and needs failure counts grouped by category.",
+        answer: "metrics",
+        correct: "Metrics is right. This is an aggregate count — \"how many\" grouped by a low-cardinality label (error code). A request counter with an error_code label is exactly what metrics are built for: summarising many events into a handful of numbers in real time.",
+        wrong: {
+          logs:   "Logs can record each individual failure, but manually counting and grouping thousands of log lines across many servers is impractical. Metrics aggregate automatically and are the right tool for \"how many\" questions.",
+          traces: "Traces follow individual request paths. For an aggregate count like \"how many failures per error code,\" you want metrics — not one trace per request."
+        }
+      },
+      {
+        question: "What exactly happened during user #8274's failed checkout at 14:23?",
+        context: "A support ticket arrived — the customer says their card was charged but no order was created.",
+        answer: "logs",
+        correct: "Logs is the right call. This is a specific single case — one user, one event, one timestamp. Structured log entries with fields like user_id, order_id, and error_code let you reconstruct exactly what happened for that one request. High-cardinality detail like a user_id is exactly what logs are designed to hold.",
+        wrong: {
+          metrics: "Metrics summarise across all events. They can confirm failures were happening, but they cannot tell you what happened for this specific user at this specific moment.",
+          traces:  "Traces show the path across services for one request, which can help narrow down where a fault occurred — but for reconstructing the full event detail (field values, error messages, state), structured logs are the primary tool."
+        }
+      },
+      {
+        question: "Why is the payment flow slow? The request crosses four services — where is the time being spent?",
+        context: "Users are reporting 8–12 second payment times. The team suspects one downstream service is the bottleneck, but does not know which one.",
+        answer: "traces",
+        correct: "Traces is the right signal. This is a cross-service path question — you need to follow one request through all four services and see the timing breakdown for each hop. Distributed tracing stitches those spans together automatically into a single timeline.",
+        wrong: {
+          logs:    "Logs from each service exist in isolation. You would need a shared trace ID to correlate them across four separate log streams, then manually piece together the timing. Traces do this automatically.",
+          metrics: "Metrics can show per-service latency averages, but they cannot show the causal chain — service A called B, which called C — for one specific slow request. Traces follow the full path."
+        }
+      },
+      {
+        question: "Is the search endpoint's error rate staying below 1% right now?",
+        context: "The team wants to set up an alert that fires when errors spike above a threshold in any five-minute window.",
+        answer: "metrics",
+        correct: "Metrics is right. An error rate is a ratio — errors divided by total requests — calculated continuously across all traffic. A pair of counters (total requests, error requests) with a low-cardinality endpoint label gives you this in real time, ready to alert on.",
+        wrong: {
+          logs:   "You could count log lines, but log systems are not optimised for real-time rate calculations and alerting. Metrics give you this as a first-class built-in capability.",
+          traces: "Sampled traces intentionally skip some requests by design, so you cannot compute a reliable error rate from them. Use metrics for rates and ratios."
+        }
+      },
+      {
+        question: "A single API request returned a 500 error. It passed through the API gateway, the auth service, and the order service. Which service caused the failure?",
+        context: "The on-call engineer has the request's trace ID and needs to pinpoint the root cause fast.",
+        answer: "traces",
+        correct: "Traces is the right signal. A trace follows that one request through the gateway → auth service → order service and records the outcome and timing at each step — pointing directly to where the failure originated, without manual log correlation across three separate systems.",
+        wrong: {
+          logs:    "Each service's logs are separate. To correlate them for one request you would need to filter all three log streams by the same trace ID and manually join them. A trace links those spans together automatically.",
+          metrics: "Metrics show aggregate counts — they can tell you which service has the highest overall error rate, but not which service caused this specific individual request to fail."
+        }
+      }
+    ];
+
+    var current = 0;
+    var score   = 0;
+    var answered = false;
+
+    function load(idx) {
+      var s = scenarios[idx];
+      document.getElementById('scenario-num').textContent     = idx + 1;
+      document.getElementById('scenario-question').textContent = '"' + s.question + '"';
+      document.getElementById('scenario-context').textContent  = s.context;
+      document.getElementById('progress-label').textContent    = 'Question ' + (idx + 1) + ' of ' + scenarios.length;
+      document.getElementById('score-chip').textContent        = score + ' correct';
+      document.getElementById('progress-fill').style.width     = (idx / scenarios.length * 100) + '%';
+
+      answered = false;
+
+      ['logs', 'metrics', 'traces'].forEach(function(sig) {
+        var btn = document.getElementById('btn-' + sig);
+        btn.className = 'signal-btn';
+        btn.disabled  = false;
+      });
+
+      document.getElementById('feedback').style.display  = 'none';
+      document.getElementById('next-btn').style.display  = 'none';
+    }
+
+    function selectSignal(chosen) {
+      if (answered) return;
+      answered = true;
+
+      var s = scenarios[current];
+      var isCorrect = (chosen === s.answer);
+      if (isCorrect) score++;
+
+      ['logs', 'metrics', 'traces'].forEach(function(sig) {
+        var btn = document.getElementById('btn-' + sig);
+        btn.disabled = true;
+        if (sig === s.answer) {
+          btn.classList.add(sig === chosen ? 'correct' : 'reveal');
+        } else if (sig === chosen) {
+          btn.classList.add('incorrect');
+        }
+      });
+
+      var fb    = document.getElementById('feedback');
+      var label = document.getElementById('feedback-label');
+      var text  = document.getElementById('feedback-text');
+
+      if (isCorrect) {
+        fb.className    = 'feedback correct-fb';
+        label.className = 'feedback-label correct-fb';
+        label.textContent = '✓ Correct';
+        text.textContent  = s.correct;
+      } else {
+        fb.className    = 'feedback incorrect-fb';
+        label.className = 'feedback-label incorrect-fb';
+        label.textContent = '✗ Not quite';
+        text.textContent  = s.wrong[chosen];
+      }
+
+      fb.style.display = 'block';
+
+      var nextBtn = document.getElementById('next-btn');
+      nextBtn.style.display = 'block';
+      nextBtn.textContent   = (current < scenarios.length - 1) ? 'Next question →' : 'See results →';
+
+      document.getElementById('score-chip').textContent = score + ' correct';
+    }
+
+    function nextScenario() {
+      current++;
+      if (current >= scenarios.length) {
+        showSummary();
+      } else {
+        load(current);
+      }
+    }
+
+    function showSummary() {
+      document.getElementById('quiz').style.display = 'none';
+
+      var el = document.getElementById('summary-score');
+      el.textContent = score + '/' + scenarios.length;
+      if      (score === scenarios.length) el.className = 'summary-score perfect';
+      else if (score >= 3)                 el.className = 'summary-score good';
+      else                                 el.className = 'summary-score ok';
+
+      document.getElementById('progress-label').textContent = 'Complete';
+      document.getElementById('progress-fill').style.width  = '100%';
+      document.getElementById('score-chip').textContent     = score + ' of ' + scenarios.length;
+      document.getElementById('summary').style.display      = 'block';
+    }
+
+    function restart() {
+      current  = 0;
+      score    = 0;
+      document.getElementById('summary').style.display = 'none';
+      document.getElementById('quiz').style.display    = 'block';
+      load(0);
+    }
+
+    load(0);
+  </script>
+</body>
+</html>

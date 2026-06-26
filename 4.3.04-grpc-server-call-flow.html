@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gRPC Server: Unary vs Streaming</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ---- Hint header ---- */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .hint-header span { font-size: 18px; }
+    .cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* ---- Tabs ---- */
+    .tabs {
+      display: flex;
+      padding: 0 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .tab-btn {
+      padding: 12px 16px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      margin-bottom: -1px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: #1A1A1A; }
+    .tab-btn.active { color: #1878DC; border-bottom-color: #1878DC; }
+
+    /* ---- Panels ---- */
+    .tab-panel { display: none; padding: 24px 20px; }
+    .tab-panel.active { display: block; }
+
+    /* ---- Chip selector ---- */
+    .selector-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .selector-label { font-size: 16px; color: rgba(0,0,0,0.50); flex-shrink: 0; }
+    .chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(0,0,0,0.14);
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      background: #F2F1EE;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .chip:hover { background: #E8E7E4; border-color: rgba(0,0,0,0.25); }
+    .chip.selected { background: #1878DC; border-color: #1878DC; color: #FFFFFF; }
+    .chip.missing.selected { background: #DE4C45; border-color: #DE4C45; }
+
+    /* ---- Flow ---- */
+    .flow { display: flex; flex-direction: column; gap: 0; margin-bottom: 24px; }
+    .flow-row { display: flex; align-items: stretch; }
+
+    .connector-col {
+      width: 32px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .step-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.14);
+      margin-top: 16px;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+    .step-line {
+      width: 2px;
+      flex: 1;
+      min-height: 8px;
+      background: rgba(0,0,0,0.10);
+    }
+
+    .step-card {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      margin-bottom: 8px;
+      opacity: 0.35;
+      transition: border-color 0.3s, background 0.3s, box-shadow 0.3s, opacity 0.3s;
+    }
+    .step-title { font-size: 16px; color: #1A1A1A; margin-bottom: 4px; }
+    .step-detail {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .step-detail.ok   { color: #328F51; }
+    .step-detail.err  { color: #DE4C45; }
+
+    /* active */
+    .flow-row.is-active .step-dot   { background: #1878DC; }
+    .flow-row.is-active .step-card  {
+      background: #FFFFFF;
+      border-color: #1878DC;
+      opacity: 1;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    /* active + error */
+    .flow-row.is-active.is-error .step-dot  { background: #DE4C45; }
+    .flow-row.is-active.is-error .step-card { border-color: #DE4C45; }
+
+    /* done */
+    .flow-row.is-done .step-dot  { background: #328F51; }
+    .flow-row.is-done .step-card { background: #FFFFFF; border-color: rgba(0,0,0,0.14); opacity: 0.65; }
+    /* done + was-error */
+    .flow-row.is-done.was-error .step-dot  { background: #DE4C45; }
+    .flow-row.is-done.was-error .step-card { border-color: rgba(222,76,69,0.40); opacity: 0.65; }
+
+    /* ---- Stream yield messages ---- */
+    .stream-yields { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .yield-msg {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: #1A1A1A;
+      opacity: 0;
+      transform: translateX(-8px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .yield-msg.visible { opacity: 1; transform: translateX(0); }
+    .yield-badge {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #8754FD;
+      color: #FFFFFF;
+      flex-shrink: 0;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    /* ---- Controls ---- */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: #1878DC; color: #FFFFFF; }
+    .btn-primary:hover:not(:disabled) { background: #1560B8; }
+    .btn-primary:disabled { opacity: 0.40; cursor: not-allowed; }
+    .btn-ghost { background: #F2F1EE; color: #1A1A1A; border: 1px solid rgba(0,0,0,0.14); }
+    .btn-ghost:hover { background: #E8E7E4; }
+    .step-counter { font-size: 14px; color: rgba(0,0,0,0.50); }
+
+    /* ---- Result banner ---- */
+    .result-banner {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 16px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .result-banner.ok  { display: block; background: #EDF7F0; border: 1px solid #328F51; color: #328F51; }
+    .result-banner.err { display: block; background: #FDF0EF; border: 1px solid #DE4C45; color: #DE4C45; }
+    .result-banner.neutral { display: block; background: #F2F1EE; border: 1px solid rgba(0,0,0,0.14); color: rgba(0,0,0,0.50); }
+    .result-title  { font-size: 16px; margin-bottom: 4px; }
+    .result-detail { font-family: 'Suisse Intl Mono', monospace; font-size: 13px; opacity: 0.85; }
+
+    /* ---- Divider ---- */
+    .divider { height: 1px; background: rgba(0,0,0,0.14); margin: 4px 0 20px; }
+
+    /* ---- Insight ---- */
+    .insight {
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #F2F1EE;
+      border-left: 3px solid #1878DC;
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.5;
+    }
+    .insight strong { display: block; margin-bottom: 4px; font-size: 16px; }
+    code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      background: rgba(0,0,0,0.07);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 400px) {
+      .hint-header, .tab-panel { padding-left: 12px; padding-right: 12px; }
+      .tabs { padding-left: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Choose an RPC type and input, then step through the call.</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-unary" onclick="switchTab('unary')">Unary: GetItem</button>
+    <button class="tab-btn" id="tab-streaming" onclick="switchTab('streaming')">Streaming: ListItems</button>
+  </div>
+
+  <!-- =================== UNARY PANEL =================== -->
+  <div class="tab-panel active" id="panel-unary">
+
+    <div class="selector-row">
+      <span class="selector-label">item_id:</span>
+      <div class="chip-group" id="unary-chips">
+        <button class="chip selected"        data-val="a1"  onclick="pickUnary(this)">a1 · Compass</button>
+        <button class="chip"                 data-val="b2"  onclick="pickUnary(this)">b2 · Map</button>
+        <button class="chip missing"         data-val="zzz" onclick="pickUnary(this)">zzz · missing</button>
+      </div>
+    </div>
+
+    <!-- Flow steps -->
+    <div class="flow" id="unary-flow">
+
+      <div class="flow-row" id="u-row-0">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">Client sends request</div>
+          <div class="step-detail" id="u-d0">GetItemRequest(item_id="a1")</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="u-row-1">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">gRPC routes to servicer method</div>
+          <div class="step-detail">CatalogService.GetItem(request, context)</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="u-row-2">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">Method looks up item in CATALOG</div>
+          <div class="step-detail" id="u-d2">CATALOG.get("a1")  →  found</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="u-row-3">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title" id="u-t3">Build and return response</div>
+          <div class="step-detail" id="u-d3">return catalog_pb2.Item(item_id="a1", name="Compass", price_cents=1299)</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="u-row-4">
+        <div class="connector-col"><div class="step-dot"></div></div>
+        <div class="step-card">
+          <div class="step-title">Client receives response</div>
+          <div class="step-detail" id="u-d4">status=OK · Item(name="Compass", price_cents=1299)</div>
+        </div>
+      </div>
+
+    </div><!-- /flow -->
+
+    <div class="control-row">
+      <button class="btn btn-primary" id="unary-btn" onclick="stepUnary()">Send request</button>
+      <button class="btn btn-ghost" onclick="resetUnary()">Reset</button>
+      <span class="step-counter" id="unary-ctr">Step 0 of 4</span>
+    </div>
+
+    <div class="result-banner" id="unary-result"></div>
+
+    <div class="divider"></div>
+    <div class="insight">
+      <strong>Key point — unary call</strong>
+      One request in, one response out. When an item is missing, set a specific status code on
+      the <code>context</code> object — never raise a plain Python exception. An uncaught exception
+      becomes an opaque <code>UNKNOWN</code> status that tells the client nothing.
+    </div>
+
+  </div><!-- /unary panel -->
+
+  <!-- =================== STREAMING PANEL =================== -->
+  <div class="tab-panel" id="panel-streaming">
+
+    <div class="selector-row">
+      <span class="selector-label">category:</span>
+      <div class="chip-group" id="stream-chips">
+        <button class="chip selected"  data-val="navigation" onclick="pickStream(this)">navigation</button>
+        <button class="chip"           data-val="shelter"    onclick="pickStream(this)">shelter</button>
+        <button class="chip missing"   data-val="unknown"    onclick="pickStream(this)">unknown</button>
+      </div>
+    </div>
+
+    <div class="flow" id="streaming-flow">
+
+      <div class="flow-row" id="s-row-0">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">Client sends request</div>
+          <div class="step-detail" id="s-d0">ListItemsRequest(category="navigation")</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="s-row-1">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">gRPC routes to servicer method</div>
+          <div class="step-detail">CatalogService.ListItems(request, context)</div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="s-row-2">
+        <div class="connector-col"><div class="step-dot"></div><div class="step-line"></div></div>
+        <div class="step-card">
+          <div class="step-title">Method iterates CATALOG, yielding matches</div>
+          <div class="step-detail" id="s-d2">for item_id, item in CATALOG.items():</div>
+          <div class="stream-yields" id="stream-yields"></div>
+        </div>
+      </div>
+
+      <div class="flow-row" id="s-row-3">
+        <div class="connector-col"><div class="step-dot"></div></div>
+        <div class="step-card">
+          <div class="step-title">Stream closes — generator exhausted</div>
+          <div class="step-detail" id="s-d3">status=OK</div>
+        </div>
+      </div>
+
+    </div><!-- /flow -->
+
+    <div class="control-row">
+      <button class="btn btn-primary" id="stream-btn" onclick="stepStreaming()">Send request</button>
+      <button class="btn btn-ghost" onclick="resetStreaming()">Reset</button>
+      <span class="step-counter" id="stream-ctr">Step 0 of 3</span>
+    </div>
+
+    <div class="result-banner" id="stream-result"></div>
+
+    <div class="divider"></div>
+    <div class="insight">
+      <strong>Key point — server streaming</strong>
+      One request in, a sequence of messages out. The method is a Python generator:
+      each <code>yield</code> sends one <code>Item</code> to the client immediately
+      without waiting for the loop to finish. An empty result is fine — the generator
+      simply exhausts with no yields and gRPC closes the stream with <code>OK</code>.
+    </div>
+
+  </div><!-- /streaming panel -->
+
+</div><!-- /container -->
+
+<script>
+  // ── Data ──────────────────────────────────────────────────────────────────
+  const CATALOG = {
+    a1: { name: 'Compass', price: 1299 },
+    b2: { name: 'Map',     price: 499  }
+  };
+
+  const STREAM_CATALOG = {
+    a1: { name: 'Compass', price: 1299, cat: 'navigation' },
+    b2: { name: 'Map',     price: 499,  cat: 'navigation' },
+    c3: { name: 'Tent',    price: 8999, cat: 'shelter'    }
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  const uState = { id: 'a1', step: 0 };
+  const sState = { cat: 'navigation', step: 0 };
+  let sTimer = null;
+
+  // ── Tab switch ─────────────────────────────────────────────────────────────
+  function switchTab(which) {
+    document.getElementById('tab-unary').classList.toggle('active', which === 'unary');
+    document.getElementById('tab-streaming').classList.toggle('active', which === 'streaming');
+    document.getElementById('panel-unary').classList.toggle('active', which === 'unary');
+    document.getElementById('panel-streaming').classList.toggle('active', which === 'streaming');
+  }
+
+  // ── Chip helpers ──────────────────────────────────────────────────────────
+  function pickUnary(el) {
+    el.closest('.chip-group').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    uState.id = el.dataset.val;
+    resetUnary();
+  }
+
+  function pickStream(el) {
+    el.closest('.chip-group').querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    sState.cat = el.dataset.val;
+    resetStreaming();
+  }
+
+  // ── Row helpers ──────────────────────────────────────────────────────────
+  function clearRow(id) {
+    const el = document.getElementById(id);
+    el.classList.remove('is-active', 'is-done', 'is-error', 'was-error');
+  }
+  function activateRow(id, isError) {
+    const el = document.getElementById(id);
+    el.classList.add('is-active');
+    if (isError) el.classList.add('is-error');
+  }
+  function doneRow(id, wasError) {
+    const el = document.getElementById(id);
+    el.classList.remove('is-active', 'is-error');
+    el.classList.add('is-done');
+    if (wasError) el.classList.add('was-error');
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  UNARY
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function updateUnaryText() {
+    const id = uState.id;
+    const item = CATALOG[id];
+    const found = !!item;
+
+    document.getElementById('u-d0').textContent = `GetItemRequest(item_id="${id}")`;
+    document.getElementById('u-d2').textContent = found
+      ? `CATALOG.get("${id}")  →  found`
+      : `CATALOG.get("${id}")  →  None (not in catalog)`;
+
+    if (found) {
+      document.getElementById('u-t3').textContent = 'Build and return response';
+      document.getElementById('u-d3').textContent =
+        `return catalog_pb2.Item(item_id="${id}", name="${item.name}", price_cents=${item.price})`;
+      document.getElementById('u-d3').className = 'step-detail ok';
+      document.getElementById('u-d4').textContent =
+        `status=OK  ·  Item(name="${item.name}", price_cents=${item.price})`;
+      document.getElementById('u-d4').className = 'step-detail ok';
+    } else {
+      document.getElementById('u-t3').textContent = 'Set error status on context';
+      document.getElementById('u-d3').textContent =
+        `context.set_code(grpc.StatusCode.NOT_FOUND)\ncontext.set_details("No item with id ${id}")\nreturn catalog_pb2.Item()`;
+      document.getElementById('u-d3').className = 'step-detail err';
+      document.getElementById('u-d4').textContent =
+        `status=NOT_FOUND  ·  Item() (empty — client reads status, not body)`;
+      document.getElementById('u-d4').className = 'step-detail err';
+    }
+  }
+
+  function resetUnary() {
+    uState.step = 0;
+    ['u-row-0','u-row-1','u-row-2','u-row-3','u-row-4'].forEach(clearRow);
+    updateUnaryText();
+    document.getElementById('unary-btn').textContent = 'Send request';
+    document.getElementById('unary-btn').disabled = false;
+    document.getElementById('unary-ctr').textContent = 'Step 0 of 4';
+    const rb = document.getElementById('unary-result');
+    rb.className = 'result-banner';
+    rb.innerHTML = '';
+  }
+
+  const UNARY_BTN_LABELS = ['Route call', 'Check catalog', 'Build response', 'Deliver to client'];
+
+  function stepUnary() {
+    const step = uState.step;
+    const id = uState.id;
+    const found = !!CATALOG[id];
+    const rowIds = ['u-row-0','u-row-1','u-row-2','u-row-3','u-row-4'];
+
+    if (step > 0) {
+      const wasErr = (step - 1 === 2 && !found) || (step - 1 === 3 && !found);
+      doneRow(rowIds[step - 1], wasErr);
+    }
+
+    const isErrStep = (!found && (step === 2 || step === 3));
+    activateRow(rowIds[step], isErrStep);
+
+    uState.step++;
+    const next = uState.step;
+
+    document.getElementById('unary-ctr').textContent = `Step ${next} of 4`;
+
+    if (next >= 5) {
+      document.getElementById('unary-btn').disabled = true;
+      document.getElementById('unary-ctr').textContent = 'Complete';
+      const rb = document.getElementById('unary-result');
+      if (found) {
+        const item = CATALOG[id];
+        rb.className = 'result-banner ok';
+        rb.innerHTML = `<div class="result-title">OK — item returned</div>`
+          + `<div class="result-detail">Item(item_id="${id}", name="${item.name}", price_cents=${item.price})</div>`;
+      } else {
+        rb.className = 'result-banner err';
+        rb.innerHTML = `<div class="result-title">NOT_FOUND — status set on context, not raised as exception</div>`
+          + `<div class="result-detail">context.set_code(NOT_FOUND)  ·  returns empty Item()</div>`;
+      }
+    } else {
+      document.getElementById('unary-btn').textContent = UNARY_BTN_LABELS[next - 1];
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  STREAMING
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function getStreamItems(cat) {
+    return Object.entries(STREAM_CATALOG)
+      .filter(([, v]) => v.cat === cat)
+      .map(([id, v]) => ({ id, name: v.name, price: v.price }));
+  }
+
+  function resetStreaming() {
+    if (sTimer) clearTimeout(sTimer);
+    sTimer = null;
+    sState.step = 0;
+    ['s-row-0','s-row-1','s-row-2','s-row-3'].forEach(clearRow);
+
+    const cat = sState.cat;
+    document.getElementById('s-d0').textContent = `ListItemsRequest(category="${cat}")`;
+    document.getElementById('stream-yields').innerHTML = '';
+    const items = getStreamItems(cat);
+    document.getElementById('s-d2').textContent = items.length === 0
+      ? `for item_id, item in CATALOG.items():  # no matches`
+      : `for item_id, item in CATALOG.items():`;
+
+    document.getElementById('stream-btn').textContent = 'Send request';
+    document.getElementById('stream-btn').disabled = false;
+    document.getElementById('stream-ctr').textContent = 'Step 0 of 3';
+    const rb = document.getElementById('stream-result');
+    rb.className = 'result-banner';
+    rb.innerHTML = '';
+  }
+
+  const STREAM_BTN_LABELS = ['Route call', 'Iterate catalog', ''];
+
+  function stepStreaming() {
+    const step = sState.step;
+    const cat  = sState.cat;
+    const rowIds = ['s-row-0','s-row-1','s-row-2','s-row-3'];
+    const items  = getStreamItems(cat);
+
+    if (step > 0) doneRow(rowIds[step - 1], false);
+    activateRow(rowIds[step], false);
+    sState.step++;
+
+    const next = sState.step;
+    document.getElementById('stream-ctr').textContent = `Step ${next} of 3`;
+
+    if (next === 3) {
+      document.getElementById('stream-btn').disabled = true;
+      const container = document.getElementById('stream-yields');
+
+      if (items.length === 0) {
+        sTimer = setTimeout(() => finishStream(items), 600);
+        return;
+      }
+
+      let delay = 0;
+      items.forEach((item, i) => {
+        sTimer = setTimeout(() => {
+          const div = document.createElement('div');
+          div.className = 'yield-msg';
+          div.innerHTML = `<span class="yield-badge">yield</span>`
+            + `Item(id="${item.id}", name="${item.name}", price_cents=${item.price})`;
+          container.appendChild(div);
+          requestAnimationFrame(() => requestAnimationFrame(() => div.classList.add('visible')));
+
+          if (i === items.length - 1) {
+            sTimer = setTimeout(() => finishStream(items), 700);
+          }
+        }, delay);
+        delay += 520;
+      });
+
+    } else if (next < 3) {
+      document.getElementById('stream-btn').textContent = STREAM_BTN_LABELS[next - 1];
+    }
+  }
+
+  function finishStream(items) {
+    doneRow('s-row-2', false);
+    activateRow('s-row-3', false);
+    document.getElementById('stream-ctr').textContent = 'Complete';
+
+    const rb = document.getElementById('stream-result');
+    if (items.length > 0) {
+      rb.className = 'result-banner ok';
+      rb.innerHTML = `<div class="result-title">Stream complete — ${items.length} message${items.length > 1 ? 's' : ''} yielded</div>`
+        + `<div class="result-detail">status=OK  ·  each Item was sent as it was yielded, not buffered</div>`;
+    } else {
+      rb.className = 'result-banner neutral';
+      rb.innerHTML = `<div class="result-title">Stream complete — 0 messages yielded</div>`
+        + `<div class="result-detail">status=OK  ·  generator simply exhausted with no matches</div>`;
+    }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  resetUnary();
+  resetStreaming();
+</script>
+</body>
+</html>

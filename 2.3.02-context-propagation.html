@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenTelemetry: Context Propagation</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ——— Hint header ——— */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      font-size: 18px;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes wiggle {
+      0%, 60%, 100% { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+    }
+
+    /* ——— Layout ——— */
+    .content { padding: 24px; }
+
+    .section-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    /* ——— Pipeline ——— */
+    .pipeline-area { margin-bottom: 28px; }
+
+    .pipeline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .service-node {
+      flex: 1;
+      border-radius: 12px;
+      padding: 12px 12px;
+      text-align: center;
+      border: 2px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: border-color 0.3s ease, background 0.3s ease;
+      min-width: 0;
+    }
+
+    .svc-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .trace-badge {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      display: inline-block;
+      transition: background 0.3s ease, color 0.3s ease;
+      white-space: nowrap;
+    }
+
+    /* ——— Connector ——— */
+    .connector {
+      flex-shrink: 0;
+      width: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 8px 4px;
+      border-radius: 8px;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .connector:hover { background: rgba(0,0,0,0.06); }
+
+    .arrow-row {
+      display: flex;
+      align-items: center;
+      width: 40px;
+      height: 12px;
+    }
+
+    .arrow-shaft {
+      flex: 1;
+      height: 2px;
+      border-radius: 1px;
+      transition: background 0.3s;
+    }
+
+    .arrow-head {
+      width: 0;
+      height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 8px solid transparent;
+      flex-shrink: 0;
+      transition: border-left-color 0.3s;
+    }
+
+    .conn-tag {
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      transition: color 0.3s;
+      white-space: nowrap;
+    }
+
+    .connector.on .arrow-shaft  { background: #328F51; }
+    .connector.on .arrow-head   { border-left-color: #328F51; }
+    .connector.on .conn-tag     { color: #328F51; }
+
+    .connector.off .arrow-shaft {
+      background: repeating-linear-gradient(
+        90deg, #DE4C45 0, #DE4C45 4px, transparent 4px, transparent 8px
+      );
+    }
+    .connector.off .arrow-head  { border-left-color: #DE4C45; }
+    .connector.off .conn-tag    { color: #DE4C45; }
+
+    /* ——— Trace colour tokens ——— */
+    .tc0-node  { border-color: #1878DC !important; background: #EEF5FD !important; }
+    .tc0-badge { background: #DBEAFE; color: #1878DC; }
+    .tc0-bar   { background: #DBEAFE; border: 1px solid #1878DC; color: #1878DC; }
+    .tc0-dot   { background: #1878DC; }
+    .tc0-text  { color: #1878DC; }
+
+    .tc1-node  { border-color: #D35722 !important; background: #FEF3EE !important; }
+    .tc1-badge { background: #FDE8D8; color: #D35722; }
+    .tc1-bar   { background: #FDE8D8; border: 1px solid #D35722; color: #D35722; }
+    .tc1-dot   { background: #D35722; }
+    .tc1-text  { color: #D35722; }
+
+    .tc2-node  { border-color: #8754FD !important; background: #F5F0FF !important; }
+    .tc2-badge { background: #EDE5FF; color: #8754FD; }
+    .tc2-bar   { background: #EDE5FF; border: 1px solid #8754FD; color: #8754FD; }
+    .tc2-dot   { background: #8754FD; }
+    .tc2-text  { color: #8754FD; }
+
+    /* ——— Trace waterfall ——— */
+    .trace-panel {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .trace-group            { margin-bottom: 16px; }
+    .trace-group:last-child { margin-bottom: 0; }
+
+    .trace-group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .trace-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .trace-id    { font-family: 'Suisse Intl Mono', monospace; font-size: 12px; }
+    .trace-count { font-size: 12px; color: rgba(0,0,0,0.50); }
+
+    .waterfall-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .wf-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.60);
+      width: 104px;
+      flex-shrink: 0;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .wf-track {
+      flex: 1;
+      position: relative;
+      height: 20px;
+    }
+
+    .wf-bar {
+      position: absolute;
+      height: 20px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 6px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 10px;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: left 0.35s ease, width 0.35s ease,
+                  background 0.35s ease, border-color 0.35s ease, color 0.35s ease;
+    }
+
+    /* ——— Status message ——— */
+    .status-msg {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 16px;
+      line-height: 1.5;
+      transition: background 0.3s, border-color 0.3s, color 0.3s;
+    }
+
+    .status-msg.ok {
+      background: #E8F5EC;
+      border: 1px solid rgba(50,143,81,0.30);
+      color: #1A5E31;
+    }
+
+    .status-msg.warn {
+      background: #FDECEA;
+      border: 1px solid rgba(222,76,69,0.30);
+      color: #8B1A17;
+    }
+
+    /* ——— Responsive ——— */
+    @media (max-width: 479px) {
+      .content            { padding: 16px; }
+      .hint-header        { padding: 12px 16px; font-size: 16px; }
+      .connector          { width: 40px; }
+      .arrow-row          { width: 28px; }
+      .svc-name           { font-size: 12px; }
+      .wf-label           { width: 84px; font-size: 11px; }
+    }
+
+    @media (max-width: 360px) {
+      .pipeline           { flex-direction: column; gap: 0; }
+      .service-node       { max-width: 100%; width: 100%; }
+      .connector          { flex-direction: row; width: 100%; height: 36px;
+                            padding: 8px 16px; justify-content: center; }
+      .connector .arrow-row { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Hint header -->
+    <div class="hint-header">
+      <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
+           xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z"
+              stroke="black" stroke-opacity="0.83" stroke-width="1.75"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Click the arrows to break or restore context propagation
+    </div>
+
+    <div class="content">
+
+      <!-- Service pipeline -->
+      <div class="pipeline-area">
+        <div class="section-label">Service request flow</div>
+        <div class="pipeline" id="pipeline"></div>
+      </div>
+
+      <!-- Trace waterfall -->
+      <div class="section-label">Backend trace view</div>
+      <div class="trace-panel" id="trace-panel"></div>
+
+      <!-- Status -->
+      <div class="status-msg ok" id="status-msg"></div>
+
+    </div>
+  </div>
+
+  <script>
+    const SERVICES = [
+      { name: 'Gateway',         spanId: 'span-a1b2' },
+      { name: 'Order Service',   spanId: 'span-c3d4' },
+      { name: 'Payment Service', spanId: 'span-e5f6' },
+    ];
+
+    const TRACES = [
+      { id: 'abc-1234', cls: 'tc0' },
+      { id: 'xyz-5678', cls: 'tc1' },
+      { id: 'def-9012', cls: 'tc2' },
+    ];
+
+    // true = context carried across this boundary, false = dropped
+    const links = [true, true];
+
+    /* ——————————————————————————————————————————
+       Compute which trace each service belongs to
+    —————————————————————————————————————————— */
+    function getGroups() {
+      const groups = [];
+      let cur = { traceIdx: 0, svcIdxs: [0] };
+      for (let i = 0; i < links.length; i++) {
+        if (links[i]) {
+          cur.svcIdxs.push(i + 1);
+        } else {
+          groups.push(cur);
+          cur = { traceIdx: groups.length, svcIdxs: [i + 1] };
+        }
+      }
+      groups.push(cur);
+      return groups;
+    }
+
+    function traceIdxFor(svcIdx) {
+      return getGroups().find(g => g.svcIdxs.includes(svcIdx)).traceIdx;
+    }
+
+    /* ——————————————————————————————————————————
+       Render: pipeline row
+    —————————————————————————————————————————— */
+    function renderPipeline() {
+      const el = document.getElementById('pipeline');
+      el.innerHTML = '';
+
+      SERVICES.forEach((svc, i) => {
+        const ti = traceIdxFor(i);
+        const tc = TRACES[ti];
+
+        const node = document.createElement('div');
+        node.className = `service-node ${tc.cls}-node`;
+        node.innerHTML =
+          `<div class="svc-name">${svc.name}</div>` +
+          `<div class="trace-badge ${tc.cls}-badge">${tc.id}</div>`;
+        el.appendChild(node);
+
+        if (i < SERVICES.length - 1) {
+          const on = links[i];
+          const conn = document.createElement('div');
+          conn.className = `connector ${on ? 'on' : 'off'}`;
+          conn.title = on
+            ? 'Context carried — click to break'
+            : 'Context dropped — click to restore';
+          conn.innerHTML =
+            `<div class="arrow-row">` +
+              `<div class="arrow-shaft"></div>` +
+              `<div class="arrow-head"></div>` +
+            `</div>` +
+            `<div class="conn-tag">${on ? 'ctx ✓' : 'dropped ✕'}</div>`;
+          conn.addEventListener('click', () => {
+            links[i] = !links[i];
+            render();
+          });
+          el.appendChild(conn);
+        }
+      });
+    }
+
+    /* ——————————————————————————————————————————
+       Render: waterfall trace view
+    —————————————————————————————————————————— */
+    function renderTracePanel() {
+      const panel = document.getElementById('trace-panel');
+      panel.innerHTML = '';
+      const groups = getGroups();
+
+      groups.forEach(group => {
+        const tc = TRACES[group.traceIdx];
+        const groupEl = document.createElement('div');
+        groupEl.className = 'trace-group';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'trace-group-header';
+        header.innerHTML =
+          `<div class="trace-dot ${tc.cls}-dot"></div>` +
+          `<div class="trace-id ${tc.cls}-text">Trace ${tc.id}</div>` +
+          `<div class="trace-count">` +
+            `${group.svcIdxs.length} span${group.svcIdxs.length !== 1 ? 's' : ''}` +
+          `</div>`;
+        groupEl.appendChild(header);
+
+        // Span bars (waterfall)
+        group.svcIdxs.forEach((svcIdx, pos) => {
+          const svc = SERVICES[svcIdx];
+          const row = document.createElement('div');
+          row.className = 'waterfall-row';
+
+          const indent   = pos * 12; // %
+          const barWidth = 90 - pos * 12; // %
+
+          row.innerHTML =
+            `<div class="wf-label">${svc.name}</div>` +
+            `<div class="wf-track">` +
+              `<div class="wf-bar ${tc.cls}-bar"` +
+                   ` style="left:${indent}%;width:${barWidth}%">` +
+                `${svc.spanId}` +
+              `</div>` +
+            `</div>`;
+          groupEl.appendChild(row);
+        });
+
+        panel.appendChild(groupEl);
+      });
+    }
+
+    /* ——————————————————————————————————————————
+       Render: status message
+    —————————————————————————————————————————— */
+    function renderStatus() {
+      const el = document.getElementById('status-msg');
+      const groups  = getGroups();
+      const broken  = links.filter(l => !l).length;
+
+      if (broken === 0) {
+        el.className = 'status-msg ok';
+        el.textContent =
+          'All three spans share one trace. The complete request path — ' +
+          'from Gateway through to Payment Service — is visible in a single view.';
+      } else {
+        el.className = 'status-msg warn';
+        const n = groups.length;
+        el.textContent =
+          (broken === 2 ? 'Both connections are' : 'One connection is') +
+          ' broken. The request appears as ' + n +
+          ' disconnected trace' + (n !== 1 ? 's' : '') +
+          ' in the backend — you cannot follow it end to end.';
+      }
+    }
+
+    /* ——————————————————————————————————————————
+       Main render
+    —————————————————————————————————————————— */
+    function render() {
+      renderPipeline();
+      renderTracePanel();
+      renderStatus();
+    }
+
+    render();
+  </script>
+</body>
+</html>

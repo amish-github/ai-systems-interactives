@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synchronous vs Asynchronous Replication</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* ── Hint header ─────────────────────────────────────────────────────── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s infinite;
+}
+
+@keyframes cursor-wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+  90%     { transform: rotate(0deg); }
+}
+
+.hint-text { font-size: 18px; }
+
+/* ── Main ────────────────────────────────────────────────────────────── */
+.main { padding: 24px 20px; }
+
+/* ── Mode toggle ─────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  background: #F2F1EE;
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: rgba(0,0,0,0.45);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.toggle-btn.active {
+  background: #FFFFFF;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.toggle-btn:hover:not(.active) { color: #1A1A1A; }
+
+/* ── Diagram ─────────────────────────────────────────────────────────── */
+.diagram-wrap {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  background: #FAFAFA;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.diagram-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── Step box ────────────────────────────────────────────────────────── */
+.step-box {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-height: 76px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #F2F1EE;
+  transition: background 0.2s, border-color 0.2s;
+}
+.step-box.s-success { background: #F0FAF4; border-color: #328F51; }
+.step-box.s-warning { background: #FFF7F2; border-color: #D35722; }
+
+.step-num {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.step-label {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1A1A1A;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+.btn-primary {
+  background: #1878DC;
+  color: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.btn-primary:not(:disabled):hover { background: #1468C0; }
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(0,0,0,0.5);
+  border: 1px solid rgba(0,0,0,0.14);
+}
+.btn-ghost:hover { color: #1A1A1A; border-color: rgba(0,0,0,0.28); }
+
+/* ── Step dots ───────────────────────────────────────────────────────── */
+.step-dots { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.2s;
+}
+.dot.active { background: #1878DC; }
+.dot.done   { background: #328F51; }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 400px) {
+  .hint-text { font-size: 15px; }
+  .step-label { font-size: 15px; }
+  .btn { padding: 10px 14px; font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Toggle between modes, then step through a write request to see what changes.</span>
+  </div>
+
+  <div class="main">
+
+    <!-- Mode toggle -->
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="btn-sync"  onclick="setMode('sync')">Synchronous</button>
+      <button class="toggle-btn"        id="btn-async" onclick="setMode('async')">Asynchronous</button>
+    </div>
+
+    <!-- Diagram -->
+    <div class="diagram-wrap">
+      <svg id="the-svg" viewBox="0 0 640 190" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="mh-blue"   markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0 L0,7 L9,3.5 z" fill="#1878DC"/>
+          </marker>
+          <marker id="mh-green"  markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0 L0,7 L9,3.5 z" fill="#328F51"/>
+          </marker>
+          <marker id="mh-orange" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0 L0,7 L9,3.5 z" fill="#D35722"/>
+          </marker>
+        </defs>
+
+        <!-- ── Client node ──────────────────────────────────────────── -->
+        <g id="nd-client">
+          <rect id="nd-client-rect" x="20" y="64" width="116" height="56" rx="10"
+                fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"/>
+          <text x="78" y="89"  text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="13" font-weight="600" fill="#1A1A1A">Client</text>
+          <text x="78" y="108" text-anchor="middle"
+                font-family="Suisse Intl Mono, monospace"
+                font-size="11" fill="rgba(0,0,0,0.42)">app server</text>
+        </g>
+
+        <!-- ── Primary node ─────────────────────────────────────────── -->
+        <g id="nd-primary">
+          <rect id="nd-primary-rect" x="262" y="64" width="116" height="56" rx="10"
+                fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"/>
+          <text x="320" y="89"  text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="13" font-weight="600" fill="#1A1A1A">Primary</text>
+          <text x="320" y="108" text-anchor="middle"
+                font-family="Suisse Intl Mono, monospace"
+                font-size="11" fill="rgba(0,0,0,0.42)">accepts writes</text>
+        </g>
+
+        <!-- ── Replica node ──────────────────────────────────────────── -->
+        <g id="nd-replica">
+          <rect id="nd-replica-rect" x="504" y="64" width="116" height="56" rx="10"
+                fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"/>
+          <text x="562" y="89"  text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="13" font-weight="600" fill="#1A1A1A">Replica</text>
+          <text x="562" y="108" text-anchor="middle"
+                font-family="Suisse Intl Mono, monospace"
+                font-size="11" fill="rgba(0,0,0,0.42)">read copy</text>
+        </g>
+
+        <!-- ── Client → Primary: WRITE ──────────────────────────────── -->
+        <g id="ar-write" opacity="0.12">
+          <line x1="140" y1="80" x2="254" y2="80"
+                stroke="#1878DC" stroke-width="2.5" marker-end="url(#mh-blue)"/>
+          <text x="197" y="73" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#1878DC">WRITE</text>
+        </g>
+
+        <!-- Primary → Client: SUCCESS -->
+        <g id="ar-success" opacity="0.12">
+          <line x1="258" y1="108" x2="143" y2="108"
+                stroke="#328F51" stroke-width="2.5" marker-end="url(#mh-green)"/>
+          <text x="197" y="124" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#328F51">SUCCESS</text>
+        </g>
+
+        <!-- ── Primary → Replica: forward ───────────────────────────── -->
+        <g id="ar-fwd" opacity="0.12">
+          <line x1="382" y1="80" x2="496" y2="80"
+                stroke="#1878DC" stroke-width="2.5" marker-end="url(#mh-blue)"/>
+          <text x="439" y="73" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#1878DC">forward</text>
+        </g>
+
+        <!-- Replica → Primary: ACK (sync only) -->
+        <g id="ar-ack" opacity="0.12">
+          <line x1="499" y1="108" x2="385" y2="108"
+                stroke="#328F51" stroke-width="2.5" marker-end="url(#mh-green)"/>
+          <text x="439" y="124" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#328F51">ACK</text>
+        </g>
+
+        <!-- "…async, later" label (async mode only) -->
+        <g id="lbl-async" opacity="0">
+          <text x="439" y="124" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="rgba(0,0,0,0.38)">…async, later</text>
+        </g>
+
+        <!-- ── Stored badges ──────────────────────────────────────────── -->
+        <g id="badge-prim-ok" opacity="0">
+          <rect x="289" y="134" width="62" height="20" rx="4" fill="#328F51"/>
+          <text x="320" y="148" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#fff">stored ✓</text>
+        </g>
+
+        <g id="badge-repl-ok" opacity="0">
+          <rect x="531" y="134" width="62" height="20" rx="4" fill="#328F51"/>
+          <text x="562" y="148" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#fff">stored ✓</text>
+        </g>
+
+        <!-- ── Lag badge ───────────────────────────────────────────────── -->
+        <g id="badge-lag" opacity="0">
+          <rect x="413" y="46" width="52" height="20" rx="4" fill="#F48E00"/>
+          <text x="439" y="60" text-anchor="middle"
+                font-family="Suisse Intl Mono, monospace"
+                font-size="10" fill="#fff">lag ⚠</text>
+        </g>
+
+        <!-- ── Primary fail overlay ───────────────────────────────────── -->
+        <g id="badge-fail" opacity="0">
+          <rect x="262" y="64" width="116" height="56" rx="10"
+                fill="#DE4C45" fill-opacity="0.16"/>
+          <text x="320" y="158" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#DE4C45">✗ failed</text>
+        </g>
+
+        <!-- ── Write lost badge ───────────────────────────────────────── -->
+        <g id="badge-lost" opacity="0">
+          <rect x="289" y="134" width="62" height="20" rx="4" fill="#DE4C45"/>
+          <text x="320" y="148" text-anchor="middle"
+                font-family="Suisse Intl, system-ui, sans-serif"
+                font-size="11" fill="#fff">write lost!</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Step description -->
+    <div class="step-box" id="step-box">
+      <div class="step-num"   id="step-num">Step 0 of 5</div>
+      <div class="step-label" id="step-label">Press "Next" to step through a write request and see when the client hears success.</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-ghost"    onclick="reset()">Reset</button>
+      <button class="btn btn-primary"  id="btn-next" onclick="nextStep()">Next →</button>
+      <div class="step-dots" id="step-dots"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let mode = 'sync';
+let step = 0;
+
+// ── Step data ──────────────────────────────────────────────────────────
+const STEPS = {
+  sync: [
+    {
+      state: 'normal',
+      label: 'Client sends a WRITE request to the Primary.',
+      arrows: ['ar-write'],
+      nodes:  ['nd-client', 'nd-primary'],
+      badges: []
+    },
+    {
+      state: 'normal',
+      label: 'Primary applies the write to its own storage.',
+      arrows: [],
+      nodes:  ['nd-primary'],
+      badges: ['badge-prim-ok']
+    },
+    {
+      state: 'normal',
+      label: 'Primary forwards the write to the Replica and waits — it will not reply to the Client until it gets confirmation back.',
+      arrows: ['ar-fwd'],
+      nodes:  ['nd-primary', 'nd-replica'],
+      badges: ['badge-prim-ok']
+    },
+    {
+      state: 'normal',
+      label: 'Replica stores the write and sends an ACK back to the Primary.',
+      arrows: ['ar-ack'],
+      nodes:  ['nd-primary', 'nd-replica'],
+      badges: ['badge-prim-ok', 'badge-repl-ok']
+    },
+    {
+      state: 'success',
+      label: 'Only now does Primary report SUCCESS to the Client. The write is confirmed on two machines. Even if Primary fails at this instant, the Replica already has the data — nothing is lost.',
+      arrows: ['ar-success'],
+      nodes:  ['nd-client', 'nd-primary'],
+      badges: ['badge-prim-ok', 'badge-repl-ok']
+    }
+  ],
+
+  async: [
+    {
+      state: 'normal',
+      label: 'Client sends a WRITE request to the Primary.',
+      arrows: ['ar-write'],
+      nodes:  ['nd-client', 'nd-primary'],
+      badges: []
+    },
+    {
+      state: 'normal',
+      label: 'Primary applies the write to its own storage only.',
+      arrows: [],
+      nodes:  ['nd-primary'],
+      badges: ['badge-prim-ok']
+    },
+    {
+      state: 'success',
+      label: 'Primary immediately reports SUCCESS to the Client — without waiting for any Replica. From here, the write exists only on the Primary.',
+      arrows: ['ar-success'],
+      nodes:  ['nd-client', 'nd-primary'],
+      badges: ['badge-prim-ok']
+    },
+    {
+      state: 'warning',
+      label: 'Later, Primary forwards the write to the Replica asynchronously. There is a replication lag window where the write is on the Primary only. If Primary fails here, the write is gone — the Client was already told SUCCESS.',
+      arrows: ['ar-fwd'],
+      nodes:  ['nd-primary', 'nd-replica'],
+      badges: ['badge-prim-ok', 'badge-lag', 'lbl-async']
+    },
+    {
+      state: 'warning',
+      label: 'Replica stores the write and catches up. The lag window is closed — but only because the Primary survived. One unlucky failure between steps 3 and 4 would have silently lost a confirmed write.',
+      arrows: [],
+      nodes:  ['nd-replica'],
+      badges: ['badge-prim-ok', 'badge-repl-ok', 'badge-lag']
+    }
+  ]
+};
+
+// ── Element id pools ───────────────────────────────────────────────────
+const ALL_ARROWS = ['ar-write','ar-success','ar-fwd','ar-ack'];
+const ALL_NODES  = ['nd-client','nd-primary','nd-replica'];
+const ALL_BADGES = ['badge-prim-ok','badge-repl-ok','badge-lag',
+                    'badge-fail','badge-lost','lbl-async'];
+
+// ── DOM helpers ────────────────────────────────────────────────────────
+function opacity(id, v) {
+  const el = document.getElementById(id);
+  if (el) el.setAttribute('opacity', String(v));
+}
+
+function highlightNode(id, on) {
+  const rect = document.querySelector('#' + id + ' rect:first-of-type');
+  if (!rect) return;
+  if (on) {
+    rect.setAttribute('fill', '#EBF4FF');
+    rect.setAttribute('stroke', '#1878DC');
+    rect.setAttribute('stroke-width', '2');
+  } else {
+    rect.setAttribute('fill', '#F2F1EE');
+    rect.setAttribute('stroke', 'rgba(0,0,0,0.14)');
+    rect.setAttribute('stroke-width', '1.5');
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function render() {
+  const steps = STEPS[mode];
+  const total = steps.length;
+
+  ALL_ARROWS.forEach(a => opacity(a, 0.12));
+  ALL_NODES.forEach(n  => highlightNode(n, false));
+  ALL_BADGES.forEach(b => opacity(b, 0));
+
+  const box      = document.getElementById('step-box');
+  const numEl    = document.getElementById('step-num');
+  const labelEl  = document.getElementById('step-label');
+  const btnNext  = document.getElementById('btn-next');
+
+  if (step === 0) {
+    numEl.textContent   = 'Step 0 of ' + total;
+    labelEl.textContent = 'Press "Next" to step through a write request and see when the client hears success.';
+    box.className       = 'step-box';
+    btnNext.disabled    = false;
+    btnNext.textContent = 'Next →';
+    renderDots(total, -1);
+    return;
+  }
+
+  const s = steps[step - 1];
+  numEl.textContent   = 'Step ' + step + ' of ' + total;
+  labelEl.textContent = s.label;
+  box.className = 'step-box' +
+    (s.state === 'success' ? ' s-success' : s.state === 'warning' ? ' s-warning' : '');
+
+  s.arrows.forEach(a => opacity(a, 1));
+  s.nodes.forEach(n  => highlightNode(n, true));
+  s.badges.forEach(b => opacity(b, 1));
+
+  const done = step >= total;
+  btnNext.disabled    = done;
+  btnNext.textContent = done ? 'Done ✓' : 'Next →';
+
+  renderDots(total, step - 1);
+}
+
+function renderDots(total, current) {
+  const c = document.getElementById('step-dots');
+  c.innerHTML = '';
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === current ? ' active' : i < current ? ' done' : '');
+    c.appendChild(d);
+  }
+}
+
+// ── Actions ────────────────────────────────────────────────────────────
+function nextStep() {
+  if (step < STEPS[mode].length) { step++; render(); }
+}
+
+function reset() {
+  step = 0;
+  render();
+}
+
+function setMode(m) {
+  mode = m;
+  step = 0;
+  document.getElementById('btn-sync').className  = 'toggle-btn' + (m === 'sync'  ? ' active' : '');
+  document.getElementById('btn-async').className = 'toggle-btn' + (m === 'async' ? ' active' : '');
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

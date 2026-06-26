@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Isolation Levels &amp; Concurrency Anomalies</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+  padding: 32px 16px 48px;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+.hint-icon { animation: cursor-wiggle 4s infinite; flex-shrink: 0; }
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── Section labels ── */
+.section-label {
+  font-size: 12px;
+  color: rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+/* ── Scenario pills ── */
+.scenario-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.pill {
+  padding: 7px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  line-height: 1;
+}
+
+.pill:hover { border-color: rgba(0,0,0,0.3); color: #1A1A1A; }
+
+.pill.active {
+  background: #1A1A1A;
+  border-color: #1A1A1A;
+  color: #FFFFFF;
+}
+
+/* ── Isolation level toggle ── */
+.iso-track {
+  display: flex;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  background: #F2F1EE;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.iso-btn {
+  flex: 1;
+  padding: 10px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.iso-btn:hover { color: #1A1A1A; }
+
+.iso-btn.active {
+  background: #FFFFFF;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+/* ── Scenario description ── */
+.scenario-desc {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.7);
+  line-height: 1.55;
+}
+
+.scenario-desc strong { color: #1A1A1A; }
+
+/* ── Timeline ── */
+.timeline-wrap {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.txn-headers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.txn-head {
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.txn-head:first-child { border-right: 1px solid rgba(0,0,0,0.14); }
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-a { background: #1878DC; }
+.dot-b { background: #D35722; }
+
+/* Steps */
+.steps-area { position: relative; }
+
+.step-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  opacity: 0.15;
+  transition: opacity 0.25s ease;
+}
+
+.step-row.revealed { opacity: 1; }
+
+.step-cell {
+  padding: 12px 16px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  font-size: 14px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+.step-cell:first-child { border-right: 1px solid rgba(0,0,0,0.14); }
+.step-cell.bg-blue  { background: rgba(24,120,220,0.04); }
+.step-cell.bg-orange{ background: rgba(211,87,34,0.04); }
+.step-cell.bg-green { background: rgba(50,143,81,0.06); }
+.step-cell.bg-red   { background: rgba(222,76,69,0.06); }
+
+.step-row:last-child .step-cell { border-bottom: none; }
+
+code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  background: rgba(0,0,0,0.065);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: pre;
+  display: inline-block;
+  line-height: 1.6;
+}
+
+.chip {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip-blue   { background: rgba(24,120,220,0.1);  color: #1878DC; }
+.chip-orange { background: rgba(211,87,34,0.1);   color: #D35722; }
+.chip-green  { background: rgba(50,143,81,0.12);  color: #328F51; }
+.chip-red    { background: rgba(222,76,69,0.12);  color: #DE4C45; }
+.chip-purple { background: rgba(135,84,253,0.1);  color: #8754FD; }
+
+.empty { color: rgba(0,0,0,0.18); font-style: italic; font-size: 13px; }
+
+/* ── Result banner ── */
+.result-banner {
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.55;
+  display: none;
+  gap: 12px;
+  align-items: flex-start;
+}
+.result-banner.show { display: flex; animation: popIn 0.25s ease; }
+.result-banner.anomaly   { background: rgba(222,76,69,0.07);  border: 1px solid rgba(222,76,69,0.22); }
+.result-banner.prevented { background: rgba(50,143,81,0.07);  border: 1px solid rgba(50,143,81,0.22); }
+
+.result-icon { font-size: 18px; flex-shrink: 0; line-height: 1.5; }
+.result-text strong { font-weight: 600; color: #1A1A1A; }
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-reset {
+  padding: 12px 20px;
+  background: transparent;
+  color: rgba(0,0,0,0.5);
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.btn-reset:hover { color: #1A1A1A; border-color: rgba(0,0,0,0.3); }
+
+.step-counter {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.45);
+  flex: 1;
+  text-align: center;
+}
+
+.btn-next {
+  padding: 12px 28px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.btn-next:hover:not(:disabled) { opacity: 0.8; }
+.btn-next:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .hint-header { font-size: 16px; }
+  .iso-btn { font-size: 12px; padding: 8px 4px; }
+  .txn-head { font-size: 13px; padding: 10px 10px; }
+  .step-cell { font-size: 13px; padding: 10px 10px; }
+  code { font-size: 11px; }
+  .btn-next, .btn-reset { font-size: 14px; padding: 10px 16px; }
+}
+
+@media (max-width: 360px) {
+  body { padding: 20px 12px 40px; }
+  .iso-btn { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Pick a scenario, set an isolation level, then step through what happens.
+  </div>
+
+  <!-- Scenario selector -->
+  <div class="section-label">Scenario</div>
+  <div class="scenario-pills" id="scenarioPills">
+    <button class="pill active" onclick="setScenario('nonrepeatable', this)">Non-repeatable read</button>
+    <button class="pill"        onclick="setScenario('phantom', this)">Phantom read</button>
+    <button class="pill"        onclick="setScenario('writeskew', this)">Write skew</button>
+  </div>
+
+  <!-- Isolation level toggle -->
+  <div class="section-label">Isolation level</div>
+  <div class="iso-track" id="isoTrack">
+    <button class="iso-btn active" onclick="setIso('rc',  this)">Read committed</button>
+    <button class="iso-btn"        onclick="setIso('rr',  this)">Repeatable read</button>
+    <button class="iso-btn"        onclick="setIso('ser', this)">Serializable</button>
+  </div>
+
+  <!-- Scenario description -->
+  <div class="scenario-desc" id="scenarioDesc"></div>
+
+  <!-- Timeline -->
+  <div class="timeline-wrap">
+    <div class="txn-headers">
+      <div class="txn-head"><span class="dot dot-a"></span>Transaction A</div>
+      <div class="txn-head"><span class="dot dot-b"></span>Transaction B</div>
+    </div>
+    <div class="steps-area" id="stepsArea"></div>
+  </div>
+
+  <!-- Result banner -->
+  <div class="result-banner" id="resultBanner">
+    <span class="result-icon" id="resultIcon"></span>
+    <span class="result-text" id="resultText"></span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn-reset" onclick="resetScenario()">&#8635; Reset</button>
+    <span class="step-counter" id="stepCounter">Step 0 / 0</span>
+    <button class="btn-next" id="btnNext" onclick="nextStep()">Start &#8594;</button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ---------------------------------------------------------------------------
+// Scenario data
+// Each step = [cellA_html, cellB_html]
+// "__VA__" / "__VB__" are replaced at render time with iso-level-specific html
+// ---------------------------------------------------------------------------
+var SCENARIOS = {
+
+  nonrepeatable: {
+    desc: '<strong>Non-repeatable read.</strong> Transaction A reads an account balance, does some work, then reads the same row again. Meanwhile Transaction B has updated and committed that balance. Does A see a different value on its second read?',
+    steps: [
+      ['<code>BEGIN</code>', '<span class="empty">—</span>'],
+      ['<span class="empty">—</span>', '<code>BEGIN</code>'],
+      ['<code>SELECT balance FROM accounts\nWHERE id = 42</code><br><span class="chip chip-blue">&#8594; $500</span>', '<span class="empty">—</span>'],
+      ['<span class="empty">—</span>', '<code>UPDATE accounts\nSET balance = 350\nWHERE id = 42</code>'],
+      ['<span class="empty">—</span>', '<code>COMMIT</code>&ensp;<span class="chip chip-orange">committed ✓</span>'],
+      ['__VA__', '<span class="empty">—</span>'],
+    ],
+    varyA: {
+      rc:  '<code>SELECT balance FROM accounts\nWHERE id = 42</code><br><span class="chip chip-red">&#8594; $350 &nbsp;⚠ changed!</span>',
+      rr:  '<code>SELECT balance FROM accounts\nWHERE id = 42</code><br><span class="chip chip-green">&#8594; $500 &nbsp;✓ snapshot held</span>',
+      ser: '<code>SELECT balance FROM accounts\nWHERE id = 42</code><br><span class="chip chip-green">&#8594; $500 &nbsp;✓ snapshot held</span>'
+    },
+    varyB: null,
+    results: {
+      rc: {
+        type: 'anomaly', icon: '⚠️',
+        html: '<strong>Non-repeatable read occurred.</strong> At read committed, Transaction A sees the freshly committed $350 on its second read — a different value than the $500 it saw first. Read committed makes no promise that already-read rows stay stable within a transaction.'
+      },
+      rr: {
+        type: 'prevented', icon: '✓',
+        html: '<strong>Anomaly prevented.</strong> At repeatable read, Transaction A holds a consistent snapshot from when it started. The second read still returns $500 even though B committed $350 in between. Already-read rows cannot change under you.'
+      },
+      ser: {
+        type: 'prevented', icon: '✓',
+        html: '<strong>Anomaly prevented.</strong> Serializable also prevents non-repeatable reads. Transaction A sees a fully consistent view throughout the transaction. Serializable adds even stronger guarantees on top of this.'
+      }
+    }
+  },
+
+  phantom: {
+    desc: '<strong>Phantom read.</strong> Transaction A counts active orders, does some work, then runs the same count again. In between, Transaction B inserts a new active order and commits. Does A get a different count the second time?',
+    steps: [
+      ['<code>BEGIN</code>', '<span class="empty">—</span>'],
+      ['<span class="empty">—</span>', '<code>BEGIN</code>'],
+      ['<code>SELECT count(*) FROM orders\nWHERE status = \'active\'</code><br><span class="chip chip-blue">&#8594; 12 rows</span>', '<span class="empty">—</span>'],
+      ['<span class="empty">—</span>', '<code>INSERT INTO orders (customer_id, status)\nVALUES (99, \'active\')</code>'],
+      ['<span class="empty">—</span>', '<code>COMMIT</code>&ensp;<span class="chip chip-orange">committed ✓</span>'],
+      ['__VA__', '<span class="empty">—</span>'],
+    ],
+    varyA: {
+      rc:  '<code>SELECT count(*) FROM orders\nWHERE status = \'active\'</code><br><span class="chip chip-red">&#8594; 13 rows &nbsp;⚠ phantom!</span>',
+      rr:  '<code>SELECT count(*) FROM orders\nWHERE status = \'active\'</code><br><span class="chip chip-green">&#8594; 12 rows &nbsp;✓ (PostgreSQL)</span>',
+      ser: '<code>SELECT count(*) FROM orders\nWHERE status = \'active\'</code><br><span class="chip chip-green">&#8594; 12 rows &nbsp;✓ snapshot held</span>'
+    },
+    varyB: null,
+    results: {
+      rc: {
+        type: 'anomaly', icon: '⚠️',
+        html: '<strong>Phantom read occurred.</strong> At read committed, the second count includes the row B inserted — a "phantom" that appeared mid-transaction. Read committed only prevents dirty reads; new committed rows can appear between repeated queries.'
+      },
+      rr: {
+        type: 'prevented', icon: '✓',
+        html: '<strong>Anomaly prevented (in PostgreSQL).</strong> PostgreSQL\'s repeatable read holds a snapshot that excludes rows inserted after the transaction started. The SQL standard allows phantoms at repeatable read — PostgreSQL goes further than the standard here.'
+      },
+      ser: {
+        type: 'prevented', icon: '✓',
+        html: '<strong>Anomaly prevented.</strong> Serializable guarantees a fully consistent snapshot. No rows inserted by other transactions can appear between repeated queries within the same transaction.'
+      }
+    }
+  },
+
+  writeskew: {
+    desc: '<strong>Write skew.</strong> A rule requires at least one doctor on call at all times. Two doctors are both on call. Each opens the app simultaneously to sign off — each checks that the other is still on call, decides it is safe, then commits their own removal.',
+    steps: [
+      ['<code>BEGIN</code>', '<code>BEGIN</code>'],
+      [
+        '<code>SELECT count(*) FROM on_call\nWHERE active = true</code><br><span class="chip chip-blue">&#8594; 2 on call &nbsp;✓ safe</span>',
+        '<code>SELECT count(*) FROM on_call\nWHERE active = true</code><br><span class="chip chip-orange">&#8594; 2 on call &nbsp;✓ safe</span>'
+      ],
+      [
+        '<span style="font-size:13px;color:rgba(0,0,0,0.5);">Other doctor still on call — decide to leave.</span>',
+        '<span style="font-size:13px;color:rgba(0,0,0,0.5);">Other doctor still on call — decide to leave.</span>'
+      ],
+      [
+        '<code>UPDATE on_call SET active = false\nWHERE doctor_id = 1</code>',
+        '<code>UPDATE on_call SET active = false\nWHERE doctor_id = 2</code>'
+      ],
+      ['__VA__', '__VB__'],
+    ],
+    varyA: {
+      rc:  '<code>COMMIT</code>&ensp;<span class="chip chip-red">committed ✓</span>',
+      rr:  '<code>COMMIT</code>&ensp;<span class="chip chip-red">committed ✓</span>',
+      ser: '<code>COMMIT</code>&ensp;<span class="chip chip-green">committed ✓ (first)</span>'
+    },
+    varyB: {
+      rc:  '<code>COMMIT</code>&ensp;<span class="chip chip-red">committed ✓</span>',
+      rr:  '<code>COMMIT</code>&ensp;<span class="chip chip-red">committed ✓</span>',
+      ser: '<code>ROLLBACK</code>&ensp;<span class="chip chip-purple">conflict — aborted</span>'
+    },
+    results: {
+      rc: {
+        type: 'anomaly', icon: '⚠️',
+        html: '<strong>Write skew occurred.</strong> Both transactions committed, leaving zero doctors on call. Each individually obeyed the rule it checked — but together they broke it. Read committed cannot see across the boundary of two separate writes.'
+      },
+      rr: {
+        type: 'anomaly', icon: '⚠️',
+        html: '<strong>Write skew still occurred at repeatable read.</strong> Repeatable read prevents rows from changing under you, but it does not track what other transactions wrote to different rows. Both commits succeed, zero doctors remain. Write skew requires serializable.'
+      },
+      ser: {
+        type: 'prevented', icon: '✓',
+        html: '<strong>Write skew prevented.</strong> The database detects that the two transactions\' reads and writes conflict. Transaction A commits; Transaction B is aborted. The application retries B — on retry it reads only one doctor on call and correctly rejects the removal.'
+      }
+    }
+  }
+};
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+var currentScenario = 'nonrepeatable';
+var currentIso      = 'rc';
+var currentStep     = 0;
+
+function sc() { return SCENARIOS[currentScenario]; }
+
+function setScenario(name, el) {
+  currentScenario = name;
+  document.querySelectorAll('.pill').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  currentStep = 0;
+  render();
+}
+
+function setIso(level, el) {
+  currentIso = level;
+  document.querySelectorAll('.iso-btn').forEach(function(b){ b.classList.remove('active'); });
+  el.classList.add('active');
+  currentStep = 0;
+  render();
+}
+
+function resetScenario() {
+  currentStep = 0;
+  render();
+}
+
+function nextStep() {
+  var s = sc();
+  if (currentStep < s.steps.length) {
+    currentStep++;
+    render();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Render
+// ---------------------------------------------------------------------------
+function render() {
+  var s = sc();
+  var total = s.steps.length;
+
+  // Description
+  document.getElementById('scenarioDesc').innerHTML = s.desc;
+
+  // Build step rows
+  var area = document.getElementById('stepsArea');
+  area.innerHTML = '';
+
+  for (var i = 0; i < total; i++) {
+    var revealed = i < currentStep;
+    var isLast   = (i === total - 1);
+
+    var rawA = s.steps[i][0];
+    var rawB = s.steps[i][1];
+
+    if (rawA === '__VA__' && s.varyA) rawA = s.varyA[currentIso];
+    if (rawB === '__VB__' && s.varyB) rawB = s.varyB[currentIso];
+
+    // Determine background tint on last (varies) row once revealed
+    var bgA = '', bgB = '';
+    if (revealed && isLast) {
+      var resultType = s.results[currentIso].type;
+      bgA = resultType === 'prevented' ? ' bg-green' : ' bg-red';
+      bgB = resultType === 'prevented' ? ' bg-green' : ' bg-red';
+    }
+
+    var row = document.createElement('div');
+    row.className = 'step-row' + (revealed ? ' revealed' : '');
+    row.innerHTML =
+      '<div class="step-cell' + bgA + '">' + rawA + '</div>' +
+      '<div class="step-cell' + bgB + '">' + rawB + '</div>';
+    area.appendChild(row);
+  }
+
+  // Counter
+  document.getElementById('stepCounter').textContent = 'Step ' + currentStep + ' / ' + total;
+
+  // Next button
+  var btn = document.getElementById('btnNext');
+  btn.disabled = currentStep >= total;
+  if (currentStep === 0) btn.textContent = 'Start →';
+  else if (currentStep >= total) btn.textContent = 'Done';
+  else btn.textContent = 'Next →';
+
+  // Result banner
+  var banner = document.getElementById('resultBanner');
+  if (currentStep >= total) {
+    var r = s.results[currentIso];
+    banner.className = 'result-banner show ' + r.type;
+    document.getElementById('resultIcon').textContent = r.icon;
+    document.getElementById('resultText').innerHTML = r.html;
+  } else {
+    banner.className = 'result-banner';
+  }
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

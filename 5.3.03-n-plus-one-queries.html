@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>N+1 Queries vs Eager Load</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #fff;
+  display: flex;
+  justify-content: center;
+}
+.container { width: 100%; max-width: 700px; }
+
+/* hint header */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px 16px;
+  font-size: 18px;
+  line-height: 1.4;
+}
+.cursor-icon { flex-shrink: 0; animation: wiggle 4s infinite; }
+@keyframes wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%      { transform: rotate(-10deg); }
+  30%      { transform: rotate(10deg); }
+  45%      { transform: rotate(-8deg); }
+  60%      { transform: rotate(6deg); }
+  75%      { transform: rotate(-3deg); }
+}
+
+/* toggle */
+.toggle { display: flex; gap: 8px; padding: 0 16px 16px; }
+.tab {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  color: rgba(0,0,0,0.5);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.tab:hover:not(.active) {
+  color: #1A1A1A;
+  border-color: rgba(0,0,0,0.25);
+}
+.tab.active {
+  background: #fff;
+  color: #1A1A1A;
+  border-color: #1878DC;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* card */
+.card {
+  margin: 0 16px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.15);
+}
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 260px;
+}
+.col { padding: 14px; }
+.col-left { border-right: 1.5px solid rgba(0,0,0,0.14); }
+.col-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(0,0,0,0.4);
+  margin-bottom: 10px;
+}
+
+/* author rows */
+.author-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+  margin-bottom: 4px;
+  font-size: 15px;
+  transition: all 0.2s;
+}
+.author-row.dim    { opacity: 0.3; background: #F2F1EE; }
+.author-row.ready  { opacity: 0.65; background: #F2F1EE; }
+.author-row.active {
+  background: #fff;
+  border-color: #1878DC;
+  opacity: 1;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.15);
+}
+.author-row.done   { opacity: 0.45; background: #F2F1EE; }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.18);
+  transition: background 0.2s;
+}
+.author-row.active .dot { background: #1878DC; }
+.author-row.done   .dot { background: #328F51; }
+
+/* query log */
+.q-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 232px;
+  overflow-y: auto;
+}
+.q-item {
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1.5px solid;
+  animation: pop 0.2s ease;
+}
+@keyframes pop {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.q-main  { background: #EBF4FF; border-color: rgba(24,120,220,0.4);   color: #0E5AAA; }
+.q-n     { background: #FFF4EF; border-color: rgba(211,87,34,0.45);   color: #8C320C; }
+.q-eager { background: #EDFAF2; border-color: rgba(50,143,81,0.45);   color: #1A5C32; }
+.q-num   { font-size: 10px; opacity: 0.5; margin-right: 4px; }
+
+/* status bar */
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #F2F1EE;
+  border-top: 1.5px solid rgba(0,0,0,0.14);
+}
+.badge {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 15px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.12);
+  color: #1A1A1A;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s, color 0.3s;
+}
+.badge.warn { background: #D35722; color: #fff; }
+.badge.ok   { background: #328F51; color: #fff; }
+.status-left { display: flex; align-items: center; gap: 8px; font-size: 14px; color: rgba(0,0,0,0.5); }
+.status-right { font-size: 14px; color: rgba(0,0,0,0.5); }
+
+/* buttons */
+.btns { display: flex; gap: 8px; padding: 12px 16px; }
+.btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-run {
+  flex: 1;
+  background: #1A1A1A;
+  color: #fff;
+  border-color: #1A1A1A;
+}
+.btn-run:hover:not(:disabled) { background: #333; border-color: #333; }
+.btn-run:disabled {
+  background: rgba(0,0,0,0.18);
+  border-color: transparent;
+  cursor: default;
+}
+.btn-reset { background: #F2F1EE; color: #1A1A1A; }
+.btn-reset:hover { background: #E8E7E3; }
+
+/* callout */
+.callout {
+  margin: 0 16px 8px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.55;
+  border: 1.5px solid;
+  animation: pop 0.25s ease;
+}
+.callout-bad  { background: #FFF4EF; border-color: rgba(211,87,34,0.4); color: #7A2A05; }
+.callout-good { background: #EDFAF2; border-color: rgba(50,143,81,0.4); color: #14492A; }
+
+/* code block */
+.code-block {
+  margin: 0 16px 20px;
+  padding: 14px;
+  background: #F2F1EE;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-x: auto;
+}
+.hl { background: rgba(24,120,220,0.16); border-radius: 3px; padding: 0 2px; }
+.cm { color: rgba(0,0,0,0.38); }
+
+@media (max-width: 500px) {
+  .hint { font-size: 16px; }
+  .cols { grid-template-columns: 1fr; }
+  .col-left {
+    border-right: none;
+    border-bottom: 1.5px solid rgba(0,0,0,0.14);
+  }
+  .q-log { max-height: 180px; }
+  .tab { font-size: 13px; padding: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Toggle between load strategies, then step through the queries.
+  </div>
+
+  <!-- Mode toggle -->
+  <div class="toggle">
+    <button class="tab active" id="tab-lazy" onclick="setMode('lazy')">Lazy Load (N+1)</button>
+    <button class="tab" id="tab-eager" onclick="setMode('eager')">Eager Load (selectinload)</button>
+  </div>
+
+  <!-- Visual card -->
+  <div class="card">
+    <div class="cols">
+      <div class="col col-left">
+        <div class="col-label">for author in authors:</div>
+        <div id="author-list"></div>
+      </div>
+      <div class="col">
+        <div class="col-label">Queries fired to DB</div>
+        <div id="q-log" class="q-log"></div>
+      </div>
+    </div>
+    <div class="status">
+      <div class="status-left">
+        <span class="badge" id="badge">0</span>
+        <span>queries fired</span>
+      </div>
+      <div class="status-right" id="status-msg">—</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btns">
+    <button class="btn btn-run" id="step-btn" onclick="doStep()">Execute next query →</button>
+    <button class="btn btn-reset" onclick="reset()">Reset</button>
+  </div>
+
+  <!-- Callout (appears on completion) -->
+  <div id="callout-area"></div>
+
+  <!-- Code snippet -->
+  <div class="code-block" id="code-block"></div>
+
+</div>
+<script>
+const AUTHORS = ['Alice', 'Bob', 'Carol', 'Dan', 'Eve'];
+
+const LAZY_STEPS = [
+  {
+    sql: 'SELECT * FROM authors',
+    type: 'main',
+    msg: 'Authors loaded into memory'
+  },
+  ...AUTHORS.map((name, i) => ({
+    sql: 'SELECT * FROM books\nWHERE author_id = ' + (i + 1),
+    type: 'n',
+    authorIndex: i,
+    msg: 'Loading books for ' + name
+  }))
+];
+
+const EAGER_STEPS = [
+  {
+    sql: 'SELECT * FROM authors',
+    type: 'main',
+    msg: 'Authors loaded into memory'
+  },
+  {
+    sql: 'SELECT * FROM books\nWHERE author_id IN (1,2,3,4,5)',
+    type: 'eager',
+    allDone: true,
+    msg: 'All books loaded in one query'
+  }
+];
+
+const CODE_LAZY = [
+  '<span class="cm"># Lazy load — N+1 problem</span>',
+  'authors = session.execute(',
+  '    select(Author)',
+  ').scalars().all()',
+  '',
+  'for author in authors:',
+  '    <span class="cm"># ⚠ fires a new query every iteration</span>',
+  '    titles = [b.title for b in author.books]'
+].join('\n');
+
+const CODE_EAGER = [
+  '<span class="cm"># Eager load — fixed</span>',
+  'authors = session.execute(',
+  '    select(Author)',
+  '    <span class="hl">.options(selectinload(Author.books))</span>',
+  ').scalars().all()',
+  '',
+  'for author in authors:',
+  '    <span class="cm"># ✓ data already loaded, no new query</span>',
+  '    titles = [b.title for b in author.books]'
+].join('\n');
+
+let mode = 'lazy';
+let stepIndex = 0;
+let authorStates = [];
+let queryLog = [];
+
+function getSteps() {
+  return mode === 'lazy' ? LAZY_STEPS : EAGER_STEPS;
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('tab-lazy').classList.toggle('active', m === 'lazy');
+  document.getElementById('tab-eager').classList.toggle('active', m === 'eager');
+  reset();
+}
+
+function reset() {
+  stepIndex = 0;
+  authorStates = Array(5).fill('dim');
+  queryLog = [];
+  render();
+  document.getElementById('badge').textContent = '0';
+  document.getElementById('badge').className = 'badge';
+  document.getElementById('status-msg').textContent = '—';
+  document.getElementById('callout-area').innerHTML = '';
+  document.getElementById('step-btn').disabled = false;
+  document.getElementById('step-btn').textContent = 'Execute next query →';
+  document.getElementById('code-block').innerHTML = mode === 'lazy' ? CODE_LAZY : CODE_EAGER;
+}
+
+function doStep() {
+  var steps = getSteps();
+  if (stepIndex >= steps.length) return;
+
+  var s = steps[stepIndex];
+
+  // Update author states
+  if (s.type === 'main') {
+    authorStates = Array(5).fill('ready');
+  } else if (s.authorIndex !== undefined) {
+    for (var i = 0; i < 5; i++) {
+      if (authorStates[i] === 'active') authorStates[i] = 'done';
+    }
+    authorStates[s.authorIndex] = 'active';
+  } else if (s.allDone) {
+    authorStates = Array(5).fill('done');
+  }
+
+  queryLog.push({ sql: s.sql, type: s.type, num: stepIndex + 1 });
+  stepIndex++;
+
+  render();
+
+  var count = queryLog.length;
+  var badge = document.getElementById('badge');
+  badge.textContent = count;
+  badge.className = 'badge';
+  if (mode === 'lazy' && count > 2) badge.classList.add('warn');
+  if (mode === 'eager' && count > 0) badge.classList.add('ok');
+
+  document.getElementById('status-msg').textContent = s.msg;
+
+  if (stepIndex >= steps.length) {
+    // Finalize remaining author states
+    authorStates = authorStates.map(function(st) {
+      return (st === 'active' || st === 'ready') ? 'done' : st;
+    });
+    renderAuthors();
+    document.getElementById('step-btn').disabled = true;
+    document.getElementById('step-btn').textContent = 'All queries executed';
+    showCallout(count);
+  }
+}
+
+function render() {
+  renderAuthors();
+  renderQueryLog();
+}
+
+function renderAuthors() {
+  var el = document.getElementById('author-list');
+  el.innerHTML = AUTHORS.map(function(name, i) {
+    var st = authorStates[i];
+    return '<div class="author-row ' + st + '"><div class="dot"></div>' + name + '</div>';
+  }).join('');
+}
+
+function renderQueryLog() {
+  var el = document.getElementById('q-log');
+  el.innerHTML = queryLog.map(function(q) {
+    var cls = q.type === 'main' ? 'q-main' : q.type === 'eager' ? 'q-eager' : 'q-n';
+    var sqlHtml = q.sql.replace(/\n/g, '<br>');
+    return '<div class="q-item ' + cls + '"><span class="q-num">#' + q.num + '</span>' + sqlHtml + '</div>';
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function showCallout(n) {
+  var el = document.getElementById('callout-area');
+  if (mode === 'lazy') {
+    el.innerHTML = '<div class="callout callout-bad">'
+      + '<strong>' + n + ' queries</strong> for 5 authors.'
+      + ' With 500 authors that would be <strong>501 queries</strong>.'
+      + ' The count grows linearly with your data — that\'s the N+1 problem.'
+      + '</div>';
+  } else {
+    el.innerHTML = '<div class="callout callout-good">'
+      + '<strong>' + n + ' queries</strong> total, regardless of author count.'
+      + ' <code>selectinload</code> fetches all books in one extra query,'
+      + ' keeping the total fixed at 2.'
+      + '</div>';
+  }
+}
+
+// Initialize
+reset();
+</script>
+</body>
+</html>

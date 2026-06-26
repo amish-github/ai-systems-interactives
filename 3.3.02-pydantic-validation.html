@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request & Response Validation with Pydantic</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* ─── Hint header ─── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 16px 0;
+    }
+
+    .hint-header svg { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+
+    @keyframes cursor-wiggle {
+      0%,100% { transform: rotate(0deg); }
+      15%      { transform: rotate(-10deg); }
+      30%      { transform: rotate(10deg); }
+      45%      { transform: rotate(-8deg); }
+      60%      { transform: rotate(6deg); }
+      75%      { transform: rotate(-3deg); }
+      90%      { transform: rotate(0deg); }
+    }
+
+    .hint-text { font-size: 18px; color: #1A1A1A; }
+
+    /* ─── Tabs ─── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      padding: 16px 16px 0;
+    }
+
+    .tab-btn {
+      padding: 8px 16px;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 8px;
+      background: #F2F1EE;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .tab-btn.active { background: #1A1A1A; color: #FFFFFF; border-color: #1A1A1A; }
+    .tab-btn:hover:not(.active) { background: #E8E7E4; color: #1A1A1A; }
+
+    /* ─── Section panels ─── */
+    .section { display: none; padding: 16px; }
+    .section.active { display: block; }
+
+    /* ─── Scenario picker ─── */
+    .section-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      margin-bottom: 8px;
+    }
+
+    .scenario-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 480px) {
+      .scenario-grid { grid-template-columns: 1fr; }
+    }
+
+    .scenario-btn {
+      padding: 10px 12px;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 8px;
+      background: #F2F1EE;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      color: #1A1A1A;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s, border-color 0.15s;
+      line-height: 1.4;
+    }
+
+    .scenario-btn:hover:not(.selected) { background: #E8E7E4; }
+    .scenario-btn.selected { border-color: #1878DC; background: #EBF3FD; }
+
+    .badge {
+      display: inline-block;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    .badge-valid   { background: #D4EDDA; color: #328F51; }
+    .badge-coerce  { background: #FFF3CD; color: #D35722; }
+    .badge-reject  { background: #FDECEA; color: #DE4C45; }
+
+    /* ─── Flow card ─── */
+    .flow-card {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .flow-card-header {
+      background: #F2F1EE;
+      padding: 10px 16px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .flow-card-body { padding: 16px; }
+
+    /* ─── Flow nodes ─── */
+    .flow-node {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      padding: 12px;
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.10);
+    }
+
+    .node-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    .node-code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .k { color: #8754FD; }    /* key / field name */
+    .s { color: #328F51; }    /* string value */
+    .n { color: #D35722; }    /* number value */
+    .e { color: #DE4C45; }    /* error / invalid */
+    .c { color: rgba(0,0,0,0.4); font-style: italic; } /* comment */
+
+    .flow-arrow {
+      text-align: center;
+      font-size: 20px;
+      padding: 6px 0;
+      transition: color 0.4s;
+    }
+
+    /* ─── Gate ─── */
+    .gate-node {
+      border: 2px solid #1878DC;
+      background: #EBF3FD;
+      border-radius: 12px;
+      padding: 12px 16px;
+      text-align: center;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.10);
+    }
+
+    .gate-title { font-size: 15px; color: #1878DC; margin-bottom: 4px; }
+    .gate-sub   { font-size: 12px; color: rgba(0,0,0,0.5); }
+
+    /* ─── Send button ─── */
+    .action-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 12px 0;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .action-btn:active { transform: scale(0.98); }
+    .btn-blue   { background: #1878DC; color: #FFFFFF; }
+    .btn-blue:hover { background: #1566BE; }
+    .btn-purple { background: #8754FD; color: #FFFFFF; }
+    .btn-purple:hover { background: #7040E0; }
+    .btn-reset  { background: #F2F1EE; color: #1A1A1A; border: 1px solid rgba(0,0,0,0.14); }
+    .btn-reset:hover { background: #E8E7E4; }
+
+    /* ─── Result block ─── */
+    .result-block {
+      border-radius: 10px;
+      padding: 12px;
+      animation: fadeIn 0.25s ease;
+    }
+
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+
+    .result-accepted { border: 1px solid #328F51; background: #F0FAF3; }
+    .result-coerced  { border: 1px solid #D35722; background: #FDF4EE; }
+    .result-rejected { border: 1px solid #DE4C45; background: #FEF0EF; }
+
+    .result-tag {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+
+    .result-accepted .result-tag { color: #328F51; }
+    .result-coerced  .result-tag { color: #D35722; }
+    .result-rejected .result-tag { color: #DE4C45; }
+
+    .result-status {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .result-accepted .result-status { color: #328F51; }
+    .result-coerced  .result-status { color: #D35722; }
+    .result-rejected .result-status { color: #DE4C45; }
+
+    .result-body {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      color: #1A1A1A;
+    }
+
+    /* ─── Explanation ─── */
+    .explanation {
+      padding: 12px 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      font-size: 15px;
+      line-height: 1.55;
+      color: #1A1A1A;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .explanation code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      background: rgba(0,0,0,0.07);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    /* ─── Legend ─── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.5);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-green  { background: #328F51; }
+    .dot-orange { background: #D35722; }
+    .dot-red    { background: #DE4C45; }
+
+    /* ─── Part 2: field rows ─── */
+    .fields-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+
+    .field-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .field-chip {
+      flex: 1;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.14);
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      transition: background 0.35s, opacity 0.35s, border-color 0.35s;
+      background: #F2F1EE;
+    }
+
+    .field-chip.exposed {
+      background: #F0FAF3;
+      border-color: rgba(50,143,81,0.4);
+    }
+
+    .field-chip.blocked {
+      background: #F9F9F9;
+      border-color: rgba(0,0,0,0.08);
+      opacity: 0.45;
+      text-decoration: line-through;
+      text-decoration-color: #DE4C45;
+    }
+
+    .field-fate {
+      font-size: 12px;
+      width: 68px;
+      text-align: right;
+      flex-shrink: 0;
+      transition: color 0.3s;
+    }
+
+    .fate-pending  { color: rgba(0,0,0,0.25); }
+    .fate-exposed  { color: #328F51; }
+    .fate-blocked  { color: #DE4C45; }
+
+    .response-preview {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 4px;
+      animation: fadeIn 0.3s ease;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.10);
+    }
+
+    .preview-header {
+      background: #F2F1EE;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: rgba(0,0,0,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .preview-body {
+      padding: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.65;
+      white-space: pre;
+      color: #1A1A1A;
+    }
+
+    .step-label {
+      font-size: 13px;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 10px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Pick a scenario, send the request, see what Pydantic does.</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('validate')">Validation gate</button>
+    <button class="tab-btn" onclick="switchTab('filter')">Response filter</button>
+  </div>
+
+  <!-- ═══ TAB: Validation gate ═══ -->
+  <div id="tab-validate" class="section active">
+    <p class="section-label">Choose a request scenario</p>
+
+    <div class="scenario-grid">
+      <button class="scenario-btn selected" onclick="pick(0)">
+        Valid input<br>
+        <span class="badge badge-valid">✓ accepted</span>
+      </button>
+      <button class="scenario-btn" onclick="pick(1)">
+        String age <span style="font-family:monospace;font-size:12px">"36"</span><br>
+        <span class="badge badge-coerce">→ coerced</span>
+      </button>
+      <button class="scenario-btn" onclick="pick(2)">
+        Invalid age <span style="font-family:monospace;font-size:12px">"banana"</span><br>
+        <span class="badge badge-reject">✗ 422</span>
+      </button>
+      <button class="scenario-btn" onclick="pick(3)">
+        Missing field<br>
+        <span class="badge badge-reject">✗ 422</span>
+      </button>
+    </div>
+
+    <div class="flow-card">
+      <div class="flow-card-header">Client &rarr; Pydantic gate &rarr; Endpoint</div>
+      <div class="flow-card-body">
+
+        <!-- Request body -->
+        <div class="node-label">Client sends (POST /users)</div>
+        <div class="flow-node" style="margin-bottom:12px;">
+          <div class="node-code" id="req-code"></div>
+        </div>
+
+        <!-- Arrow -->
+        <div class="flow-arrow" id="arrow-down" style="color:rgba(0,0,0,0.28);">&#8595;</div>
+
+        <!-- Gate -->
+        <div class="gate-node" style="margin:8px 0;">
+          <div class="gate-title">Pydantic &middot; UserCreateRequest</div>
+          <div class="gate-sub">validates types &middot; coerces where safe &middot; rejects what is invalid</div>
+        </div>
+
+        <!-- Send button -->
+        <button class="action-btn btn-blue" id="send-btn" onclick="sendRequest()">Send request</button>
+
+        <!-- Result -->
+        <div id="result-area" style="min-height:64px;"></div>
+      </div>
+    </div>
+
+    <!-- Explanation -->
+    <div id="explanation" class="explanation" style="display:none;"></div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item"><div class="dot dot-green"></div>accepted — valid data</div>
+      <div class="legend-item"><div class="dot dot-orange"></div>coerced — type converted safely</div>
+      <div class="legend-item"><div class="dot dot-red"></div>rejected — 422 returned</div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: Response filter ═══ -->
+  <div id="tab-filter" class="section">
+    <p style="font-size:15px;color:rgba(0,0,0,0.65);line-height:1.55;margin-bottom:16px;">
+      The endpoint returns the full <code style="font-family:monospace;font-size:13px;background:#F2F1EE;padding:1px 5px;border-radius:4px;">UserInternal</code> object. The <code style="font-family:monospace;font-size:13px;background:#F2F1EE;padding:1px 5px;border-radius:4px;">PublicUser</code> response model acts as an allow list — only declared fields reach the client.
+    </p>
+
+    <div class="flow-card">
+      <div class="flow-card-header">Internal object &rarr; PublicUser filter &rarr; Client</div>
+      <div class="flow-card-body">
+
+        <span class="step-label" id="step-label">Step 1 of 2 — Internal object returned by endpoint</span>
+
+        <div class="fields-list" id="fields-list"></div>
+
+        <div id="filter-actions">
+          <button class="action-btn btn-purple" onclick="applyFilter()">Apply PublicUser response model &rarr;</button>
+        </div>
+
+        <div id="response-preview" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div id="filter-explanation" class="explanation" style="display:none;"></div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  /* ─── Scenario data ─── */
+  const scenarios = [
+    {
+      outcome: 'accepted',
+      reqHtml:
+        '{\n' +
+        '  <span class="k">"name"</span>: <span class="s">"Ada"</span>,\n' +
+        '  <span class="k">"age"</span>: <span class="n">36</span>\n' +
+        '}',
+      statusText: '200 OK',
+      respText:
+        '{\n' +
+        '  "name": "Ada",\n' +
+        '  "age": 36\n' +
+        '}',
+      explain:
+        '<strong>Valid input</strong> — both fields are present and already the right types. ' +
+        'Pydantic accepts the data and hands a clean typed object to your endpoint. ' +
+        'No rejection logic needed in your code.'
+    },
+    {
+      outcome: 'coerced',
+      reqHtml:
+        '{\n' +
+        '  <span class="k">"name"</span>: <span class="s">"Ada"</span>,\n' +
+        '  <span class="k">"age"</span>: <span class="s">"36"</span>  <span class="c">// string, not int</span>\n' +
+        '}',
+      statusText: '200 OK',
+      respText:
+        '{\n' +
+        '  "name": "Ada",\n' +
+        '  "age": 36   ← coerced from "36"\n' +
+        '}',
+      explain:
+        '<strong>Coercion</strong> — the client sent <code>age</code> as the string <code>"36"</code>. ' +
+        'Converting a digit-only string to an integer is unambiguous and safe, so Pydantic does it automatically. ' +
+        'Your endpoint receives the integer <code>36</code>, not a string. ' +
+        'Coercion eliminates tedious parsing code while still refusing anything genuinely invalid.'
+    },
+    {
+      outcome: 'rejected',
+      reqHtml:
+        '{\n' +
+        '  <span class="k">"name"</span>: <span class="s">"Ada"</span>,\n' +
+        '  <span class="k">"age"</span>: <span class="e">"banana"</span>  <span class="c">// not convertible</span>\n' +
+        '}',
+      statusText: '422 Unprocessable Entity',
+      respText:
+        '{\n' +
+        '  "detail": [\n' +
+        '    {\n' +
+        '      "type": "int_parsing",\n' +
+        '      "loc": ["body", "age"],\n' +
+        '      "msg": "Input should be a valid integer"\n' +
+        '    }\n' +
+        '  ]\n' +
+        '}',
+      explain:
+        '<strong>Rejection</strong> — <code>"banana"</code> cannot safely become an integer, so Pydantic refuses the request. ' +
+        'FastAPI turns that into a 422 Unprocessable Entity with a structured body that names the exact field and problem. ' +
+        'Your endpoint function is <em>never called</em> — the bad data never enters your business logic.'
+    },
+    {
+      outcome: 'rejected',
+      reqHtml:
+        '{\n' +
+        '  <span class="k">"name"</span>: <span class="s">"Ada"</span>\n' +
+        '  <span class="c">// "age" is missing entirely</span>\n' +
+        '}',
+      statusText: '422 Unprocessable Entity',
+      respText:
+        '{\n' +
+        '  "detail": [\n' +
+        '    {\n' +
+        '      "type": "missing",\n' +
+        '      "loc": ["body", "age"],\n' +
+        '      "msg": "Field required"\n' +
+        '    }\n' +
+        '  ]\n' +
+        '}',
+      explain:
+        '<strong>Missing required field</strong> — <code>age</code> has no default, so it is required. ' +
+        'The request body does not include it, so Pydantic rejects the request before your endpoint runs. ' +
+        'The 422 body names the missing field, giving the caller exactly enough detail to fix their request.'
+    }
+  ];
+
+  /* ─── Internal fields for Part 2 ─── */
+  const internalFields = [
+    { name: 'id',            type: 'int',  value: '1',                    public: true },
+    { name: 'name',          type: 'str',  value: '"Ada"',                public: true },
+    { name: 'email',         type: 'str',  value: '"ada@example.com"',    public: true },
+    { name: 'password_hash', type: 'str',  value: '"super-secret-hash"',  public: false },
+    { name: 'is_internal',   type: 'bool', value: 'True',                 public: false },
+  ];
+
+  /* ─── State ─── */
+  let current    = 0;
+  let sent       = false;
+  let filtered   = false;
+
+  /* ─── Part 1 helpers ─── */
+  function pick(idx) {
+    current = idx;
+    sent = false;
+    document.querySelectorAll('.scenario-btn').forEach((b, i) =>
+      b.classList.toggle('selected', i === idx));
+    document.getElementById('req-code').innerHTML = scenarios[idx].reqHtml;
+    document.getElementById('result-area').innerHTML = '';
+    document.getElementById('explanation').style.display = 'none';
+    document.getElementById('arrow-down').style.color = 'rgba(0,0,0,0.28)';
+    document.getElementById('send-btn').textContent = 'Send request';
+    document.getElementById('send-btn').className = 'action-btn btn-blue';
+  }
+
+  function sendRequest() {
+    if (sent) { pick(current); return; }
+    sent = true;
+    const s = scenarios[current];
+
+    /* arrow color */
+    const arrowColors = { accepted:'#328F51', coerced:'#D35722', rejected:'#DE4C45' };
+    document.getElementById('arrow-down').style.color = arrowColors[s.outcome];
+
+    /* result block */
+    const cls = s.outcome === 'coerced' ? 'result-coerced'
+              : s.outcome === 'rejected' ? 'result-rejected'
+              : 'result-accepted';
+
+    const tag = s.outcome === 'accepted' ? '&#10003; Accepted — passed to endpoint'
+              : s.outcome === 'coerced'  ? '&rarr; Coerced and accepted — passed to endpoint'
+              : '&#10007; Rejected — endpoint never runs';
+
+    document.getElementById('result-area').innerHTML =
+      '<div class="result-block ' + cls + '">' +
+        '<div class="result-tag">' + tag + '</div>' +
+        '<div class="result-status">' + esc(s.statusText) + '</div>' +
+        '<div class="result-body">' + esc(s.respText) + '</div>' +
+      '</div>';
+
+    /* explanation */
+    const el = document.getElementById('explanation');
+    el.innerHTML = s.explain;
+    el.style.display = 'block';
+
+    document.getElementById('send-btn').textContent = 'Reset';
+    document.getElementById('send-btn').className = 'action-btn btn-reset';
+  }
+
+  function esc(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /* ─── Tab switching ─── */
+  function switchTab(id) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) =>
+      b.classList.toggle('active', (i === 0 && id === 'validate') || (i === 1 && id === 'filter')));
+    document.getElementById('tab-validate').classList.toggle('active', id === 'validate');
+    document.getElementById('tab-filter').classList.toggle('active', id === 'filter');
+    if (id === 'filter') renderFields(false);
+  }
+
+  /* ─── Part 2 helpers ─── */
+  function renderFields(applied) {
+    const list = document.getElementById('fields-list');
+    list.innerHTML = internalFields.map(f => {
+      let chipCls   = applied ? (f.public ? 'exposed' : 'blocked') : '';
+      let fateClass = applied ? (f.public ? 'fate-exposed' : 'fate-blocked') : 'fate-pending';
+      let fateText  = applied ? (f.public ? '✓ exposed'   : '✗ blocked')    : 'awaiting...';
+      let valColor  = !f.public ? 'color:#DE4C45' : 'color:#328F51';
+      return (
+        '<div class="field-row">' +
+          '<div class="field-chip ' + chipCls + '">' +
+            '<span class="k">' + f.name + '</span>' +
+            '<span style="color:rgba(0,0,0,0.45)">: ' + f.type + '</span>' +
+            ' = <span style="' + valColor + '">' + f.value + '</span>' +
+          '</div>' +
+          '<span class="field-fate ' + fateClass + '">' + fateText + '</span>' +
+        '</div>'
+      );
+    }).join('');
+  }
+
+  function applyFilter() {
+    if (filtered) { resetFilter(); return; }
+    filtered = true;
+
+    document.getElementById('step-label').textContent = 'Step 2 of 2 — After PublicUser response model filter';
+    renderFields(true);
+
+    /* swap button */
+    document.getElementById('filter-actions').innerHTML =
+      '<button class="action-btn btn-reset" onclick="applyFilter()">← Reset</button>';
+
+    /* preview */
+    const prev = document.getElementById('response-preview');
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<div class="response-preview">' +
+        '<div class="preview-header">Client receives (200 OK)</div>' +
+        '<div class="preview-body">' +
+          '<span class="k">id</span>:    <span class="n">1</span>\n' +
+          '<span class="k">name</span>:  <span class="s">"Ada"</span>\n' +
+          '<span class="k">email</span>: <span class="s">"ada@example.com"</span>' +
+        '</div>' +
+      '</div>';
+
+    const exp = document.getElementById('filter-explanation');
+    exp.innerHTML =
+      '<strong>Response model as allow list</strong> — the endpoint returned the full <code>UserInternal</code> object, ' +
+      'but FastAPI filtered it through <code>PublicUser</code> before sending the response. ' +
+      'Only <code>id</code>, <code>name</code>, and <code>email</code> are declared in <code>PublicUser</code>, so only those fields reach the client. ' +
+      '<code>password_hash</code> and <code>is_internal</code> are silently dropped — they cannot leak even if the internal object grows more fields in the future.';
+    exp.style.display = 'block';
+  }
+
+  function resetFilter() {
+    filtered = false;
+    document.getElementById('step-label').textContent = 'Step 1 of 2 — Internal object returned by endpoint';
+    renderFields(false);
+    document.getElementById('filter-actions').innerHTML =
+      '<button class="action-btn btn-purple" onclick="applyFilter()">Apply PublicUser response model &rarr;</button>';
+    document.getElementById('response-preview').style.display = 'none';
+    document.getElementById('response-preview').innerHTML = '';
+    document.getElementById('filter-explanation').style.display = 'none';
+  }
+
+  /* ─── Init ─── */
+  pick(0);
+  renderFields(false);
+</script>
+</body>
+</html>

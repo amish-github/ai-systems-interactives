@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trust Boundaries — Interactive</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #fff;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #fff;
+}
+
+/* ── HINT HEADER ── */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+  font-size: 18px;
+}
+.hint svg {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+}
+@keyframes wiggle {
+  0%,90%,100% { transform: rotate(0deg); }
+  15%          { transform: rotate(-10deg); }
+  30%          { transform: rotate(10deg); }
+  45%          { transform: rotate(-8deg); }
+  60%          { transform: rotate(6deg); }
+  75%          { transform: rotate(-3deg); }
+}
+
+/* ── STEP DOTS ── */
+.dots {
+  display: flex;
+  gap: 6px;
+  padding: 16px 20px 0;
+}
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.25s;
+}
+.dot.active { background: #1878DC; }
+.dot.past   { background: rgba(24,120,220,0.35); }
+
+/* ── DIAGRAM ── */
+.diagram { padding: 16px 20px 8px; }
+
+/* outside zones */
+.outside-zone {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 12px 16px;
+  transition: opacity 0.22s;
+}
+.zone-tag {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.38);
+  margin-bottom: 8px;
+}
+
+/* node chips */
+.node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #fff;
+  transition: background 0.22s, border-color 0.22s, opacity 0.22s, box-shadow 0.22s;
+  white-space: nowrap;
+}
+.node .ico { font-size: 15px; line-height: 1; }
+
+.node.dim        { opacity: 0.28; }
+.node.hl-red     { background: rgba(222,76,69,0.08);  border-color: #DE4C45; box-shadow: 0 0 0 3px rgba(222,76,69,0.13); }
+.node.hl-blue    { background: rgba(24,120,220,0.08); border-color: #1878DC; box-shadow: 0 0 0 3px rgba(24,120,220,0.13); }
+.node.hl-green   { background: rgba(50,143,81,0.08);  border-color: #328F51; box-shadow: 0 0 0 3px rgba(50,143,81,0.13); }
+.node.hl-orange  { background: rgba(211,87,34,0.08);  border-color: #D35722; box-shadow: 0 0 0 3px rgba(211,87,34,0.13); }
+
+/* nodes row inside outside zones */
+.nodes-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ── CROSSING ARROWS (between outside zones and fence) ── */
+.cross-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+  gap: 3px;
+}
+.cross-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.38);
+  min-height: 18px;
+  text-align: center;
+  transition: color 0.22s;
+}
+.cross-shaft {
+  width: 2px;
+  height: 20px;
+  background: rgba(0,0,0,0.16);
+  position: relative;
+  transition: background 0.22s;
+}
+.cross-shaft::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: -4px;
+  border-top: 7px solid rgba(0,0,0,0.16);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  transition: border-top-color 0.22s;
+}
+
+.cross-wrap.hl-blue  .cross-label { color: #1878DC; }
+.cross-wrap.hl-blue  .cross-shaft { background: #1878DC; }
+.cross-wrap.hl-blue  .cross-shaft::after { border-top-color: #1878DC; }
+
+.cross-wrap.hl-orange .cross-label { color: #D35722; }
+.cross-wrap.hl-orange .cross-shaft { background: #D35722; }
+.cross-wrap.hl-orange .cross-shaft::after { border-top-color: #D35722; }
+
+/* ── FENCE (trusted platform box) ── */
+.fence {
+  border: 2px dashed rgba(0,0,0,0.22);
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  background: #fff;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  transition: border-color 0.22s;
+}
+.fence-label {
+  position: absolute;
+  top: -10px;
+  left: 14px;
+  background: #fff;
+  padding: 0 6px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.38);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  transition: color 0.22s;
+}
+.fence.hl-green { border-color: #328F51; }
+.fence.hl-green .fence-label { color: #328F51; }
+
+/* inner vertical arrow (gateway → service → db) */
+.inner-arr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2px 0;
+}
+.inner-shaft {
+  width: 2px;
+  height: 14px;
+  background: rgba(0,0,0,0.13);
+  position: relative;
+}
+.inner-shaft::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: -4px;
+  border-top: 6px solid rgba(0,0,0,0.13);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+}
+
+/* ── INFO CARD ── */
+.info {
+  margin: 0 20px 16px;
+  padding: 16px;
+  border-radius: 10px;
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.10);
+  min-height: 136px;
+}
+.info-sublbl {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.info-title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 6px;
+}
+.info-body {
+  font-size: 15px;
+  color: rgba(0,0,0,0.70);
+  line-height: 1.55;
+}
+.rule-tag {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+}
+.rule-tag.red    { background: rgba(222,76,69,0.10);  color: #DE4C45; }
+.rule-tag.blue   { background: rgba(24,120,220,0.10); color: #1878DC; }
+.rule-tag.green  { background: rgba(50,143,81,0.10);  color: #328F51; }
+.rule-tag.orange { background: rgba(211,87,34,0.10);  color: #D35722; }
+
+/* ── CONTROLS ── */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 24px;
+}
+.counter {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  color: rgba(0,0,0,0.42);
+}
+.btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.14s, box-shadow 0.14s;
+}
+.btn-back { background: rgba(0,0,0,0.06); color: #1A1A1A; }
+.btn-back:hover:not(:disabled) { background: rgba(0,0,0,0.10); }
+.btn-next { background: #1878DC; color: #fff; }
+.btn-next:hover:not(:disabled) {
+  background: #1567C0;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(24,120,220,0.30);
+}
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 480px) {
+  .hint    { font-size: 16px; padding: 12px 16px; }
+  .diagram { padding: 12px 16px 8px; }
+  .info    { margin: 0 16px 16px; padding: 14px; }
+  .controls{ padding: 0 16px 20px; }
+  .node    { font-size: 13px; padding: 7px 10px; }
+  .info-body { font-size: 14px; }
+}
+@media (max-width: 360px) {
+  .node { font-size: 12px; padding: 6px 8px; }
+  .btn  { padding: 8px 14px; font-size: 14px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HINT HEADER -->
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Click Next to trace a request across the trust boundary
+  </div>
+
+  <!-- STEP DOTS -->
+  <div class="dots" id="dots"></div>
+
+  <!-- DIAGRAM -->
+  <div class="diagram">
+
+    <!-- OUTSIDE TOP: Client -->
+    <div class="outside-zone" id="zone-top">
+      <div class="zone-tag">outside the boundary</div>
+      <div class="nodes-row">
+        <div class="node" id="n-client"><span class="ico">🖥</span> Client</div>
+      </div>
+    </div>
+
+    <!-- INBOUND CROSSING ARROW -->
+    <div class="cross-wrap" id="arr-in">
+      <div class="cross-shaft"></div>
+      <div class="cross-label" id="arr-in-lbl"></div>
+    </div>
+
+    <!-- FENCE: trusted platform -->
+    <div class="fence" id="fence">
+      <span class="fence-label">your platform — trusted zone</span>
+      <div class="node" id="n-gw"><span class="ico">🔐</span> API Gateway</div>
+      <div class="inner-arr"><div class="inner-shaft"></div></div>
+      <div class="node" id="n-svc"><span class="ico">⚙️</span> App Service</div>
+      <div class="inner-arr"><div class="inner-shaft"></div></div>
+      <div class="node" id="n-db"><span class="ico">🗄</span> Database</div>
+    </div>
+
+    <!-- OUTBOUND CROSSING ARROW -->
+    <div class="cross-wrap" id="arr-out">
+      <div class="cross-shaft"></div>
+      <div class="cross-label" id="arr-out-lbl"></div>
+    </div>
+
+    <!-- OUTSIDE BOTTOM: External services -->
+    <div class="outside-zone" id="zone-bottom">
+      <div class="zone-tag">outside the boundary</div>
+      <div class="nodes-row">
+        <div class="node" id="n-pay"><span class="ico">💳</span> Payments</div>
+        <div class="node" id="n-email"><span class="ico">✉️</span> Email</div>
+        <div class="node" id="n-llm"><span class="ico">🤖</span> LLM API</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INFO CARD -->
+  <div class="info">
+    <div class="info-sublbl" id="i-lbl"></div>
+    <div class="info-title" id="i-title"></div>
+    <div class="info-body" id="i-body"></div>
+    <div class="rule-tag" id="i-rule"></div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn btn-back" id="btn-back" onclick="go(-1)">← Back</button>
+    <span class="counter" id="counter"></span>
+    <button class="btn btn-next" id="btn-next" onclick="go(1)">Next →</button>
+  </div>
+
+</div>
+
+<script>
+const STEPS = [
+  {
+    lbl:   'Step 1 of 4  —  The Untrusted Client',
+    title: 'The client lives outside your fence',
+    body:  'A browser, mobile app, or script sends requests to your system. You did not write its code, and you cannot control what it sends. Anyone can bypass the interface entirely and talk to your service directly — in any shape, at any rate. Client-side checks like form validation happen out here, so they protect nothing on your side of the fence.',
+    rule:  'Assume nothing from outside',
+    ruleClass: 'red',
+    nodes: { 'n-client':'hl-red', 'n-gw':'dim', 'n-svc':'dim', 'n-db':'dim', 'n-pay':'dim', 'n-email':'dim', 'n-llm':'dim' },
+    fence: '', zoneTop: '', zoneBottom: 'dim',
+    arrIn: '', arrInHl: '', arrOut: '', arrOutHl: '',
+  },
+  {
+    lbl:   'Step 2 of 4  —  Crossing Inbound',
+    title: 'The gateway is the single front door — validate everything here',
+    body:  'Every request must cross the trust boundary at the API gateway before reaching your application logic. This is where you confirm who is calling (authentication), limit how often they can call (rate limiting), and check that the data has the shape you expect (validation). Nothing untrusted passes this checkpoint.',
+    rule:  'auth · rate limiting · validation',
+    ruleClass: 'blue',
+    nodes: { 'n-client':'', 'n-gw':'hl-blue', 'n-svc':'dim', 'n-db':'dim', 'n-pay':'dim', 'n-email':'dim', 'n-llm':'dim' },
+    fence: '', zoneTop: '', zoneBottom: 'dim',
+    arrIn: 'validate →', arrInHl: 'hl-blue', arrOut: '', arrOutHl: '',
+  },
+  {
+    lbl:   'Step 3 of 4  —  Inside the Trusted Zone',
+    title: 'You control everything inside the fence',
+    body:  'Your application service and database sit inside the trust boundary. You wrote the code and own the network. Because nothing untrusted reaches here, you can make reasonable assumptions about how these parts behave. This is the only place in the system where you can genuinely trust what you see.',
+    rule:  'you own it — it behaves as designed',
+    ruleClass: 'green',
+    nodes: { 'n-client':'dim', 'n-gw':'', 'n-svc':'hl-green', 'n-db':'hl-green', 'n-pay':'dim', 'n-email':'dim', 'n-llm':'dim' },
+    fence: 'hl-green', zoneTop: 'dim', zoneBottom: 'dim',
+    arrIn: '', arrInHl: '', arrOut: '', arrOutHl: '',
+  },
+  {
+    lbl:   'Step 4 of 4  —  Crossing Outbound',
+    title: 'Every outbound call needs a timeout and a fallback',
+    body:  'When your service calls a payment provider, email service, or LLM API, the call crosses outward past the fence into territory you do not control. These services can be slow, unavailable, or return bad data. A timeout caps how long you wait. A fallback decides what your system does when the call fails. Plan both in advance — the failure will come.',
+    rule:  'timeout + fallback — always',
+    ruleClass: 'orange',
+    nodes: { 'n-client':'dim', 'n-gw':'dim', 'n-svc':'', 'n-db':'dim', 'n-pay':'hl-orange', 'n-email':'hl-orange', 'n-llm':'hl-orange' },
+    fence: '', zoneTop: 'dim', zoneBottom: '',
+    arrIn: '', arrInHl: '', arrOut: '→ timeout + fallback', arrOutHl: 'hl-orange',
+  },
+];
+
+const NODE_IDS = ['n-client','n-gw','n-svc','n-db','n-pay','n-email','n-llm'];
+let cur = 0;
+
+function render(i) {
+  const s = STEPS[i];
+
+  // dots
+  document.getElementById('dots').innerHTML = STEPS.map((_,j) =>
+    '<div class="dot' + (j===i?' active':j<i?' past':'') + '"></div>'
+  ).join('');
+
+  // nodes
+  NODE_IDS.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'node';
+    var st = s.nodes[id];
+    if (st) el.classList.add(st);
+  });
+
+  // fence
+  var fence = document.getElementById('fence');
+  fence.className = 'fence';
+  if (s.fence) fence.classList.add(s.fence);
+
+  // outside zones
+  var zt = document.getElementById('zone-top');
+  var zb = document.getElementById('zone-bottom');
+  zt.style.opacity = s.zoneTop === 'dim' ? '0.30' : '1';
+  zb.style.opacity = s.zoneBottom === 'dim' ? '0.30' : '1';
+
+  // inbound arrow
+  var aIn    = document.getElementById('arr-in');
+  var aInLbl = document.getElementById('arr-in-lbl');
+  aIn.className = 'cross-wrap';
+  if (s.arrInHl) aIn.classList.add(s.arrInHl);
+  aInLbl.textContent = s.arrIn;
+
+  // outbound arrow
+  var aOut    = document.getElementById('arr-out');
+  var aOutLbl = document.getElementById('arr-out-lbl');
+  aOut.className = 'cross-wrap';
+  if (s.arrOutHl) aOut.classList.add(s.arrOutHl);
+  aOutLbl.textContent = s.arrOut;
+
+  // info card
+  document.getElementById('i-lbl').textContent   = s.lbl;
+  document.getElementById('i-title').textContent = s.title;
+  document.getElementById('i-body').textContent  = s.body;
+  var ruleEl = document.getElementById('i-rule');
+  ruleEl.className    = 'rule-tag ' + s.ruleClass;
+  ruleEl.textContent  = s.rule;
+
+  // controls
+  document.getElementById('btn-back').disabled = (i === 0);
+  document.getElementById('btn-next').disabled = (i === STEPS.length - 1);
+  document.getElementById('counter').textContent = (i + 1) + ' / ' + STEPS.length;
+}
+
+function go(d) {
+  var n = cur + d;
+  if (n >= 0 && n < STEPS.length) { cur = n; render(cur); }
+}
+
+render(0);
+</script>
+</body>
+</html>

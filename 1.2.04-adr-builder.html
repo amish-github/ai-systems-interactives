@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>04. Writing the Decision as an ADR — Interactive</title>
+<style>
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    font-size: 18px;
+    color: #1A1A1A;
+    background: #ffffff;
+    line-height: 1.5;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  /* ── Hint bar ── */
+  .hint-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+  }
+  .cursor-icon {
+    flex-shrink: 0;
+    animation: wiggle 4s ease-in-out infinite;
+  }
+  @keyframes wiggle {
+    0%,100% { transform: rotate(0deg); }
+    15%     { transform: rotate(-10deg); }
+    30%     { transform: rotate(10deg); }
+    45%     { transform: rotate(-8deg); }
+    60%     { transform: rotate(6deg); }
+    75%     { transform: rotate(-3deg); }
+    90%     { transform: rotate(0deg); }
+  }
+  .hint-text { font-size: 18px; }
+
+  /* ── Progress ── */
+  .progress-row {
+    display: flex;
+    gap: 8px;
+    padding: 16px 24px 0;
+  }
+  .pdot {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.12);
+    transition: background 0.3s ease;
+  }
+  .pdot.done   { background: #328F51; }
+  .pdot.active { background: #1878DC; }
+
+  .step-lbl {
+    padding: 10px 24px 0;
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+  }
+
+  /* ── Main content ── */
+  .content { padding: 16px 24px 0; }
+
+  /* ── ADR document ── */
+  .adr-doc {
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.14);
+    overflow: hidden;
+    background: #F2F1EE;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+  .adr-hdr {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .adr-filename {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 13px;
+    color: rgba(0,0,0,0.45);
+    white-space: nowrap;
+  }
+  .adr-sep { color: rgba(0,0,0,0.20); }
+  .adr-title { font-size: 15px; font-weight: 600; }
+
+  /* ── ADR section rows ── */
+  .adr-sec {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+    border-left: 3px solid transparent;
+    transition: background 0.2s ease, border-left-color 0.2s ease;
+  }
+  .adr-sec:last-child { border-bottom: none; }
+
+  .adr-sec.active          { background: #ffffff; }
+  .adr-sec.active.s-ctx   { border-left-color: #1878DC; }
+  .adr-sec.active.s-dec   { border-left-color: #328F51; }
+  .adr-sec.active.s-alt   { border-left-color: #D35722; }
+  .adr-sec.active.s-con   { border-left-color: #8754FD; }
+
+  .sec-lbl {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+    color: rgba(0,0,0,0.38);
+    transition: color 0.2s ease;
+  }
+  .active.s-ctx .sec-lbl { color: #1878DC; }
+  .active.s-dec .sec-lbl { color: #328F51; }
+  .active.s-alt .sec-lbl { color: #D35722; }
+  .active.s-con .sec-lbl { color: #8754FD; }
+
+  .sec-body { font-size: 16px; line-height: 1.6; }
+
+  /* New section slide-in animation */
+  .adr-sec[data-new="1"] {
+    animation: secIn 0.4s ease both;
+  }
+  @keyframes secIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+
+  /* ── Consequences toggle ── */
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tog-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.14);
+    background: #ffffff;
+    font-size: 14px;
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    color: rgba(0,0,0,0.55);
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  .tog-btn:hover:not(.on-bad):not(.on-good) {
+    border-color: rgba(0,0,0,0.28);
+    color: #1A1A1A;
+  }
+  .tog-btn.on-bad  { background: #DE4C45; border-color: #DE4C45; color: #ffffff; }
+  .tog-btn.on-good { background: #328F51; border-color: #328F51; color: #ffffff; }
+
+  /* Missing content placeholder */
+  .missing {
+    margin-top: 12px;
+    padding: 12px 14px;
+    background: rgba(0,0,0,0.035);
+    border-radius: 6px;
+    border: 1px dashed rgba(0,0,0,0.16);
+  }
+  .mline {
+    height: 10px;
+    border-radius: 3px;
+    background: rgba(0,0,0,0.11);
+    margin-bottom: 8px;
+  }
+  .mline:last-of-type { margin-bottom: 0; }
+  .mcap {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 12px;
+    color: rgba(0,0,0,0.36);
+    font-style: italic;
+    margin-top: 8px;
+    display: block;
+  }
+
+  /* ── Annotation card ── */
+  .annotation {
+    margin-top: 16px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.14);
+    background: #ffffff;
+    font-size: 16px;
+    line-height: 1.6;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+  .ann-lbl {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(0,0,0,0.38);
+    margin-bottom: 8px;
+  }
+
+  /* ── Navigation ── */
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 28px;
+  }
+  .nav-btn {
+    padding: 12px 24px;
+    border-radius: 10px;
+    border: 1px solid rgba(0,0,0,0.14);
+    background: #F2F1EE;
+    font-size: 16px;
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    color: #1A1A1A;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+  .nav-btn:hover:not(:disabled) { background: #ffffff; border-color: rgba(0,0,0,0.24); }
+  .nav-btn:disabled { opacity: 0.28; cursor: default; }
+  .nav-btn.blue  { background: #1878DC; border-color: #1878DC; color: #ffffff; }
+  .nav-btn.blue:hover:not(:disabled)  { background: #1567c4; border-color: #1567c4; }
+  .nav-btn.green { background: #328F51; border-color: #328F51; color: #ffffff; cursor: default; }
+
+  .step-ct {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .hint-bar, .content, .nav-row { padding-left: 16px; padding-right: 16px; }
+    .progress-row { padding-left: 16px; padding-right: 16px; }
+    .step-lbl     { padding-left: 16px; padding-right: 16px; }
+    .hint-text    { font-size: 16px; }
+    .adr-hdr      { padding: 12px 14px; }
+    .adr-sec      { padding: 12px 14px; }
+    .annotation   { padding: 12px 14px; }
+    .nav-btn      { padding: 10px 16px; font-size: 15px; }
+  }
+  @media (max-width: 360px) {
+    .hint-bar, .content, .nav-row { padding-left: 12px; padding-right: 12px; }
+    .progress-row { padding-left: 12px; padding-right: 12px; }
+    .step-lbl     { padding-left: 12px; padding-right: 12px; }
+    .nav-btn      { padding: 8px 12px; font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint bar -->
+  <div class="hint-bar">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Step through each section to see how the ADR builds up.</span>
+  </div>
+
+  <!-- Progress dots -->
+  <div class="progress-row">
+    <div class="pdot" id="d0"></div>
+    <div class="pdot" id="d1"></div>
+    <div class="pdot" id="d2"></div>
+    <div class="pdot" id="d3"></div>
+  </div>
+  <div class="step-lbl" id="step-lbl"></div>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="adr-doc">
+      <div class="adr-hdr">
+        <span class="adr-filename">adr-001.md</span>
+        <span class="adr-sep">·</span>
+        <span class="adr-title">Start with a modular monolith for the ordering platform</span>
+      </div>
+      <div id="secs"></div>
+    </div>
+
+    <div class="annotation" id="ann">
+      <div class="ann-lbl" id="ann-lbl"></div>
+      <div id="ann-body"></div>
+    </div>
+  </div>
+
+  <!-- Nav -->
+  <div class="nav-row">
+    <button class="nav-btn" id="btn-back" onclick="goBack()">&#8592; Back</button>
+    <span class="step-ct" id="step-ct"></span>
+    <button class="nav-btn blue" id="btn-next" onclick="goNext()">Next &#8594;</button>
+  </div>
+
+</div>
+<script>
+/* ──────────────────────────────── Data ──────────────────────────────── */
+var STEPS = [
+  {
+    cls: 's-ctx',
+    label: 'Context',
+    stepLbl: 'Step 1 of 4 — Context',
+    html: 'We are a team of four engineers building a new ordering platform with an aggressive launch deadline in one quarter. We expect modest traffic at launch and do not yet know which parts will need to scale independently. Nobody on the team has run a production microservices deployment. <strong>The force that matters most: speed of delivery with a small team.</strong>',
+    annLbl: 'What context does',
+    annHtml: 'Context sets the scene — the pressures, constraints, and what mattered most at the time. It lets a future reader judge whether the original forces still hold. Notice the final sentence names the <strong>dominant deciding factor</strong>: the one force that outweighed all others. That is exactly what a future reader must re-examine if circumstances change.'
+  },
+  {
+    cls: 's-dec',
+    label: 'Decision',
+    stepLbl: 'Step 2 of 4 — Decision',
+    html: 'We will build the system as a single deployable application, organized into clear modules with well-defined boundaries between them. We will not split it into separately deployed services at this stage.',
+    annLbl: 'What the decision statement does',
+    annHtml: 'The decision is stated plainly in one or two sentences — no hedging, no ambiguity. Anyone reading it knows exactly what path the team chose. On its own, this is the <em>least</em> valuable part of the record: anyone can already see it in the running system. The context and reasoning are what the record exists to preserve.'
+  },
+  {
+    cls: 's-alt',
+    label: 'Alternatives considered',
+    stepLbl: 'Step 3 of 4 — Alternatives considered',
+    html: '<strong>Microservices from day one</strong> — rejected. Operational overhead of running, deploying, and monitoring many services would slow a four-person team down badly before we have any users.<br><br><strong>Single application with no internal boundaries</strong> — rejected. It would make a future split into services much harder if one is ever needed.',
+    annLbl: 'Why alternatives matter',
+    annHtml: 'This section answers the question every future reader will ask: <em>did the team even consider the other approach?</em> It proves the decision was deliberate and made with open eyes. One clear sentence of reasoning per alternative is enough — only list options a reasonable engineer would genuinely consider.'
+  },
+  {
+    cls: 's-con',
+    label: 'Consequences',
+    stepLbl: 'Step 4 of 4 — Consequences',
+    annLbl: 'The most common failure point',
+    annHtml: 'Every architectural decision buys you something <em>and</em> costs you something. A consequences section that lists only benefits is a sales pitch — an experienced reader will not trust it, and a future engineer will hit the hidden costs with no warning. Switch to <strong>Honest record</strong> to see what this section should actually contain.',
+    annHtmlHonest: 'Now the record is trustworthy. Benefits <em>and</em> costs are stated as plainly as each other. A future engineer knows exactly what was accepted and why. If scaling requirements later change, the team can write a new ADR that supersedes this one — with full knowledge of what they are changing and why that matters.'
+  }
+];
+
+var CONS_BAD  = '<strong>Benefits:</strong> We can ship quickly, deploy in one step, and debug in one place — which suits our size and deadline.';
+var CONS_GOOD = '<strong>Benefits:</strong> We can ship quickly, deploy in one step, and debug in one place — which suits our size and deadline.<br><br><strong>Costs and risks accepted:</strong> Every part of the system scales together, so a spike in one area forces us to scale the whole application. We accept that risk for now. Because we kept clear module boundaries, we leave ourselves a realistic path to extract services later if real needs appear.';
+
+/* ──────────────────────────────── State ─────────────────────────────── */
+var step = 0;
+var honest = false;
+var animateNew = false;
+
+/* ──────────────────────────── Build sections ────────────────────────── */
+function buildSection(i) {
+  var s = STEPS[i];
+  var isActive = (i === step);
+  var div = document.createElement('div');
+  div.className = 'adr-sec ' + s.cls + (isActive ? ' active' : '');
+  if (animateNew && i === step) div.setAttribute('data-new', '1');
+
+  var lbl = document.createElement('div');
+  lbl.className = 'sec-lbl';
+  lbl.textContent = s.label;
+  div.appendChild(lbl);
+
+  if (i < 3) {
+    var body = document.createElement('div');
+    body.className = 'sec-body';
+    body.innerHTML = s.html;
+    div.appendChild(body);
+  } else {
+    /* Consequences: toggle + content */
+    var row = document.createElement('div');
+    row.className = 'toggle-row';
+    var b1 = document.createElement('button');
+    b1.className = 'tog-btn' + (!honest ? ' on-bad' : '');
+    b1.textContent = 'Sales pitch';
+    b1.onclick = function() { toggleCons(false); };
+    var b2 = document.createElement('button');
+    b2.className = 'tog-btn' + (honest ? ' on-good' : '');
+    b2.textContent = 'Honest record';
+    b2.onclick = function() { toggleCons(true); };
+    row.appendChild(b1);
+    row.appendChild(b2);
+    div.appendChild(row);
+
+    var body = document.createElement('div');
+    body.className = 'sec-body';
+    body.id = 'cons-body';
+    body.innerHTML = getConsHtml();
+    div.appendChild(body);
+  }
+  return div;
+}
+
+function getConsHtml() {
+  if (honest) return CONS_GOOD;
+  return CONS_BAD +
+    '<div class="missing">' +
+      '<div class="mline" style="width:87%"></div>' +
+      '<div class="mline" style="width:68%"></div>' +
+      '<span class="mcap">costs and risks — not recorded</span>' +
+    '</div>';
+}
+
+/* ──────────────────────────── Render ────────────────────────────────── */
+function renderSections() {
+  var container = document.getElementById('secs');
+  container.innerHTML = '';
+  for (var i = 0; i <= step; i++) {
+    container.appendChild(buildSection(i));
+  }
+}
+
+function renderAnnotation() {
+  var s = STEPS[step];
+  var lbl = s.annLbl;
+  var html = (step === 3 && honest) ? s.annHtmlHonest : s.annHtml;
+  var ann = document.getElementById('ann');
+  /* Set hidden with no transition */
+  ann.style.cssText = 'opacity:0;transform:translateY(6px);transition:none';
+  document.getElementById('ann-lbl').textContent = lbl;
+  document.getElementById('ann-body').innerHTML = html;
+  /* Two rAFs: ensure hidden state paints, then animate in */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      ann.style.cssText = 'opacity:1;transform:translateY(0);transition:opacity 0.35s ease,transform 0.35s ease';
+    });
+  });
+}
+
+function renderProgress() {
+  for (var i = 0; i < 4; i++) {
+    var d = document.getElementById('d' + i);
+    d.className = 'pdot' + (i < step ? ' done' : i === step ? ' active' : '');
+  }
+  document.getElementById('step-lbl').textContent = STEPS[step].stepLbl;
+  document.getElementById('step-ct').textContent = (step + 1) + ' / 4';
+}
+
+function renderNav() {
+  var back = document.getElementById('btn-back');
+  var next = document.getElementById('btn-next');
+  back.disabled = (step === 0);
+  if (step < 3) {
+    next.textContent = 'Next →';
+    next.className = 'nav-btn blue';
+    next.disabled = false;
+  } else if (!honest) {
+    next.textContent = 'Make it honest →';
+    next.className = 'nav-btn blue';
+    next.disabled = false;
+  } else {
+    next.textContent = 'Done ✓';
+    next.className = 'nav-btn green';
+    next.disabled = true;
+  }
+}
+
+function renderAll() {
+  renderSections();
+  renderAnnotation();
+  renderProgress();
+  renderNav();
+}
+
+/* ──────────────────────────── Interactions ──────────────────────────── */
+function goNext() {
+  if (step < 3) {
+    animateNew = true;
+    step++;
+    honest = false;
+    renderAll();
+    animateNew = false;
+  } else if (!honest) {
+    toggleCons(true);
+  }
+}
+
+function goBack() {
+  if (step > 0) {
+    animateNew = false;
+    step--;
+    renderAll();
+  }
+}
+
+function toggleCons(val) {
+  honest = val;
+
+  /* Update toggle button states in place */
+  var btns = document.querySelectorAll('.tog-btn');
+  if (btns.length === 2) {
+    btns[0].className = 'tog-btn' + (!val ? ' on-bad'  : '');
+    btns[1].className = 'tog-btn' + ( val ? ' on-good' : '');
+  }
+
+  /* Update consequences body in place */
+  var cb = document.getElementById('cons-body');
+  if (cb) cb.innerHTML = getConsHtml();
+
+  /* Fade annotation: out then in with new content */
+  var ann = document.getElementById('ann');
+  var s = STEPS[3];
+  ann.style.cssText = 'opacity:0;transform:translateY(5px);transition:opacity 0.15s ease,transform 0.15s ease';
+  setTimeout(function() {
+    document.getElementById('ann-body').innerHTML = val ? s.annHtmlHonest : s.annHtml;
+    ann.style.cssText = 'opacity:1;transform:translateY(0);transition:opacity 0.28s ease,transform 0.28s ease';
+  }, 160);
+
+  renderNav();
+}
+
+/* ──────────────────────────── Init ──────────────────────────────────── */
+animateNew = true;
+renderAll();
+animateNew = false;
+</script>
+</body>
+</html>

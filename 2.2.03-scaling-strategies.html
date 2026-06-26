@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pick the Right Lever — Scaling Strategies</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #F2F1EE;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 16px;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 700px;
+  background: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+/* ── Hint header ── */
+.hint-header {
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+  padding: 16px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.hint-cursor {
+  flex-shrink: 0;
+  margin-top: 1px;
+  animation: cursor-wiggle 4s infinite;
+}
+
+.hint-text { font-size: 18px; line-height: 1.4; }
+
+/* ── Progress ── */
+.progress-row {
+  padding: 20px 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.25s;
+}
+.dot.current { background: #1A1A1A; }
+.dot.done    { background: #328F51; }
+
+.progress-count {
+  margin-left: 8px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* ── Scenario ── */
+.scenario-section { padding: 20px 24px 0; }
+
+.scenario-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: #FFFFFF;
+  margin-bottom: 12px;
+}
+
+.scenario-title {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 12px;
+}
+
+.scenario-desc {
+  font-size: 16px;
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+
+/* ── Diagram ── */
+.diag-wrap {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.diag-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.diag-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-node {
+  padding: 10px 14px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.4;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  min-width: 80px;
+  white-space: nowrap;
+}
+
+.diag-node small {
+  display: block;
+  font-size: 12px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  margin-top: 2px;
+}
+
+.diag-node.hot   { border: 2px solid #DE4C45; background: #FEF4F4; }
+.diag-node.blue  { border: 2px solid #1878DC; background: #EFF5FE; }
+.diag-node.green { border: 2px solid #328F51; background: #EFF7F1; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  background: #DE4C45;
+  color: #FFFFFF;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.arr {
+  font-size: 14px;
+  color: rgba(0,0,0,0.35);
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.arr-sm {
+  font-size: 12px;
+  color: rgba(0,0,0,0.30);
+  font-family: 'Suisse Intl Mono', monospace;
+  flex-shrink: 0;
+}
+
+.diag-caption {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* ── Levers ── */
+.lever-section { padding: 0 24px 24px; }
+
+.lever-q {
+  font-size: 16px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 12px;
+}
+
+.lever-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+@media (max-width: 440px) {
+  .lever-grid { grid-template-columns: 1fr; }
+}
+
+.lever {
+  padding: 14px 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  color: #1A1A1A;
+  text-align: left;
+  line-height: 1.4;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.lever:hover:not(:disabled) {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.22);
+  transform: translateY(-1px);
+}
+
+.lever .lname { font-weight: 600; display: block; margin-bottom: 2px; }
+.lever .lsub  { display: block; font-size: 14px; color: rgba(0,0,0,0.50); }
+
+.lever.picked-right { background: #EFF7F1; border: 2px solid #328F51; }
+.lever.picked-wrong { background: #FEF4F4; border: 2px solid #DE4C45; }
+.lever:disabled { cursor: default; }
+
+/* ── Feedback ── */
+.feedback {
+  margin: 0 24px 24px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.fb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+
+.fb-head.right { background: #328F51; }
+.fb-head.wrong { background: #DE4C45; }
+
+.fb-icon {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.55);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.fb-body {
+  background: #F2F1EE;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.fb-try-again {
+  margin-top: 12px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+}
+
+.fb-after-label {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.next-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #FFF9EE;
+  border: 1px solid rgba(244,142,0,0.30);
+  border-radius: 8px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.65);
+  font-family: 'Suisse Intl Mono', monospace;
+  line-height: 1.5;
+}
+
+/* ── Nav ── */
+.nav-row {
+  padding: 0 24px 28px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.28;
+  pointer-events: none;
+  transition: opacity 0.25s, background 0.15s;
+}
+
+.next-btn.ready { opacity: 1; pointer-events: auto; }
+.next-btn.ready:hover { background: #2D2D2D; }
+
+/* ── Done screen ── */
+.done-screen {
+  padding: 48px 24px 52px;
+  text-align: center;
+}
+
+.done-check {
+  width: 56px; height: 56px;
+  background: #328F51;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 20px;
+  color: #FFFFFF;
+  font-size: 26px;
+}
+
+.done-title { font-size: 22px; font-weight: 600; margin-bottom: 12px; }
+
+.done-body {
+  font-size: 16px;
+  line-height: 1.65;
+  color: rgba(0,0,0,0.65);
+  max-width: 520px;
+  margin: 0 auto 28px;
+}
+
+.done-body strong { color: #1A1A1A; font-weight: 600; }
+
+.restart-btn {
+  padding: 12px 24px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.restart-btn:hover { background: #2D2D2D; }
+</style>
+</head>
+
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+// ── Scenario data ─────────────────────────────────────────────────────────
+const SCENARIOS = [
+  {
+    chip: 'Read bottleneck',
+    chipColor: '#1878DC',
+    title: 'Too Many Reads',
+    desc: 'Your product catalog database handles 12,000 read requests per second at peak. Writes are rare — only 50 per second. The database CPU is pinned at 90% and query response times are climbing.',
+    correctIndex: 2,
+    levers: [
+      { name: 'Vertical Scaling',      sub: 'Upgrade to a bigger machine' },
+      { name: 'Horizontal Scaling',    sub: 'Add copies behind a load balancer' },
+      { name: 'Cache & Read Replicas', sub: 'Add fast, separate read paths' },
+      { name: 'Partition & Queue',     sub: 'Split data or buffer writes' },
+    ],
+    feedback: [
+      'Vertical scaling buys some headroom, but all 12,000 reads per second still hit one machine. You will reach a new ceiling soon, and there is no availability benefit — that single instance is still a point of failure.',
+      'The database holds state — you cannot add copies without a deliberate replication strategy. Without one, copies cannot agree on current data and you risk conflicting reads and stale results.',
+      'A cache absorbs repeated reads before they reach the database. Read replicas serve read queries directly, sharing the load without touching the primary\'s write path. Both work because reads can tolerate data that is slightly out of date.',
+      'Partitioning and queueing address write bottlenecks. With only 50 writes per second here, writes are not the problem. These levers add real complexity without touching the actual read pressure.',
+    ],
+    beforeHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node">App<small>stateless</small></div>
+        <div class="arr">→</div>
+        <div class="diag-node hot">Database<div class="badge">90% CPU</div></div>
+      </div>
+      <div class="diag-caption">12,000 reads/s hitting one database instance</div>
+    `,
+    afterHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node blue">Cache<small>hot reads</small></div>
+        <div class="arr-sm">miss→</div>
+        <div class="diag-node">App</div>
+        <div class="arr">→</div>
+        <div class="diag-col">
+          <div class="diag-node green">Primary DB<small>writes only</small></div>
+          <div class="diag-node green">Read Replica<small>reads only</small></div>
+        </div>
+      </div>
+      <div class="diag-caption">Cache hits skip the DB entirely; replicas share the read load</div>
+    `,
+  },
+  {
+    chip: 'Write bottleneck',
+    chipColor: '#D35722',
+    title: 'Overwhelmed by Writes',
+    desc: 'An analytics pipeline writes 50,000 event records per second during peak. The single analytics database is falling behind — writes are queueing up and some are timing out. Read queries on the same store are fast and rare.',
+    correctIndex: 3,
+    levers: [
+      { name: 'Vertical Scaling',      sub: 'Upgrade to a bigger machine' },
+      { name: 'Horizontal Scaling',    sub: 'Add copies behind a load balancer' },
+      { name: 'Cache & Read Replicas', sub: 'Add fast, separate read paths' },
+      { name: 'Partition & Queue',     sub: 'Split data or buffer writes' },
+    ],
+    feedback: [
+      'Vertical scaling buys temporary headroom, but 50,000 writes per second is a structural challenge — you will eventually exhaust any single machine, and you still have one instance, one ceiling.',
+      'The database is stateful. Adding copies without a write replication strategy does not multiply write capacity — those copies would need to agree on every incoming write, or you get data inconsistency.',
+      'Caches and read replicas relieve read pressure. Reads here are fast and rare. Every write still has to land on the primary, so the write bottleneck is completely untouched.',
+      'A queue placed in front of the store accepts writes quickly and drains them at a sustainable rate, smoothing out bursts. Partitioning splits writes across multiple shards so each one handles only a fraction of the total load.',
+    ],
+    beforeHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Events</div>
+        <div class="arr">→</div>
+        <div class="diag-node">App</div>
+        <div class="arr">→</div>
+        <div class="diag-node hot">Analytics DB<div class="badge">write queue backing up</div></div>
+      </div>
+      <div class="diag-caption">50,000 writes/s — one database cannot keep pace</div>
+    `,
+    afterHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Events</div>
+        <div class="arr">→</div>
+        <div class="diag-node">App</div>
+        <div class="arr">→</div>
+        <div class="diag-node blue">Queue<small>absorbs bursts</small></div>
+        <div class="arr-sm">drain→</div>
+        <div class="diag-col">
+          <div class="diag-node green">Shard A<small>A–M data</small></div>
+          <div class="diag-node green">Shard B<small>N–Z data</small></div>
+        </div>
+      </div>
+      <div class="diag-caption">Queue smooths bursts; sharding splits write load across stores</div>
+    `,
+  },
+  {
+    chip: 'Stateless service',
+    chipColor: '#8754FD',
+    title: 'A Service That Needs Both',
+    desc: 'Your image processing API converts uploaded photos. A single instance is near CPU capacity. Your SRE team flags it has no redundancy — if that instance restarts, uploads fail for everyone. You need more throughput and better availability at the same time.',
+    correctIndex: 1,
+    levers: [
+      { name: 'Vertical Scaling',      sub: 'Upgrade to a bigger machine' },
+      { name: 'Horizontal Scaling',    sub: 'Add copies behind a load balancer' },
+      { name: 'Cache & Read Replicas', sub: 'Add fast, separate read paths' },
+      { name: 'Partition & Queue',     sub: 'Split data or buffer writes' },
+    ],
+    feedback: [
+      'Vertical scaling addresses the CPU pressure but leaves one instance. The next time it fails or restarts, everyone is still affected. It helps throughput temporarily and the availability concern not at all.',
+      'The image processing service holds no user-specific state between calls — it is stateless, so every copy is interchangeable. Horizontal scaling is safe here. More copies increase throughput and mean that losing any one copy does not take the whole service down.',
+      'Caches and read replicas address database read bottlenecks. Image processing is CPU-bound computation, not a database read problem. This lever would do nothing for processing throughput.',
+      'Partitioning and queueing address write-heavy data store bottlenecks. The constraint here is CPU in a stateless compute service, not write volume to a store.',
+    ],
+    beforeHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node hot">Image Service<div class="badge">1 instance · 94% CPU</div></div>
+        <div class="arr">→</div>
+        <div class="diag-node">Storage</div>
+      </div>
+      <div class="diag-caption">Single stateless instance — one failure takes all uploads down</div>
+    `,
+    afterHtml: `
+      <div class="diag-row">
+        <div class="diag-node">Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node blue">Load Balancer</div>
+        <div class="arr">→</div>
+        <div class="diag-col">
+          <div class="diag-node green">Service A</div>
+          <div class="diag-node green">Service B</div>
+          <div class="diag-node green">Service C</div>
+        </div>
+      </div>
+      <div class="diag-caption">Three interchangeable copies — no single point of failure</div>
+    `,
+  },
+  {
+    chip: 'Need a quick fix',
+    chipColor: '#F48E00',
+    title: 'A Sudden Spike',
+    desc: 'A marketing campaign launched unexpectedly and traffic is 3× normal. A single application server is at 87% CPU with memory nearly exhausted. You need relief in the next 15 minutes. The service stores each user\'s session data in the memory of whichever instance handled them.',
+    correctIndex: 0,
+    levers: [
+      { name: 'Vertical Scaling',      sub: 'Upgrade to a bigger machine' },
+      { name: 'Horizontal Scaling',    sub: 'Add copies behind a load balancer' },
+      { name: 'Cache & Read Replicas', sub: 'Add fast, separate read paths' },
+      { name: 'Partition & Queue',     sub: 'Split data or buffer writes' },
+    ],
+    feedback: [
+      'Right for right now. The service keeps session state in one instance\'s memory, so it is not yet safe to scale horizontally — users routed to a new copy would not find their sessions. Upgrading the same instance gets more CPU and memory immediately, with no code changes and no session breakage. The ceiling is real, which is why the next step is moving sessions to a shared store.',
+      'Horizontal scaling would work eventually, but sessions live in local memory — this service is stateful right now. Users routed to a new copy would not find their sessions, causing broken logins. You would have to move session state to a shared store first, and there is no time for that in the next 15 minutes.',
+      'Caches and read replicas address database read pressure. The constraint here is CPU and memory on the application server, not database reads.',
+      'Partitioning and queueing address write-heavy data store bottlenecks. The pressure here is compute and memory on a stateful application instance.',
+    ],
+    beforeHtml: `
+      <div class="diag-row">
+        <div class="diag-node">3× Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node hot">App Server<div class="badge">87% CPU · session in RAM</div></div>
+        <div class="arr">→</div>
+        <div class="diag-node">Database</div>
+      </div>
+      <div class="diag-caption">Stateful session in memory — horizontal scaling not yet safe</div>
+    `,
+    afterHtml: `
+      <div class="diag-row">
+        <div class="diag-node">3× Users</div>
+        <div class="arr">→</div>
+        <div class="diag-node green">App Server<small>4× CPU · 2× RAM</small></div>
+        <div class="arr">→</div>
+        <div class="diag-node">Database</div>
+      </div>
+      <div class="next-note">Next step → move sessions to a shared store (e.g. Redis) → safe to scale horizontally</div>
+      <div class="diag-caption">Bigger machine buys time while you plan the stateless refactor</div>
+    `,
+  },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+const state = {
+  scenario:  0,
+  selection: null,      // index of last-clicked lever (null = none)
+  solved:    new Set(), // scenario indices solved correctly
+};
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render() {
+  const app = document.getElementById('app');
+
+  const hintHtml = `
+    <div class="hint-header">
+      <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="hint-text">Click a lever — try wrong ones to see why they fail, then find the right fix.</span>
+    </div>
+  `;
+
+  if (state.scenario >= SCENARIOS.length) {
+    app.innerHTML = hintHtml + renderDone();
+    return;
+  }
+
+  const s      = SCENARIOS[state.scenario];
+  const sel    = state.selection;
+  const solved = state.solved.has(state.scenario);
+
+  // Progress dots
+  const dotsHtml = SCENARIOS.map((_, i) => {
+    const cls = state.solved.has(i) ? 'dot done'
+              : i === state.scenario ? 'dot current'
+              : 'dot';
+    return `<div class="${cls}"></div>`;
+  }).join('');
+
+  // Lever buttons
+  const leversHtml = s.levers.map((l, i) => {
+    let cls = 'lever';
+    if (sel !== null && sel === i) {
+      cls += (i === s.correctIndex) ? ' picked-right' : ' picked-wrong';
+    }
+    return `
+      <button class="${cls}" ${solved ? 'disabled' : ''} onclick="pick(${i})">
+        <span class="lname">${l.name}</span>
+        <span class="lsub">${l.sub}</span>
+      </button>
+    `;
+  }).join('');
+
+  // Feedback
+  let feedbackHtml = '';
+  if (sel !== null) {
+    const isRight     = (sel === s.correctIndex);
+    const headCls     = isRight ? 'right' : 'wrong';
+    const headLabel   = isRight
+      ? 'Right lever'
+      : s.levers[sel].name + ' won\'t fix this';
+    const tryAgain    = !isRight
+      ? `<p class="fb-try-again">Try a different lever.</p>` : '';
+    const afterSection = isRight ? `
+      <div class="fb-after-label">After applying this lever</div>
+      <div class="diag-wrap" style="margin-bottom:0;">${s.afterHtml}</div>
+    ` : '';
+
+    feedbackHtml = `
+      <div class="feedback" id="fbarea">
+        <div class="fb-head ${headCls}">
+          <div class="fb-icon">${isRight ? '&#10003;' : '&#10005;'}</div>
+          <span>${headLabel}</span>
+        </div>
+        <div class="fb-body">
+          <p>${s.feedback[sel]}</p>
+          ${tryAgain}
+          ${afterSection}
+        </div>
+      </div>
+    `;
+  }
+
+  const nextReady = solved ? ' ready' : '';
+  const nextLabel = (state.scenario < SCENARIOS.length - 1)
+    ? 'Next scenario &#8594;'
+    : 'See summary &#8594;';
+
+  app.innerHTML = `
+    ${hintHtml}
+    <div class="progress-row">
+      ${dotsHtml}
+      <span class="progress-count">Scenario ${state.scenario + 1} of ${SCENARIOS.length}</span>
+    </div>
+    <div class="scenario-section">
+      <div class="scenario-chip" style="background:${s.chipColor};">${s.chip}</div>
+      <div class="scenario-title">${s.title}</div>
+      <div class="scenario-desc">${s.desc}</div>
+      <div class="diag-wrap">${s.beforeHtml}</div>
+    </div>
+    <div class="lever-section">
+      <div class="lever-q">Which lever should you pull?</div>
+      <div class="lever-grid">${leversHtml}</div>
+    </div>
+    ${feedbackHtml}
+    <div class="nav-row">
+      <button class="next-btn${nextReady}" onclick="advance()">${nextLabel}</button>
+    </div>
+  `;
+
+  if (sel !== null) {
+    const fb = document.getElementById('fbarea');
+    if (fb) requestAnimationFrame(() => fb.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+  }
+}
+
+function renderDone() {
+  return `
+    <div class="done-screen">
+      <div class="done-check">&#10003;</div>
+      <div class="done-title">All four scenarios complete</div>
+      <div class="done-body">
+        The skill is matching the lever to <strong>the kind of load you measured</strong>. A read bottleneck answered with partitioning will not improve. A stateful service will not survive horizontal scaling until the state is moved out. And the fastest fix is not always the right one — context determines the choice every time.
+      </div>
+      <button class="restart-btn" onclick="restart()">Start over</button>
+    </div>
+  `;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────
+function pick(index) {
+  state.selection = index;
+  if (index === SCENARIOS[state.scenario].correctIndex) {
+    state.solved.add(state.scenario);
+  }
+  render();
+}
+
+function advance() {
+  if (!state.solved.has(state.scenario)) return;
+  state.scenario++;
+  state.selection = null;
+  render();
+}
+
+function restart() {
+  state.scenario  = 0;
+  state.selection = null;
+  state.solved    = new Set();
+  render();
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>When gRPC's Performance Matters — Boundary Decision</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  line-height: 1.5;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 24px 16px 40px;
+  }
+}
+
+/* Hint header */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.hint-text {
+  font-size: 18px;
+  color: #1A1A1A;
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s ease-in-out infinite;
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Score bar */
+.score-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding: 12px 16px;
+  background: #F2F1EE;
+  border-radius: 10px;
+}
+
+.score-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  white-space: nowrap;
+}
+
+.progress-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.35s;
+}
+
+.dot.correct  { background: #328F51; }
+.dot.incorrect { background: #DE4C45; }
+
+.score-value {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1A1A1A;
+  white-space: nowrap;
+}
+
+/* Scenario card */
+.scenario-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 14px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  padding: 24px;
+  margin-bottom: 16px;
+  transition: opacity 0.3s;
+}
+
+.scenario-card.answered {
+  opacity: 0.72;
+}
+
+.scenario-number {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.40);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.scenario-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 12px;
+}
+
+.scenario-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tag {
+  display: inline-block;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.55);
+}
+
+.scenario-desc {
+  font-size: 16px;
+  color: rgba(0,0,0,0.72);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+/* Choice buttons */
+.choice-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+@media (max-width: 360px) {
+  .choice-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1A1A;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: rgba(0,0,0,0.32);
+  background: #F2F1EE;
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  cursor: default;
+}
+
+.btn.selected-correct {
+  background: #EAF5EE;
+  border-color: #328F51;
+  color: #247240;
+}
+
+.btn.selected-incorrect {
+  background: #FDECEA;
+  border-color: #DE4C45;
+  color: #B03535;
+}
+
+.btn.dimmed {
+  opacity: 0.36;
+}
+
+/* Feedback */
+.feedback {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  font-size: 16px;
+  line-height: 1.6;
+  display: none;
+}
+
+.feedback.show {
+  display: block;
+  animation: fadeSlideIn 0.25s ease;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.feedback.correct {
+  background: #EAF5EE;
+  border: 1px solid #B6DFC4;
+  color: #1F6B3B;
+}
+
+.feedback.incorrect {
+  background: #FDECEA;
+  border: 1px solid #F5B8B5;
+  color: #8C2626;
+}
+
+.feedback-header {
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-size: 16px;
+}
+
+/* Summary panel */
+.summary {
+  display: none;
+  margin-top: 8px;
+  padding: 32px 24px;
+  background: #F2F1EE;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.summary.show {
+  display: block;
+  animation: fadeSlideIn 0.4s ease;
+}
+
+.summary-score {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 44px;
+  font-weight: 700;
+  color: #1A1A1A;
+  margin-bottom: 4px;
+}
+
+.summary-sublabel {
+  font-size: 14px;
+  color: rgba(0,0,0,0.45);
+  margin-bottom: 20px;
+}
+
+.summary-message {
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 1.65;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.btn-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 24px;
+}
+
+.btn-reset:hover {
+  background: #333333;
+}
+
+.key-takeaway {
+  padding: 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 10px;
+  font-size: 15px;
+  color: rgba(0,0,0,0.65);
+  line-height: 1.65;
+  text-align: left;
+}
+
+.key-takeaway strong {
+  color: #1A1A1A;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">For each boundary, pick the right protocol.</span>
+  </div>
+
+  <!-- Score bar -->
+  <div class="score-bar">
+    <span class="score-label">Score</span>
+    <div class="progress-dots">
+      <div class="dot" id="dot0"></div>
+      <div class="dot" id="dot1"></div>
+      <div class="dot" id="dot2"></div>
+      <div class="dot" id="dot3"></div>
+    </div>
+    <span class="score-value" id="scoreValue">0 / 4</span>
+  </div>
+
+  <!-- Scenario cards -->
+  <div id="cards">
+
+    <!-- Card 0 -->
+    <div class="scenario-card" id="card0">
+      <div class="scenario-number">Boundary 01</div>
+      <div class="scenario-title">Public product catalog API</div>
+      <div class="scenario-tags">
+        <span class="tag">caller: browsers + third parties</span>
+        <span class="tag">traffic: moderate</span>
+      </div>
+      <p class="scenario-desc">Your e-commerce platform needs an API for its product catalog. It will be called by a React web app, an iOS app, and two external partners who want to build integrations. The response is structured JSON-style product data and current performance is already fine.</p>
+      <div class="choice-buttons">
+        <button class="btn" id="card0-grpc" onclick="choose(0,'grpc')">gRPC</button>
+        <button class="btn" id="card0-rest" onclick="choose(0,'rest')">REST</button>
+      </div>
+      <div class="feedback" id="feedback0"></div>
+    </div>
+
+    <!-- Card 1 -->
+    <div class="scenario-card" id="card1">
+      <div class="scenario-number">Boundary 02</div>
+      <div class="scenario-title">Order → Inventory sync on a hot path</div>
+      <div class="scenario-tags">
+        <span class="tag">caller: internal service</span>
+        <span class="tag">traffic: ~80,000 calls/min</span>
+      </div>
+      <p class="scenario-desc">Your Order service must check stock availability on every purchase attempt. Profiling shows this internal call fires 80,000 times a minute and the JSON round-trips are adding measurable latency. Both services are owned by your team and share the same build pipeline.</p>
+      <div class="choice-buttons">
+        <button class="btn" id="card1-grpc" onclick="choose(1,'grpc')">gRPC</button>
+        <button class="btn" id="card1-rest" onclick="choose(1,'rest')">REST</button>
+      </div>
+      <div class="feedback" id="feedback1"></div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="scenario-card" id="card2">
+      <div class="scenario-number">Boundary 03</div>
+      <div class="scenario-title">Continuous telemetry stream from edge nodes</div>
+      <div class="scenario-tags">
+        <span class="tag">caller: internal service</span>
+        <span class="tag">pattern: continuous stream</span>
+      </div>
+      <p class="scenario-desc">A fleet of edge inference nodes must push sensor readings to a central aggregator service in real time — not as individual request-response pairs, but as an ongoing flow of messages. Both endpoints are internal services you control and own.</p>
+      <div class="choice-buttons">
+        <button class="btn" id="card2-grpc" onclick="choose(2,'grpc')">gRPC</button>
+        <button class="btn" id="card2-rest" onclick="choose(2,'rest')">REST</button>
+      </div>
+      <div class="feedback" id="feedback2"></div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="scenario-card" id="card3">
+      <div class="scenario-number">Boundary 04</div>
+      <div class="scenario-title">Internal admin report export</div>
+      <div class="scenario-tags">
+        <span class="tag">caller: internal ops team</span>
+        <span class="tag">traffic: ~50 calls/day</span>
+      </div>
+      <p class="scenario-desc">Your operations team triggers a bulk export report once or twice a day from an internal dashboard. The call is infrequent, performance is not a concern, and the team uses a simple curl script to kick off the job. No streaming needed.</p>
+      <div class="choice-buttons">
+        <button class="btn" id="card3-grpc" onclick="choose(3,'grpc')">gRPC</button>
+        <button class="btn" id="card3-rest" onclick="choose(3,'rest')">REST</button>
+      </div>
+      <div class="feedback" id="feedback3"></div>
+    </div>
+
+  </div>
+
+  <!-- Summary panel -->
+  <div class="summary" id="summary">
+    <div class="summary-score" id="summaryScore">0/4</div>
+    <div class="summary-sublabel">correct answers</div>
+    <div class="summary-message" id="summaryMessage"></div>
+    <button class="btn-reset" onclick="resetAll()">Try again</button>
+    <div class="key-takeaway">
+      <strong>The decision rule in one sentence:</strong> Ask three questions per boundary — who is calling (internal or external?), how hot is the path, and is streaming needed? Those three factors drive every choice here, and they get asked one boundary at a time.
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SCENARIOS = [
+  {
+    correct: 'rest',
+    feedback: {
+      correct: {
+        header: 'Correct — REST belongs on this boundary.',
+        body: 'Browsers and third-party integrators cannot call gRPC directly. A public edge where outside parties need a universal, readable protocol is precisely where REST reach matters most. Performance is already fine, so binary encoding would buy nothing — and forcing a translating proxy makes every outside consumer\'s life harder for no gain.'
+      },
+      incorrect: {
+        header: 'Not quite — this boundary calls for REST.',
+        body: 'Browsers cannot speak gRPC directly, so choosing it here forces a translating proxy and hands every outside caller a harder integration. The callers are browsers and third parties — this is a public edge. REST reach and readability matter most here, and there is no performance problem to solve.'
+      }
+    }
+  },
+  {
+    correct: 'grpc',
+    feedback: {
+      correct: {
+        header: 'Correct — gRPC earns its place here.',
+        body: 'On a hot internal path at 80,000 calls per minute, binary encoding sends fewer bytes and HTTP/2 reuses a single connection across many requests, cutting latency on every one of them. Both services are yours and share a build pipeline, so the tooling cost is manageable. This boundary justifies gRPC.'
+      },
+      incorrect: {
+        header: 'Not quite — this hot path belongs on gRPC.',
+        body: 'At 80,000 calls per minute, the bytes saved by binary encoding and the connection reuse from HTTP/2 make a measurable difference. Both services are internal and share the build pipeline, so the tooling cost is justified by real gains. Staying on REST leaves performance on the table at this scale.'
+      }
+    }
+  },
+  {
+    correct: 'grpc',
+    feedback: {
+      correct: {
+        header: 'Correct — gRPC streaming is built for this.',
+        body: 'gRPC supports bidirectional streaming as a first-class feature. An ongoing flow of messages from edge nodes maps directly to a client-streaming gRPC call. REST models this as repeated individual requests, adding overhead and making the flow harder to implement and reason about.'
+      },
+      incorrect: {
+        header: 'Not quite — streaming calls for gRPC.',
+        body: 'gRPC supports streaming natively: client and server can exchange a continuous flow of messages over a single connection. REST is designed around request-response pairs, so sending a continuous stream with it means polling or repeated round-trips — more overhead and more complexity than a gRPC stream would carry.'
+      }
+    }
+  },
+  {
+    correct: 'rest',
+    feedback: {
+      correct: {
+        header: 'Correct — REST is sufficient here.',
+        body: 'A low-traffic, non-performance-sensitive internal call that already works fine does not benefit from gRPC. Adding a code-generation pipeline and Protobuf stubs for 50 calls a day would be pure overhead with no gain. Simple REST keeps the boundary easy to operate, easy to debug by hand, and zero extra tooling.'
+      },
+      incorrect: {
+        header: 'Not quite — REST is the right fit here.',
+        body: 'gRPC earns its cost on hot, latency-sensitive paths. At 50 calls a day, there is nothing to optimize. Introducing a code-generation pipeline for a rarely-used admin endpoint is pure tooling overhead with no measurable benefit. The cost must be justified by gains — and on this boundary, there are none.'
+      }
+    }
+  }
+];
+
+var answered = [false, false, false, false];
+var results   = [null,  null,  null,  null];
+var score = 0;
+
+function choose(idx, choice) {
+  if (answered[idx]) return;
+
+  var scenario  = SCENARIOS[idx];
+  var isCorrect = (choice === scenario.correct);
+
+  answered[idx] = true;
+  results[idx]  = isCorrect;
+  if (isCorrect) score++;
+
+  // Style buttons
+  var grpcBtn = document.getElementById('card' + idx + '-grpc');
+  var restBtn = document.getElementById('card' + idx + '-rest');
+  var chosen  = choice === 'grpc' ? grpcBtn : restBtn;
+  var other   = choice === 'grpc' ? restBtn : grpcBtn;
+
+  grpcBtn.disabled = true;
+  restBtn.disabled = true;
+
+  chosen.classList.add(isCorrect ? 'selected-correct' : 'selected-incorrect');
+  other.classList.add('dimmed');
+
+  // Show feedback
+  var fb = isCorrect ? scenario.feedback.correct : scenario.feedback.incorrect;
+  var feedbackEl = document.getElementById('feedback' + idx);
+  feedbackEl.innerHTML = '<div class="feedback-header">' + fb.header + '</div>' + fb.body;
+  feedbackEl.classList.add('show', isCorrect ? 'correct' : 'incorrect');
+
+  // Mark card
+  document.getElementById('card' + idx).classList.add('answered');
+
+  // Update score bar
+  refreshScoreBar();
+
+  // Show summary when all done
+  if (answered.every(function(a){ return a; })) {
+    setTimeout(showSummary, 700);
+  }
+}
+
+function refreshScoreBar() {
+  document.getElementById('scoreValue').textContent = score + ' / 4';
+  for (var i = 0; i < 4; i++) {
+    var dot = document.getElementById('dot' + i);
+    dot.className = 'dot';
+    if (answered[i]) {
+      dot.classList.add(results[i] ? 'correct' : 'incorrect');
+    }
+  }
+}
+
+function showSummary() {
+  var summaryEl      = document.getElementById('summary');
+  var summaryScoreEl = document.getElementById('summaryScore');
+  var summaryMsgEl   = document.getElementById('summaryMessage');
+
+  summaryScoreEl.textContent = score + '/4';
+
+  var messages = {
+    4: 'You picked the right protocol on every boundary. The key habit is there: you asked who is calling, how heavy the traffic is, and whether streaming is needed — and you answered it one boundary at a time, not once for the whole system.',
+    3: 'Three out of four. Re-read the feedback on the one you missed. Usually it comes down to either the caller type (browsers cannot speak gRPC) or the traffic level (the tooling cost needs real gains to justify it).',
+    2: 'Two out of four. The core rule: public edges and low-traffic paths lean REST; internal hot paths and streaming calls lean gRPC. Go back through the two you missed and match each signal in the scenario to a factor in the decision table.',
+    1: 'Review the decision table in the lesson. Three questions settle it: who is the caller (internal or external?), how hot is the path, and is streaming needed? Each scenario above signals at least one of those clearly.',
+    0: 'Start from the lesson\'s decision table. Three questions settle every boundary: who is calling, how heavy is the traffic, and is streaming needed? Work through each scenario again with those three questions in mind.'
+  };
+
+  summaryMsgEl.textContent = messages[score] || messages[0];
+  summaryEl.classList.add('show');
+  summaryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetAll() {
+  answered = [false, false, false, false];
+  results  = [null,  null,  null,  null];
+  score    = 0;
+
+  refreshScoreBar();
+
+  for (var i = 0; i < 4; i++) {
+    var card    = document.getElementById('card' + i);
+    var grpcBtn = document.getElementById('card' + i + '-grpc');
+    var restBtn = document.getElementById('card' + i + '-rest');
+    var fb      = document.getElementById('feedback' + i);
+
+    card.classList.remove('answered');
+    grpcBtn.disabled = false;
+    restBtn.disabled = false;
+    grpcBtn.className = 'btn';
+    restBtn.className = 'btn';
+    fb.className = 'feedback';
+    fb.innerHTML = '';
+  }
+
+  document.getElementById('summary').classList.remove('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GraphQL: Over-fetching &amp; Under-fetching</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 20px 0;
+  font-size: 18px;
+  color: #1A1A1A;
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s infinite;
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px 20px 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  background: #F2F1EE;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  color: rgba(0,0,0,0.50);
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+  text-align: center;
+}
+
+.tab-btn:hover {
+  border-color: rgba(0,0,0,0.28);
+  color: #1A1A1A;
+  background: #E8E6E2;
+}
+
+.tab-btn.active {
+  background: #1A1A1A;
+  border-color: #1A1A1A;
+  color: #FFFFFF;
+}
+
+/* ── Description ── */
+.desc {
+  padding: 12px 20px 4px;
+  font-size: 15px;
+  color: rgba(0,0,0,0.60);
+  line-height: 1.55;
+}
+
+/* ── Panel grid ── */
+.panels {
+  display: flex;
+  gap: 12px;
+  padding: 12px 20px 24px;
+}
+
+@media (max-width: 480px) {
+  .panels { flex-direction: column; }
+  .hint-header { padding: 16px 12px 0; }
+  .tabs { padding: 12px 12px 0; }
+  .desc { padding: 10px 12px 4px; }
+  .panels { padding: 10px 12px 20px; }
+}
+
+.panel {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.panel-head {
+  padding: 10px 14px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-rest .panel-head {
+  background: rgba(222,76,69,0.06);
+  border-bottom: 1px solid rgba(222,76,69,0.16);
+}
+
+.panel-gql .panel-head {
+  background: rgba(50,143,81,0.06);
+  border-bottom: 1px solid rgba(50,143,81,0.16);
+}
+
+.panel-chip {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.panel-rest .panel-chip {
+  background: rgba(222,76,69,0.14);
+  color: #DE4C45;
+}
+
+.panel-gql .panel-chip {
+  background: rgba(50,143,81,0.14);
+  color: #328F51;
+}
+
+.panel-head-lbl {
+  color: rgba(0,0,0,0.45);
+  font-size: 13px;
+}
+
+.panel-body {
+  padding: 12px;
+  background: #FFFFFF;
+}
+
+/* ── Reusable inner atoms ── */
+.sec-lbl {
+  font-size: 12px;
+  color: rgba(0,0,0,0.40);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+.ep {
+  display: inline-block;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  padding: 5px 10px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+/* Response block */
+.resp {
+  background: #F2F1EE;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.fk { color: #8754FD; }
+.fv { color: #1878DC; white-space: nowrap; }
+
+.field.needed .fk,
+.field.needed .fv { color: #328F51; }
+
+.field.discarded {
+  opacity: 0.32;
+}
+
+.tag {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.tag-need { background: rgba(50,143,81,0.14); color: #328F51; }
+.tag-drop { background: rgba(222,76,69,0.12); color: #DE4C45; }
+
+/* Summary strip */
+.strip {
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.strip-bad  { background: rgba(222,76,69,0.07);  color: #A83530; border: 1px solid rgba(222,76,69,0.18); }
+.strip-good { background: rgba(50,143,81,0.07);  color: #236038; border: 1px solid rgba(50,143,81,0.18); }
+
+/* Query block (syntax-highlighted code) */
+.qblock {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  line-height: 1.8;
+  background: #F2F1EE;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.qk { color: #8754FD; }
+.qf { color: #1878DC; }
+.qa { color: #D35722; }
+.qb { color: rgba(0,0,0,0.32); }
+
+/* Waterfall steps */
+.step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.step-n {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 50%;
+  background: #F2F1EE;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.step-info { flex: 1; min-width: 0; padding-bottom: 2px; }
+
+.step-ep {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  padding: 4px 8px;
+  border-radius: 5px;
+  display: inline-block;
+  margin-bottom: 3px;
+}
+
+.step-note {
+  font-size: 12px;
+  color: rgba(0,0,0,0.42);
+  padding-left: 2px;
+  line-height: 1.4;
+}
+
+.vline {
+  width: 1.5px;
+  height: 12px;
+  background: rgba(0,0,0,0.14);
+  margin: 2px 0 2px 10px;
+}
+
+/* Nested result preview */
+.result-tree {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  color: #328F51;
+  background: #F2F1EE;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  white-space: pre;
+  overflow-x: auto;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Toggle between the two problems REST creates, and see how GraphQL solves each.
+  </div>
+
+  <!-- Tab selector -->
+  <div class="tabs">
+    <button class="tab-btn active" id="btn-over"  onclick="show('over')">Over-fetching</button>
+    <button class="tab-btn"        id="btn-under" onclick="show('under')">Under-fetching</button>
+  </div>
+
+  <!-- Scenario description -->
+  <p class="desc" id="desc"></p>
+
+  <!-- Side-by-side panels -->
+  <div class="panels">
+    <div class="panel panel-rest">
+      <div class="panel-head">
+        <span class="panel-chip">REST</span>
+        <span class="panel-head-lbl">The problem</span>
+      </div>
+      <div class="panel-body" id="rest-body"></div>
+    </div>
+    <div class="panel panel-gql">
+      <div class="panel-head">
+        <span class="panel-chip">GraphQL</span>
+        <span class="panel-head-lbl">The solution</span>
+      </div>
+      <div class="panel-body" id="gql-body"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── Content data ── */
+
+const OVER = {
+  desc: 'A mobile screen needs only a user\'s <strong>name</strong> and <strong>avatar</strong>. The REST endpoint returns the full record regardless — most of it is thrown away.',
+
+  rest: function() {
+    var r = document.getElementById('rest-body');
+    r.innerHTML = '';
+    r.innerHTML =
+      '<div class="ep">GET /users/42</div>' +
+      '<div class="sec-lbl">Response — fixed shape, no matter who asks:</div>' +
+      '<div class="resp">' +
+        '<div class="field needed"><span class="fk">"name":</span><span class="fv">"Ada Lovelace"</span><span class="tag tag-need">needed</span></div>' +
+        '<div class="field needed"><span class="fk">"avatar":</span><span class="fv">"ada.jpg"</span><span class="tag tag-need">needed</span></div>' +
+        '<div class="field discarded"><span class="fk">"address":</span><span class="fv">"10 Downing St"</span><span class="tag tag-drop">discarded</span></div>' +
+        '<div class="field discarded"><span class="fk">"billing":</span><span class="fv">[...12 items]</span><span class="tag tag-drop">discarded</span></div>' +
+        '<div class="field discarded"><span class="fk">"prefs":</span><span class="fv">{...8 keys}</span><span class="tag tag-drop">discarded</span></div>' +
+        '<div class="field discarded"><span class="fk">"created_at":</span><span class="fv">"2019-03-12"</span><span class="tag tag-drop">discarded</span></div>' +
+      '</div>' +
+      '<div class="strip strip-bad">5 of 6 fields transferred then thrown away. Bandwidth and processing wasted.</div>';
+  },
+
+  gql: function() {
+    var g = document.getElementById('gql-body');
+    g.innerHTML = '';
+
+    var qb = document.createElement('div');
+    qb.className = 'qblock';
+    qb.innerHTML =
+      '<span class="qk">query</span> <span class="qb">{</span>\n' +
+      '  <span class="qf">user</span>(<span class="qa">id: "42"</span>) <span class="qb">{</span>\n' +
+      '    <span class="qf">name</span>\n' +
+      '    <span class="qf">avatar</span>\n' +
+      '  <span class="qb">}</span>\n' +
+      '<span class="qb">}</span>';
+
+    var lbl1 = document.createElement('div');
+    lbl1.className = 'sec-lbl';
+    lbl1.textContent = 'Client states exactly what it needs:';
+
+    var lbl2 = document.createElement('div');
+    lbl2.className = 'sec-lbl';
+    lbl2.textContent = 'Response mirrors the query — nothing extra:';
+
+    var resp = document.createElement('div');
+    resp.className = 'resp';
+    resp.innerHTML =
+      '<div class="field needed"><span class="fk">"name":</span><span class="fv">"Ada Lovelace"</span><span class="tag tag-need">returned</span></div>' +
+      '<div class="field needed"><span class="fk">"avatar":</span><span class="fv">"ada.jpg"</span><span class="tag tag-need">returned</span></div>';
+
+    var strip = document.createElement('div');
+    strip.className = 'strip strip-good';
+    strip.textContent = 'Only 2 fields transferred — exactly what the screen asked for. Nothing wasted.';
+
+    g.appendChild(lbl1);
+    g.appendChild(qb);
+    g.appendChild(lbl2);
+    g.appendChild(resp);
+    g.appendChild(strip);
+  }
+};
+
+const UNDER = {
+  desc: 'A profile screen needs a user, their orders, and each order\'s product details. REST requires three separate round trips — a request waterfall.',
+
+  rest: function() {
+    var r = document.getElementById('rest-body');
+    r.innerHTML =
+      '<div class="sec-lbl">Three sequential network calls:</div>' +
+
+      '<div class="step">' +
+        '<div class="step-n">1</div>' +
+        '<div class="step-info">' +
+          '<div class="step-ep">GET /users/42</div>' +
+          '<div class="step-note">Returns user — no orders yet</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="vline"></div>' +
+
+      '<div class="step">' +
+        '<div class="step-n">2</div>' +
+        '<div class="step-info">' +
+          '<div class="step-ep">GET /orders?user=42</div>' +
+          '<div class="step-note">Waits for step 1 — returns order IDs</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="vline"></div>' +
+
+      '<div class="step">' +
+        '<div class="step-n">3</div>' +
+        '<div class="step-info">' +
+          '<div class="step-ep">GET /products/789</div>' +
+          '<div class="step-note">Waits for step 2 — returns product</div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="strip strip-bad" style="margin-top:10px">3 serial round trips before the screen can render. Each call blocks the next.</div>';
+  },
+
+  gql: function() {
+    var g = document.getElementById('gql-body');
+    g.innerHTML = '';
+
+    var lbl1 = document.createElement('div');
+    lbl1.className = 'sec-lbl';
+    lbl1.textContent = 'One nested query gets everything at once:';
+
+    var qb = document.createElement('div');
+    qb.className = 'qblock';
+    qb.innerHTML =
+      '<span class="qk">query</span> <span class="qb">{</span>\n' +
+      '  <span class="qf">user</span>(<span class="qa">id: "42"</span>) <span class="qb">{</span>\n' +
+      '    <span class="qf">name</span>\n' +
+      '    <span class="qf">orders</span> <span class="qb">{</span>\n' +
+      '      <span class="qf">title</span>\n' +
+      '      <span class="qf">product</span> <span class="qb">{</span>\n' +
+      '        <span class="qf">name</span>\n' +
+      '        <span class="qf">price</span>\n' +
+      '      <span class="qb">}</span>\n' +
+      '    <span class="qb">}</span>\n' +
+      '  <span class="qb">}</span>\n' +
+      '<span class="qb">}</span>';
+
+    var lbl2 = document.createElement('div');
+    lbl2.className = 'sec-lbl';
+    lbl2.textContent = 'One response, fully assembled:';
+
+    var tree = document.createElement('div');
+    tree.className = 'result-tree';
+    tree.textContent =
+      'user\n' +
+      '  name: "Ada Lovelace"\n' +
+      '  orders[0]\n' +
+      '    title: "Mechanical notebook"\n' +
+      '    product.name: "Brass Ruler"\n' +
+      '    product.price: 12.00\n' +
+      '  orders[1]\n' +
+      '    title: "Brass gears set"\n' +
+      '    product.name: "Gear Kit"\n' +
+      '    product.price: 34.50';
+
+    var strip = document.createElement('div');
+    strip.className = 'strip strip-good';
+    strip.textContent = '1 round trip. Server resolvers handle the joins — client receives everything nested and ready.';
+
+    g.appendChild(lbl1);
+    g.appendChild(qb);
+    g.appendChild(lbl2);
+    g.appendChild(tree);
+    g.appendChild(strip);
+  }
+};
+
+/* ── Switch logic ── */
+function show(tab) {
+  document.getElementById('btn-over').classList.toggle('active', tab === 'over');
+  document.getElementById('btn-under').classList.toggle('active', tab === 'under');
+
+  var data = (tab === 'over') ? OVER : UNDER;
+  document.getElementById('desc').innerHTML = data.desc;
+  data.rest();
+  data.gql();
+}
+
+/* ── Init ── */
+show('over');
+</script>
+</body>
+</html>

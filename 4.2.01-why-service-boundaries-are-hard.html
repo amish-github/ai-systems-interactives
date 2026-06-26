@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why Service Boundaries Are Hard</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.outer {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 16px;
+  font-size: 18px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+.cursor-icon { animation: cursor-wiggle 4s infinite; flex-shrink: 0; }
+
+/* ── Main ── */
+.main { padding: 24px; }
+
+/* ── Caption ── */
+.caption {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 16px 20px;
+  font-size: 16px;
+  line-height: 1.55;
+  margin-bottom: 20px;
+  min-height: 68px;
+  transition: opacity 0.2s;
+}
+
+/* ── Architecture panels ── */
+.archs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.panel-hd {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.panel-hd.bad  { background: rgba(222,76,69,0.08);  color: #DE4C45; }
+.panel-hd.good { background: rgba(50,143,81,0.08);   color: #328F51; }
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  background: #FFFFFF;
+  min-height: 300px;
+}
+
+/* ── Service boxes ── */
+.svc {
+  width: 100%;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  text-align: center;
+  background: #FFFFFF;
+  color: #1A1A1A;
+  transition: border-color 0.3s ease, background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 2px 0 rgba(0,0,0,0.08);
+}
+.svc-sub {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.40);
+  display: block;
+  margin-top: 3px;
+}
+
+.svc.s-active {
+  border-color: #1878DC;
+  background: rgba(24,120,220,0.07);
+  box-shadow: 0 0 0 2px rgba(24,120,220,0.20), 0 0 0.5px 0 rgba(0,0,0,0.20);
+}
+.svc.s-visited {
+  border-color: rgba(0,0,0,0.08);
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.40);
+  box-shadow: none;
+}
+.svc.s-done {
+  border-color: #328F51;
+  background: rgba(50,143,81,0.06);
+  box-shadow: 0 0 0 2px rgba(50,143,81,0.14);
+}
+
+/* ── Arrows ── */
+.arr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0;
+  width: 100%;
+}
+.arr-shaft {
+  width: 2px;
+  height: 14px;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.3s ease;
+}
+.arr-tip {
+  width: 0; height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid rgba(0,0,0,0.14);
+  transition: border-top-color 0.3s ease;
+}
+.arr-lbl {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 10px;
+  color: rgba(0,0,0,0.35);
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+  transition: color 0.3s ease;
+}
+
+@keyframes hop-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.arr.a-active .arr-shaft { background: #1878DC; animation: hop-pulse 0.9s ease-in-out infinite; }
+.arr.a-active .arr-tip   { border-top-color: #1878DC; }
+.arr.a-active .arr-lbl   { color: #1878DC; font-weight: 500; }
+
+.arr.a-done .arr-shaft   { background: rgba(24,120,220,0.28); }
+.arr.a-done .arr-tip     { border-top-color: rgba(24,120,220,0.28); }
+.arr.a-done .arr-lbl     { color: rgba(24,120,220,0.45); }
+
+.arr.a-rare-active .arr-shaft { background: #328F51; animation: hop-pulse 0.9s ease-in-out infinite; }
+.arr.a-rare-active .arr-tip   { border-top-color: #328F51; }
+.arr.a-rare-active .arr-lbl   { color: #328F51; font-weight: 500; }
+
+/* ── Hop counter ── */
+.hop-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid rgba(0,0,0,0.10);
+  background: #F2F1EE;
+  font-size: 13px;
+  color: rgba(0,0,0,0.55);
+}
+.hop-num {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 20px;
+  min-width: 28px;
+  text-align: center;
+  transition: color 0.3s ease;
+  color: #1A1A1A;
+}
+.hop-num.hn-bad  { color: #DE4C45; }
+.hop-num.hn-zero { color: #1A1A1A; }
+.hop-num.hn-good { color: #328F51; }
+
+/* ── Controls ── */
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.step-ind {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+  min-width: 76px;
+  text-align: center;
+}
+
+.btn {
+  border: none;
+  cursor: pointer;
+  font-family: 'Suisse Intl', sans-serif;
+  font-size: 16px;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-next {
+  background: #1A1A1A;
+  color: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.btn-next:hover:not(:disabled) { background: #333333; transform: translateY(-1px); }
+.btn-next:disabled { background: rgba(0,0,0,0.18); cursor: not-allowed; transform: none; }
+.btn-reset {
+  background: #F2F1EE;
+  color: #1A1A1A;
+  border: 1px solid rgba(0,0,0,0.14);
+}
+.btn-reset:hover { background: #E8E7E4; }
+
+/* ── Summary ── */
+.summary {
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.14);
+  overflow: hidden;
+  display: none;
+}
+.summary.vis { display: block; }
+
+.sum-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  font-size: 16px;
+  line-height: 1.5;
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.sum-row:last-child { border-bottom: none; }
+
+.tag {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.tag-bad  { background: rgba(222,76,69,0.10);  color: #DE4C45; }
+.tag-good { background: rgba(50,143,81,0.10);   color: #328F51; }
+
+/* ── Responsive ── */
+@media (max-width: 520px) {
+  .main { padding: 16px; }
+  .hint-header { padding: 16px 16px 12px; font-size: 16px; }
+  .archs { gap: 8px; }
+  .panel-body { padding: 12px 8px; min-height: 260px; }
+  .svc { font-size: 12px; padding: 8px 8px; }
+  .svc-sub { font-size: 10px; }
+  .btn { font-size: 14px; padding: 8px 14px; }
+  .caption { font-size: 15px; min-height: 60px; }
+}
+@media (max-width: 375px) {
+  .svc { font-size: 11px; padding: 7px 6px; }
+  .hint-header { font-size: 14px; }
+  .panel-hd { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <!-- Interactive hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Click Next to trace a "Place Order" request through both architectures
+  </div>
+
+  <div class="main">
+
+    <!-- Step caption -->
+    <div class="caption" id="caption">
+      A user clicks <strong>Place Order</strong>. The same action plays out in two different architectures. Which one crosses fewer service boundaries?
+    </div>
+
+    <!-- Architecture panels -->
+    <div class="archs">
+
+      <!-- LEFT: Split by layer (bad) -->
+      <div class="panel">
+        <div class="panel-hd bad">Split by layer</div>
+        <div class="panel-body">
+          <div class="svc" id="l-fe">
+            Frontend<br>service
+          </div>
+          <div class="arr" id="l-a1">
+            <div class="arr-shaft"></div>
+            <div class="arr-tip"></div>
+            <div class="arr-lbl">network</div>
+          </div>
+          <div class="svc" id="l-bl">
+            Business logic<br>service
+          </div>
+          <div class="arr" id="l-a2">
+            <div class="arr-shaft"></div>
+            <div class="arr-tip"></div>
+            <div class="arr-lbl">network</div>
+          </div>
+          <div class="svc" id="l-da">
+            Data access<br>service
+          </div>
+          <div class="arr" id="l-a3">
+            <div class="arr-shaft"></div>
+            <div class="arr-tip"></div>
+            <div class="arr-lbl">network</div>
+          </div>
+          <div class="svc" id="l-db">
+            Database
+            <span class="svc-sub">shared</span>
+          </div>
+        </div>
+        <div class="hop-row">
+          Network hops:&nbsp;<span class="hop-num hn-zero" id="l-hops">0</span>
+        </div>
+      </div>
+
+      <!-- RIGHT: Split by domain (good) -->
+      <div class="panel">
+        <div class="panel-hd good">Split by domain</div>
+        <div class="panel-body">
+          <div class="svc" id="r-ord">
+            Ordering<br>service
+            <span class="svc-sub">owns its data</span>
+          </div>
+          <div class="arr" id="r-a1">
+            <div class="arr-shaft"></div>
+            <div class="arr-tip"></div>
+            <div class="arr-lbl">rare</div>
+          </div>
+          <div class="svc" id="r-pay">
+            Payments<br>service
+            <span class="svc-sub">owns its data</span>
+          </div>
+          <!-- Inventory exists but isn't involved in this request -->
+          <div class="arr" style="opacity:0.30;">
+            <div class="arr-shaft"></div>
+            <div class="arr-tip"></div>
+            <div class="arr-lbl">rare</div>
+          </div>
+          <div class="svc" id="r-inv" style="opacity:0.35;">
+            Inventory<br>service
+            <span class="svc-sub">owns its data</span>
+          </div>
+        </div>
+        <div class="hop-row">
+          Network hops:&nbsp;<span class="hop-num hn-zero" id="r-hops">0</span>
+        </div>
+      </div>
+
+    </div><!-- /archs -->
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-reset" onclick="reset()">Reset</button>
+      <span class="step-ind" id="step-ind">Step 0 of 4</span>
+      <button class="btn btn-next" id="next-btn" onclick="advance()">Next &#8594;</button>
+    </div>
+
+    <!-- Summary (revealed at final step) -->
+    <div class="summary" id="summary">
+      <div class="sum-row">
+        <span class="tag tag-bad">layer split</span>
+        <span>3 mandatory network hops for one action — slow, fragile, and all three services must be deployed together.</span>
+      </div>
+      <div class="sum-row">
+        <span class="tag tag-good">domain split</span>
+        <span>1 rare, intentional call — most work stays inside the Ordering service. Services can evolve and deploy independently.</span>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /outer -->
+
+<script>
+(function () {
+  var TOTAL = 4;
+  var step  = 0;
+
+  var captions = [
+    'A user clicks <strong>Place Order</strong>. The same action plays out in two different architectures. Which one crosses fewer service boundaries?',
+    'The request arrives. On the left it enters the <strong>Frontend service</strong>. On the right it goes directly into the <strong>Ordering service</strong>, which already owns all the data it needs.',
+    'Left: the Frontend must call the <strong>Business Logic service</strong> over the network &#8212; hop <strong>#1</strong>. Right: the Ordering service reads its own database internally. No network call needed.',
+    'Left: Business Logic now calls the <strong>Data Access service</strong> &#8212; hop <strong>#2</strong>. Every layer is a separate deployment, so every read has to cross a network boundary. Right: still just one service doing its work.',
+    'Left: Data Access finally reaches the <strong>Database</strong> &#8212; hop <strong>#3</strong>. Three hops, three failure points, three services that must change together. Right: one occasional call to <strong>Payments</strong> &#8212; the only hop needed, and only when genuinely warranted.'
+  ];
+
+  var states = [
+    {},
+    { 'l-fe': 's-active', 'r-ord': 's-active' },
+    { 'l-fe': 's-visited', 'l-a1': 'a-active', 'l-bl': 's-active', 'r-ord': 's-done' },
+    { 'l-fe': 's-visited', 'l-a1': 'a-done', 'l-bl': 's-visited', 'l-a2': 'a-active', 'l-da': 's-active', 'r-ord': 's-done' },
+    { 'l-fe': 's-visited', 'l-a1': 'a-done', 'l-bl': 's-visited', 'l-a2': 'a-done', 'l-da': 's-visited', 'l-a3': 'a-active', 'l-db': 's-active', 'r-ord': 's-done', 'r-a1': 'a-rare-active', 'r-pay': 's-active' }
+  ];
+
+  var hops = [
+    { l: 0, r: 0 },
+    { l: 0, r: 0 },
+    { l: 1, r: 0 },
+    { l: 2, r: 0 },
+    { l: 3, r: 1 }
+  ];
+
+  var SVC_CLASSES   = ['s-active', 's-visited', 's-done'];
+  var ARROW_CLASSES = ['a-active', 'a-done', 'a-rare-active'];
+
+  function render(s) {
+    document.querySelectorAll('.svc').forEach(function (el) {
+      SVC_CLASSES.forEach(function (c) { el.classList.remove(c); });
+    });
+    document.querySelectorAll('.arr').forEach(function (el) {
+      ARROW_CLASSES.forEach(function (c) { el.classList.remove(c); });
+    });
+
+    var st = states[s];
+    Object.keys(st).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.classList.add(st[id]);
+    });
+
+    var lh = document.getElementById('l-hops');
+    var rh = document.getElementById('r-hops');
+    lh.textContent = hops[s].l;
+    rh.textContent = hops[s].r;
+    lh.className = 'hop-num ' + (hops[s].l > 0 ? 'hn-bad'  : 'hn-zero');
+    rh.className = 'hop-num ' + (hops[s].r > 0 ? 'hn-good' : 'hn-zero');
+
+    document.getElementById('caption').innerHTML = captions[s];
+    document.getElementById('step-ind').textContent = 'Step ' + s + ' of ' + TOTAL;
+    document.getElementById('next-btn').disabled = (s >= TOTAL);
+    document.getElementById('summary').classList.toggle('vis', s >= TOTAL);
+  }
+
+  window.advance = function () {
+    if (step < TOTAL) { step++; render(step); }
+  };
+
+  window.reset = function () {
+    step = 0;
+    render(0);
+  };
+
+  render(0);
+}());
+</script>
+</body>
+</html>

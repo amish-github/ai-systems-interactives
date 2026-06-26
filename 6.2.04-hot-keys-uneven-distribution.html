@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hot Keys: Uneven Distribution</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ───────────────────────────────────────────── */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .hint-icon { flex-shrink: 0; animation: wiggle 4s ease-in-out infinite; }
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      15%       { transform: rotate(-10deg); }
+      30%       { transform: rotate(10deg); }
+      45%       { transform: rotate(-8deg); }
+      60%       { transform: rotate(6deg); }
+      75%       { transform: rotate(-3deg); }
+    }
+    .hint-text { font-size: 18px; line-height: 1.4; }
+
+    /* ── Scenario tabs ─────────────────────────────────────────── */
+    .tabs-section { padding: 20px 24px 0; }
+    .tabs-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tab {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      color: rgba(0,0,0,0.60);
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .tab:hover { background: #F2F1EE; color: #1A1A1A; }
+    .tab.on { background: #1878DC; color: #FFFFFF; border-color: #1878DC; }
+
+    /* ── Viz area ──────────────────────────────────────────────── */
+    .viz { padding: 20px 24px; }
+
+    .diagram {
+      background: #F2F1EE;
+      border-radius: 14px;
+      padding: 20px 16px 16px;
+      margin-bottom: 12px;
+    }
+
+    /* traffic source */
+    .src-row { display: flex; justify-content: center; margin-bottom: 4px; }
+    .src-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      padding: 8px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    /* arrows */
+    .arrow-row {
+      display: flex;
+      height: 56px;
+      padding: 0 6px;
+      align-items: stretch;
+    }
+    .arrow-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .arrow-stem {
+      flex: 1;
+      border-radius: 3px 3px 0 0;
+      position: relative;
+      transition: width 0.5s ease, background 0.4s ease, opacity 0.4s ease;
+    }
+    .arrow-stem::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      /* border-top set inline */
+    }
+
+    /* shards */
+    .shards { display: flex; gap: 8px; margin-top: 12px; }
+    .shard {
+      flex: 1;
+      background: #FFFFFF;
+      border-radius: 10px;
+      padding: 10px 6px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: box-shadow 0.3s ease;
+    }
+    .shard.is-hot {
+      box-shadow: 0 0 0 2px #DE4C45, 0 2px 8px rgba(222,76,69,0.20);
+    }
+    .shard-name {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.55);
+    }
+    .bar-bg {
+      width: 100%;
+      height: 72px;
+      background: rgba(0,0,0,0.07);
+      border-radius: 6px;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+    }
+    .bar-fill {
+      width: 100%;
+      border-radius: 4px 4px 0 0;
+      transition: height 0.55s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.4s ease;
+    }
+    .pct-lbl {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #1A1A1A;
+    }
+    .shard-status {
+      font-size: 10px;
+      color: rgba(0,0,0,0.40);
+      text-align: center;
+      min-height: 13px;
+      line-height: 1.3;
+    }
+    .shard-status.danger { color: #DE4C45; font-weight: 700; letter-spacing: 0.02em; }
+    .shard-status.warn   { color: #D35722; }
+
+    /* ── Fleet average ─────────────────────────────────────────── */
+    .fleet {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #F2F1EE;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    .fleet-lbl { color: rgba(0,0,0,0.50); white-space: nowrap; }
+    .fleet-val {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 16px;
+      color: #1A1A1A;
+    }
+    .fleet-note {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-left: auto;
+      font-style: italic;
+      text-align: right;
+    }
+
+    /* ── Explanation callout ───────────────────────────────────── */
+    .callout {
+      border-radius: 10px;
+      padding: 16px;
+      border: 1px solid rgba(0,0,0,0.12);
+      font-size: 16px;
+      line-height: 1.55;
+      transition: background 0.3s, border-color 0.3s;
+    }
+    .callout.c-ok   { background: rgba(50,143,81,0.07);  border-color: rgba(50,143,81,0.28); }
+    .callout.c-hot  { background: rgba(222,76,69,0.06);  border-color: rgba(222,76,69,0.28); }
+    .callout.c-warn { background: rgba(244,142,0,0.07);  border-color: rgba(244,142,0,0.30); }
+    .callout.c-fix  { background: rgba(24,120,220,0.06); border-color: rgba(24,120,220,0.28); }
+
+    .callout-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .badge {
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 2px 8px;
+      border-radius: 4px;
+      color: #FFFFFF;
+      white-space: nowrap;
+    }
+    .badge.g { background: #328F51; }
+    .badge.r { background: #DE4C45; }
+    .badge.o { background: #F48E00; }
+    .badge.b { background: #1878DC; }
+
+    .callout-sub { font-size: 14px; color: rgba(0,0,0,0.50); line-height: 1.4; }
+    .callout-body { color: #1A1A1A; }
+
+    /* ── Responsive ────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .hint        { padding: 16px 16px 12px; }
+      .tabs-section { padding: 16px 16px 0; }
+      .viz         { padding: 16px; }
+      .shards      { gap: 4px; }
+      .shard       { padding: 8px 4px 8px; }
+      .bar-bg      { height: 56px; }
+      .shard-name  { font-size: 10px; }
+      .fleet-note  { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <span class="hint-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="hint-text">Select a scenario to see how different shard key choices affect load distribution.</span>
+  </div>
+
+  <!-- Scenario tabs -->
+  <div class="tabs-section">
+    <div class="tabs-label">Scenario</div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+
+  <!-- Visualization -->
+  <div class="viz">
+    <div class="diagram">
+      <!-- Traffic source chip -->
+      <div class="src-row">
+        <div class="src-chip">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 7h8M7.5 3.5L11 7l-3.5 3.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Incoming requests
+        </div>
+      </div>
+
+      <!-- Arrows -->
+      <div class="arrow-row" id="arrow-row"></div>
+
+      <!-- Shard cards -->
+      <div class="shards" id="shards"></div>
+    </div>
+
+    <!-- Fleet average -->
+    <div class="fleet">
+      <span class="fleet-lbl">Fleet avg load:</span>
+      <span class="fleet-val" id="fleet-val">—</span>
+      <span class="fleet-note" id="fleet-note"></span>
+    </div>
+
+    <!-- Explanation -->
+    <div class="callout" id="callout">
+      <div class="callout-head">
+        <span class="badge" id="badge"></span>
+        <span class="callout-sub" id="cause"></span>
+      </div>
+      <div class="callout-body" id="msg"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── Scenario data ─────────────────────────────────────────────── */
+  const SCENARIOS = [
+    {
+      label : 'Even distribution',
+      loads : [24, 26, 25, 25],
+      hotIdx: -1,
+      type  : 'c-ok',
+      badge : ['Balanced', 'g'],
+      cause : 'Healthy state — high-cardinality shard key, even access pattern',
+      msg   : 'Traffic is spread evenly across all four shards. Each carries roughly 25% of the load. Adding more shards scales capacity in a predictable, proportional way. Fleet-wide averages accurately reflect each individual shard — no outlier is hiding.'
+    },
+    {
+      label : 'Celebrity user',
+      loads : [6, 7, 82, 5],
+      hotIdx: 2,
+      type  : 'c-hot',
+      badge : ['Hot partition', 'r'],
+      cause : 'One account with 50M followers — all traffic hashes to Shard 3',
+      msg   : 'Every read and write for the celebrity account lands on Shard 3. Fleet-wide average CPU is only about 25% — completely healthy-looking. Meanwhile Shard 3 is saturated and dropping requests. This is why per-shard monitoring matters: the average hides the crisis entirely.'
+    },
+    {
+      label : 'Time-based key',
+      loads : [3, 3, 4, 90],
+      hotIdx: 3,
+      type  : 'c-hot',
+      badge : ['Write hotspot', 'r'],
+      cause : 'Shard key is a timestamp — every new write targets the newest shard',
+      msg   : 'With a timestamp as the shard key, the current moment always points to Shard 4. Every incoming write targets that one machine while older shards sit nearly idle. Fleet average looks fine at ~25%, but the entire write pipeline is bottlenecked on a single shard.'
+    },
+    {
+      label : 'Low cardinality',
+      loads : [46, 4, 47, 3],
+      hotIdx: -1,
+      type  : 'c-warn',
+      badge : ['Lumpy load', 'o'],
+      cause : 'Too few distinct key values — most records collapse onto two shards',
+      msg   : 'When the shard key has only a handful of possible values (e.g. a "status" field with two options), most records fall on the same shards. Adding more machines cannot help: the key space has nowhere new to go. Shards 1 and 3 absorb almost all traffic.'
+    },
+    {
+      label : 'Salting applied',
+      loads : [25, 24, 26, 25],
+      hotIdx: -1,
+      type  : 'c-fix',
+      badge : ['Salted key', 'b'],
+      cause : 'Hot key split: user42#0 … user42#3 distributed across all shards',
+      msg   : 'The celebrity user\'s key is salted into four buckets, one per shard. Writes go to a randomly chosen bucket; reads fan out to all four buckets and merge the results. Load is balanced again — at the cost of extra fan-out logic for that one hot key only.'
+    }
+  ];
+
+  /* ── Helpers ─────────────────────────────────────────────────── */
+  function arrowProps(pct, maxPct, type) {
+    const norm = maxPct > 0 ? pct / maxPct : 0;
+    const w    = Math.max(2, Math.round(2 + norm * 7));
+    const op   = pct < 12 ? 0.28 : 0.85;
+    let color;
+    if (type === 'c-fix')              color = '#328F51';
+    else if (pct === maxPct && pct > 40) color = '#DE4C45';
+    else if (pct >= 40)                color = '#F48E00';
+    else                               color = '#1878DC';
+    return { w, color, op };
+  }
+
+  function barColor(pct, isHot) {
+    if (isHot || pct >= 75) return '#DE4C45';
+    if (pct >= 45)          return '#F48E00';
+    return '#328F51';
+  }
+
+  function shardStatus(pct, isHot) {
+    if (isHot || pct >= 75) return { text: 'OVERLOADED', cls: 'danger' };
+    if (pct >= 45)           return { text: 'high',       cls: 'warn'   };
+    if (pct >= 20)           return { text: 'normal',     cls: ''       };
+    return                          { text: 'idle',       cls: ''       };
+  }
+
+  /* ── Render ─────────────────────────────────────────────────── */
+  function render(idx) {
+    const s = SCENARIOS[idx];
+
+    /* tabs */
+    document.querySelectorAll('.tab').forEach((b, i) => b.classList.toggle('on', i === idx));
+
+    /* arrows */
+    const arrowRow = document.getElementById('arrow-row');
+    arrowRow.innerHTML = '';
+    const maxLoad = Math.max(...s.loads);
+    s.loads.forEach(pct => {
+      const { w, color, op } = arrowProps(pct, maxLoad, s.type);
+      const col = document.createElement('div');
+      col.className = 'arrow-col';
+      col.innerHTML = `
+        <div class="arrow-stem"
+             style="width:${w}px; background:${color}; opacity:${op};">
+          <div style="
+            position:absolute; bottom:-5px; left:50%;
+            transform:translateX(-50%);
+            width:0; height:0;
+            border-left:${w + 3}px solid transparent;
+            border-right:${w + 3}px solid transparent;
+            border-top:${w + 4}px solid ${color};
+            opacity:${op};
+          "></div>
+        </div>`;
+      arrowRow.appendChild(col);
+    });
+
+    /* shards */
+    const shardsEl = document.getElementById('shards');
+    shardsEl.innerHTML = '';
+    s.loads.forEach((pct, j) => {
+      const isHot = (j === s.hotIdx || pct >= 75);
+      const st    = shardStatus(pct, isHot);
+      const bc    = barColor(pct, isHot);
+      const card  = document.createElement('div');
+      card.className = 'shard' + (isHot ? ' is-hot' : '');
+      card.innerHTML = `
+        <div class="shard-name">Shard ${j + 1}</div>
+        <div class="bar-bg">
+          <div class="bar-fill" style="height:${pct}%; background-color:${bc};"></div>
+        </div>
+        <div class="pct-lbl">${pct}%</div>
+        <div class="shard-status ${st.cls}">${st.text}</div>`;
+      shardsEl.appendChild(card);
+    });
+
+    /* fleet average */
+    const avg = Math.round(s.loads.reduce((a, b) => a + b, 0) / s.loads.length);
+    document.getElementById('fleet-val').textContent = avg + '%';
+    const noteMap = {
+      'c-ok'  : 'accurately reflects each shard',
+      'c-hot' : 'hides the overloaded shard ⚠',
+      'c-warn': 'hides uneven distribution ⚠',
+      'c-fix' : 'evenly distributed'
+    };
+    document.getElementById('fleet-note').textContent = noteMap[s.type] || '';
+
+    /* callout */
+    const callout = document.getElementById('callout');
+    callout.className = 'callout ' + s.type;
+    const badgeEl = document.getElementById('badge');
+    badgeEl.textContent  = s.badge[0];
+    badgeEl.className    = 'badge ' + s.badge[1];
+    document.getElementById('cause').textContent = s.cause;
+    document.getElementById('msg').textContent   = s.msg;
+  }
+
+  /* ── Init ────────────────────────────────────────────────────── */
+  const tabsEl = document.getElementById('tabs');
+  SCENARIOS.forEach((s, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab';
+    btn.textContent = s.label;
+    btn.onclick = () => render(i);
+    tabsEl.appendChild(btn);
+  });
+
+  render(0);
+</script>
+</body>
+</html>

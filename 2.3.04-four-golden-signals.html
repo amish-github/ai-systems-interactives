@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Four Golden Signals</title>
+<style>
+
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ─── Hint header ─── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+  0%,100%  { transform: rotate(0deg); }
+  15%      { transform: rotate(-10deg); }
+  30%      { transform: rotate(10deg); }
+  45%      { transform: rotate(-8deg); }
+  60%      { transform: rotate(6deg); }
+  75%      { transform: rotate(-3deg); }
+  90%      { transform: rotate(0deg); }
+}
+
+/* ─── Scenario strip ─── */
+.scenarios {
+  padding: 20px 24px 0;
+}
+.scenarios-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  margin-bottom: 10px;
+}
+.scenario-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.scenario-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: inherit;
+  font-size: 14px;
+  color: #1A1A1A;
+  cursor: pointer;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.scenario-btn:hover {
+  border-color: #1878DC;
+  color: #1878DC;
+}
+.scenario-btn.active {
+  border-color: #1878DC;
+  background: #1878DC;
+  color: #FFFFFF;
+}
+
+/* ─── Signal grid ─── */
+.signal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.signal-card {
+  border-radius: 12px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  padding: 16px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color 0.35s ease, box-shadow 0.35s ease;
+}
+.signal-card.is-alert {
+  border-color: #DE4C45;
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(222,76,69,0.14), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.signal-card.is-warn {
+  border-color: #D35722;
+  border-style: solid;
+  box-shadow: 0 0 0 3px rgba(211,87,34,0.12), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.signal-card.is-blind {
+  border-color: #F48E00;
+  border-style: dashed;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.signal-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.signal-name {
+  font-size: 13px;
+  color: rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.signal-q {
+  font-size: 13px;
+  color: rgba(0,0,0,0.38);
+  margin-top: 3px;
+}
+.signal-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #328F51;
+  flex-shrink: 0;
+  margin-top: 3px;
+  transition: background 0.35s;
+}
+.signal-dot.is-alert { background: #DE4C45; }
+.signal-dot.is-warn  { background: #D35722; }
+.signal-dot.is-blind { background: #F48E00; }
+
+.signal-value {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 26px;
+  line-height: 1;
+  margin-bottom: 10px;
+  transition: color 0.35s;
+}
+.signal-value.is-alert { color: #DE4C45; }
+.signal-value.is-warn  { color: #D35722; }
+
+.signal-unit {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 12px;
+  color: rgba(0,0,0,0.4);
+  margin-left: 3px;
+}
+
+.bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #328F51;
+  width: 0%;
+  transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.35s;
+}
+.bar-fill.is-alert { background: #DE4C45; }
+.bar-fill.is-warn  { background: #D35722; }
+.bar-fill.is-blind { background: #F48E00; }
+
+.blind-badge {
+  display: none;
+  font-size: 12px;
+  color: #D35722;
+  margin-top: 6px;
+}
+.signal-card.is-blind .blind-badge { display: block; }
+
+/* ─── Explanation panel ─── */
+.explanation-wrap {
+  padding: 0 24px 24px;
+}
+.explanation {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 80px;
+}
+.exp-label {
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.exp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.exp-tags:empty { margin-bottom: 0; }
+.exp-tag {
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.exp-tag.is-alert { background: rgba(222,76,69,0.12); color: #DE4C45; }
+.exp-tag.is-warn  { background: rgba(211,87,34,0.12); color: #D35722; }
+.exp-tag.is-blind { background: rgba(244,142,0,0.14); color: #C47500; }
+.exp-text {
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 1.6;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 500px) {
+  .hint-header      { padding: 16px; }
+  .scenarios        { padding: 16px 16px 0; }
+  .signal-grid      { padding: 16px; gap: 12px; }
+  .explanation-wrap { padding: 0 16px 16px; }
+  .signal-value     { font-size: 22px; }
+}
+@media (max-width: 360px) {
+  .signal-grid  { padding: 12px; gap: 8px; }
+  .signal-card  { padding: 12px; }
+  .signal-value { font-size: 18px; }
+}
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Pick a scenario to see which signals fire — and why</span>
+  </div>
+
+  <div class="scenarios">
+    <div class="scenarios-label">Service scenario</div>
+    <div class="scenario-buttons">
+      <button class="scenario-btn active" data-key="normal">All clear</button>
+      <button class="scenario-btn" data-key="slow-tail">Slow tail</button>
+      <button class="scenario-btn" data-key="traffic-surge">Traffic surge</button>
+      <button class="scenario-btn" data-key="silent-error">Silent error</button>
+      <button class="scenario-btn" data-key="resource-creep">Resource creep</button>
+    </div>
+  </div>
+
+  <div class="signal-grid">
+
+    <div class="signal-card" id="card-latency">
+      <div class="signal-top">
+        <div>
+          <div class="signal-name">Latency</div>
+          <div class="signal-q">Is it slow?</div>
+        </div>
+        <div class="signal-dot" id="dot-latency"></div>
+      </div>
+      <div class="signal-value" id="val-latency">120<span class="signal-unit">ms p95</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar-latency"></div></div>
+    </div>
+
+    <div class="signal-card" id="card-traffic">
+      <div class="signal-top">
+        <div>
+          <div class="signal-name">Traffic</div>
+          <div class="signal-q">Is it busy?</div>
+        </div>
+        <div class="signal-dot" id="dot-traffic"></div>
+      </div>
+      <div class="signal-value" id="val-traffic">240<span class="signal-unit">req/s</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar-traffic"></div></div>
+    </div>
+
+    <div class="signal-card" id="card-errors">
+      <div class="signal-top">
+        <div>
+          <div class="signal-name">Errors</div>
+          <div class="signal-q">Is it failing?</div>
+        </div>
+        <div class="signal-dot" id="dot-errors"></div>
+      </div>
+      <div class="signal-value" id="val-errors">0.2<span class="signal-unit">%</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar-errors"></div></div>
+      <div class="blind-badge">definition too narrow</div>
+    </div>
+
+    <div class="signal-card" id="card-saturation">
+      <div class="signal-top">
+        <div>
+          <div class="signal-name">Saturation</div>
+          <div class="signal-q">Is it about to run out?</div>
+        </div>
+        <div class="signal-dot" id="dot-saturation"></div>
+      </div>
+      <div class="signal-value" id="val-saturation">38<span class="signal-unit">% pool</span></div>
+      <div class="bar-track"><div class="bar-fill" id="bar-saturation"></div></div>
+    </div>
+
+  </div>
+
+  <div class="explanation-wrap">
+    <div class="explanation">
+      <div class="exp-label">What to watch</div>
+      <div class="exp-tags" id="exp-tags"></div>
+      <div class="exp-text" id="exp-text">All four signals are in a healthy range. The service is responding quickly, handling moderate load, returning correct results, and has headroom left in its resources.</div>
+    </div>
+  </div>
+
+</div>
+<script>
+const SCENARIOS = {
+  normal: {
+    latency:    { v:'120',   u:'ms p95', bar:24, s:'ok' },
+    traffic:    { v:'240',   u:'req/s',  bar:40, s:'ok' },
+    errors:     { v:'0.2',   u:'%',      bar:2,  s:'ok' },
+    saturation: { v:'38',    u:'% pool', bar:38, s:'ok' },
+    tags: [],
+    text: 'All four signals are in a healthy range. The service is responding quickly, handling moderate load, returning correct results, and has headroom left in its resources.'
+  },
+  'slow-tail': {
+    latency:    { v:'3,420', u:'ms p95', bar:85, s:'alert' },
+    traffic:    { v:'255',   u:'req/s',  bar:42, s:'ok' },
+    errors:     { v:'0.3',   u:'%',      bar:3,  s:'ok' },
+    saturation: { v:'41',    u:'% pool', bar:41, s:'ok' },
+    tags: [{ label:'Latency', s:'is-alert' }],
+    text: 'Latency fires — at the p95. If you were watching the average it would read around 190 ms and look fine. But one in twenty users is waiting over three seconds. The average hid the slow tail entirely. The other three signals are calm, which tells you the bottleneck is inside the service itself, not load or resources.'
+  },
+  'traffic-surge': {
+    latency:    { v:'290',   u:'ms p95', bar:58, s:'warn' },
+    traffic:    { v:'1,840', u:'req/s',  bar:92, s:'alert' },
+    errors:     { v:'1.1',   u:'%',      bar:11, s:'ok' },
+    saturation: { v:'71',    u:'% pool', bar:71, s:'warn' },
+    tags: [{ label:'Traffic', s:'is-alert' }, { label:'Saturation', s:'is-warn' }],
+    text: 'Traffic is the lead signal — load is nearly eight times normal. That gives context to the other readings: latency has climbed only modestly, suggesting the service is coping but under strain. Saturation is climbing toward its limit, so the connection pool could become a bottleneck soon. High traffic does not mean something is broken; it means every other signal must be read in that light.'
+  },
+  'silent-error': {
+    latency:    { v:'118',   u:'ms p95', bar:23, s:'ok' },
+    traffic:    { v:'248',   u:'req/s',  bar:41, s:'ok' },
+    errors:     { v:'0.2',   u:'%',      bar:2,  s:'blind' },
+    saturation: { v:'40',    u:'% pool', bar:40, s:'ok' },
+    tags: [{ label:'Errors — definition too narrow', s:'is-blind' }],
+    text: 'All four gauges look healthy — yet search returns empty results for real queries. The service responds with HTTP 200 success codes, so the error counter reads near zero. This is the silent-error trap. If you only count crashes and failure codes, wrong-but-successful responses are invisible. The fix: decide in advance that an empty result where data should exist counts as a failure, and instrument it so it shows up here.'
+  },
+  'resource-creep': {
+    latency:    { v:'124',   u:'ms p95', bar:25, s:'ok' },
+    traffic:    { v:'252',   u:'req/s',  bar:42, s:'ok' },
+    errors:     { v:'0.2',   u:'%',      bar:2,  s:'ok' },
+    saturation: { v:'89',    u:'% pool', bar:89, s:'alert' },
+    tags: [{ label:'Saturation', s:'is-alert' }],
+    text: 'Saturation is your early warning. Requests are still succeeding — latency, traffic, and errors all look fine. But the connection pool has crept to 89%. Once it hits 100%, every new request will queue or fail. You have a calm window right now to add capacity or find the leak. Without a saturation signal, the first thing you would notice is the error rate suddenly spiking, with no warning beforehand.'
+  }
+};
+
+const SIGS = ['latency','traffic','errors','saturation'];
+const ALL_STATES = ['is-alert','is-warn','is-blind'];
+
+function apply(key) {
+  const sc = SCENARIOS[key];
+
+  SIGS.forEach(sig => {
+    const d    = sc[sig];
+    const card = document.getElementById('card-' + sig);
+    const dot  = document.getElementById('dot-'  + sig);
+    const val  = document.getElementById('val-'  + sig);
+    const bar  = document.getElementById('bar-'  + sig);
+
+    card.classList.remove(...ALL_STATES);
+    dot.classList.remove(...ALL_STATES);
+    val.classList.remove('is-alert','is-warn');
+    bar.classList.remove(...ALL_STATES);
+
+    if (d.s !== 'ok') {
+      const cls = 'is-' + d.s;
+      card.classList.add(cls);
+      dot.classList.add(cls);
+      if (d.s === 'alert' || d.s === 'warn') val.classList.add(cls);
+      bar.classList.add(cls);
+    }
+
+    val.innerHTML = d.v + '<span class="signal-unit">' + d.u + '</span>';
+    bar.style.width = d.bar + '%';
+  });
+
+  const tagsEl = document.getElementById('exp-tags');
+  tagsEl.innerHTML = sc.tags.map(t =>
+    '<span class="exp-tag ' + t.s + '">' + t.label + '</span>'
+  ).join('');
+
+  document.getElementById('exp-text').textContent = sc.text;
+}
+
+// Initialise bar widths on load
+SIGS.forEach(sig => {
+  document.getElementById('bar-' + sig).style.width = SCENARIOS.normal[sig].bar + '%';
+});
+
+document.querySelectorAll('.scenario-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    apply(btn.dataset.key);
+  });
+});
+</script>
+</body>
+</html>

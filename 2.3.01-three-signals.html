@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Three Signals — Match the Question</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+    }
+
+    .hint-cursor {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      padding: 20px 24px 0;
+    }
+
+    .progress-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(0,0,0,0.10);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: #1878DC;
+      border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Scenario ── */
+    .scenario-area {
+      padding: 20px 24px 4px;
+    }
+
+    .scenario-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .scenario-question {
+      font-size: 17px;
+      line-height: 1.65;
+      color: #1A1A1A;
+      background: #F2F1EE;
+      border-radius: 16px;
+      padding: 20px 24px;
+      min-height: 80px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    /* ── Signal buttons ── */
+    .signals-area {
+      padding: 16px 24px 20px;
+    }
+
+    .signals-prompt {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 12px;
+    }
+
+    .signals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .signal-btn {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      background: #FFFFFF;
+      cursor: pointer;
+      padding: 16px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease, box-shadow 0.12s ease;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .signal-btn:hover:not([disabled]) {
+      border-color: rgba(0,0,0,0.28);
+      transform: translateY(-2px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 4px 8px 0 rgba(0,0,0,0.12);
+    }
+
+    .signal-btn:active:not([disabled]) {
+      transform: translateY(0px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .signal-btn[disabled] {
+      cursor: default;
+    }
+
+    .signal-icon {
+      font-size: 28px;
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    .signal-name {
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .signal-name.logs-color   { color: #1878DC; }
+    .signal-name.metrics-color { color: #328F51; }
+    .signal-name.traces-color  { color: #D35722; }
+
+    .signal-hint {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      text-align: center;
+      font-family: 'Suisse Intl Mono', monospace;
+      line-height: 1.3;
+    }
+
+    /* answered states */
+    .signal-btn.state-correct {
+      background: #EAF5EE;
+      border-color: #328F51;
+      border-width: 2px;
+    }
+
+    .signal-btn.state-wrong {
+      background: #FDE9E8;
+      border-color: #DE4C45;
+      border-width: 2px;
+      opacity: 0.65;
+    }
+
+    .signal-btn.state-neutral-off {
+      opacity: 0.45;
+    }
+
+    /* ── Feedback ── */
+    .feedback {
+      margin: 0 24px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 16px;
+      line-height: 1.6;
+      display: none;
+      border: 1.5px solid transparent;
+    }
+
+    .feedback.show {
+      display: block;
+    }
+
+    .feedback.fb-correct {
+      background: #EAF5EE;
+      border-color: #328F51;
+    }
+
+    .feedback.fb-wrong {
+      background: #FDE9E8;
+      border-color: #DE4C45;
+    }
+
+    .feedback-verdict {
+      font-weight: 700;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .fb-correct .feedback-verdict { color: #328F51; }
+    .fb-wrong   .feedback-verdict { color: #DE4C45; }
+
+    .feedback-body {
+      font-size: 15px;
+      color: #1A1A1A;
+    }
+
+    /* ── Next button ── */
+    .next-wrap {
+      padding: 16px 24px 24px;
+      display: none;
+    }
+
+    .next-wrap.show {
+      display: block;
+    }
+
+    .next-btn {
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.15s ease;
+    }
+
+    .next-btn:hover {
+      background: #333333;
+    }
+
+    /* ── Final screen ── */
+    .final-screen {
+      display: none;
+      padding: 32px 24px 32px;
+    }
+
+    .final-screen.show {
+      display: block;
+    }
+
+    .final-top {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .final-score {
+      font-size: 52px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #1A1A1A;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .final-verdict {
+      font-size: 17px;
+      color: rgba(0,0,0,0.60);
+      line-height: 1.5;
+    }
+
+    .signal-summary {
+      background: #F2F1EE;
+      border-radius: 16px;
+      padding: 20px 20px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0,0,0,0.08);
+    }
+
+    .signal-summary-title {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+      margin-bottom: 16px;
+    }
+
+    .summary-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+
+    .summary-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .summary-pip {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    .summary-text {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+
+    .summary-text strong {
+      font-weight: 700;
+    }
+
+    .restart-btn {
+      background: transparent;
+      border: 1.5px solid rgba(0,0,0,0.20);
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      cursor: pointer;
+      width: 100%;
+      color: #1A1A1A;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .restart-btn:hover {
+      background: #F2F1EE;
+      border-color: rgba(0,0,0,0.30);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 500px) {
+      .signals-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+
+      .signal-btn {
+        flex-direction: row;
+        justify-content: flex-start;
+        padding: 12px 16px;
+        gap: 12px;
+        border-radius: 12px;
+      }
+
+      .signal-icon {
+        font-size: 24px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+      }
+
+      .signal-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+      }
+
+      .signal-name, .signal-hint {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .hint-header,
+      .scenario-area,
+      .signals-area,
+      .next-wrap,
+      .final-screen {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .feedback {
+        margin-left: 16px;
+        margin-right: 16px;
+      }
+
+      .progress-wrap {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click the signal that best answers each operational question.</span>
+  </div>
+
+  <!-- Quiz area -->
+  <div id="quizArea">
+
+    <!-- Progress -->
+    <div class="progress-wrap">
+      <div class="progress-label" id="progressLabel">1 / 6</div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Scenario -->
+    <div class="scenario-area">
+      <div class="scenario-label">Scenario</div>
+      <div class="scenario-question" id="scenarioQuestion"></div>
+    </div>
+
+    <!-- Signal buttons -->
+    <div class="signals-area">
+      <div class="signals-prompt">Which signal answers this?</div>
+      <div class="signals-grid">
+        <button class="signal-btn" id="btn-logs" onclick="answer('logs')">
+          <span class="signal-icon">📋</span>
+          <span class="signal-info">
+            <span class="signal-name logs-color">Logs</span>
+            <span class="signal-hint">What happened</span>
+          </span>
+        </button>
+        <button class="signal-btn" id="btn-metrics" onclick="answer('metrics')">
+          <span class="signal-icon">📊</span>
+          <span class="signal-info">
+            <span class="signal-name metrics-color">Metrics</span>
+            <span class="signal-hint">How much / often</span>
+          </span>
+        </button>
+        <button class="signal-btn" id="btn-traces" onclick="answer('traces')">
+          <span class="signal-icon">🔗</span>
+          <span class="signal-info">
+            <span class="signal-name traces-color">Traces</span>
+            <span class="signal-hint">Where time went</span>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Feedback -->
+    <div class="feedback" id="feedback">
+      <div class="feedback-verdict" id="feedbackVerdict"></div>
+      <div class="feedback-body" id="feedbackBody"></div>
+    </div>
+
+    <!-- Next -->
+    <div class="next-wrap" id="nextWrap">
+      <button class="next-btn" id="nextBtn" onclick="next()">Next scenario →</button>
+    </div>
+
+  </div><!-- /quizArea -->
+
+  <!-- Final screen -->
+  <div class="final-screen" id="finalScreen">
+    <div class="final-top">
+      <div class="final-score" id="finalScore"></div>
+      <div class="final-verdict" id="finalVerdict"></div>
+    </div>
+    <div class="signal-summary">
+      <div class="signal-summary-title">The three signals, in one sentence each</div>
+      <div class="summary-row">
+        <div class="summary-pip" style="background:#1878DC;"></div>
+        <div class="summary-text"><strong>Logs</strong> — structured records of individual events; query them to understand exactly what happened in one specific case.</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-pip" style="background:#328F51;"></div>
+        <div class="summary-text"><strong>Metrics</strong> — numbers sampled over time; use them for dashboards, alerts, and an aggregate view of system health.</div>
+      </div>
+      <div class="summary-row">
+        <div class="summary-pip" style="background:#D35722;"></div>
+        <div class="summary-text"><strong>Traces</strong> — timed spans stitched across services; use them to find which hop in a multi-service request consumed the time.</div>
+      </div>
+    </div>
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+  var scenarios = [
+    {
+      question: "A customer reports their coupon code returned a 'not found' error at 2:14 PM. You need to reconstruct exactly what your system saw and did for that specific request — the validation rule that fired, the input it received, and the error it returned.",
+      answer: "logs",
+      explanations: {
+        correct:  "Logs are the right tool here. They record the full detail of individual events, and with structured key-value fields you can filter by timestamp, user ID, or status code to find this exact case.",
+        metrics:  "Metrics aggregate events into numbers over time — they can tell you that coupon errors increased, but they deliberately discard per-request detail. You cannot reconstruct one specific validation failure from a metric.",
+        traces:   "Traces show how long each hop took as a request crossed services — useful for slow requests, but they don't capture the business logic detail (which validation rule fired, what input it saw) you need here."
+      }
+    },
+    {
+      question: "You need a real-time dashboard showing the percentage of HTTP requests returning 5xx errors over the last hour, with an alert that fires automatically when it crosses 2%.",
+      answer: "metrics",
+      explanations: {
+        correct: "Metrics are built for exactly this. A counter for errors and a counter for total requests give you a cheap, continuously-updated error rate. Metrics are the only affordable foundation for dashboards and threshold alerts.",
+        logs:    "Scanning and counting log entries to compute error rate works at small scale, but it becomes slow and expensive as traffic grows. It is a poor foundation for a real-time alert that needs to fire within seconds.",
+        traces:  "Traces follow individual requests across service chains — they are not designed to aggregate error counts across all traffic, and they cannot drive a threshold alert."
+      }
+    },
+    {
+      question: "An end-to-end request passes through a gateway, an auth service, an orders service, and a payment provider. The whole journey takes 2.8 seconds. Every service's own dashboard shows normal latency. Where is the time actually going?",
+      answer: "traces",
+      explanations: {
+        correct:  "Traces are the only signal that follows one request across all four services and measures each span individually. When every service looks healthy in isolation, the bottleneck only becomes visible when you see the complete cross-service path.",
+        logs:     "Logs from any one service show only that service's view. No single service's logs see the full journey, so they cannot tell you which hop downstream consumed most of the 2.8 seconds.",
+        metrics:  "Metrics can tell you that overall latency is high, but they aggregate across all requests — they cannot attribute the time in one specific slow request to one specific hop in its service chain."
+      }
+    },
+    {
+      question: "You want to track how many new user registrations your platform receives per minute, and automatically alert your team if that rate drops below 10 — a possible sign the signup flow is broken.",
+      answer: "metrics",
+      explanations: {
+        correct: "Metrics are right. A counter that increments on each successful registration gives you a per-minute rate cheaply. Rate-based threshold alerts are exactly what metric counters are designed for.",
+        logs:    "You could count log entries to compute registration rate, but it is slow and expensive as volume grows, and it cannot drive a low-latency alert the way a metric counter can.",
+        traces:  "Traces attribute time within individual requests across services — they do not aggregate event counts across all users over time, and they cannot drive an alert based on a rate dropping."
+      }
+    },
+    {
+      question: "A worker service occasionally crashes with a vague 'invalid state' error. You need to see the exact job parameters, the sequence of steps the worker completed, and the internal state at the moment of failure — everything it knew when it crashed.",
+      answer: "logs",
+      explanations: {
+        correct:  "Logs are the right tool. Structured entries emitted at each step capture the full context: job parameters, intermediate state values, and the exact conditions at failure. This is what logs were made for.",
+        metrics:  "Metrics can tell you the worker is crashing and how often, but they aggregate into numbers and discard the per-event detail you need to understand what state the worker was in when it failed.",
+        traces:   "Traces show the timing and structure of spans across services — useful for performance questions, but they don't capture job parameters, internal variables, or the business-level context that explains why a crash happened."
+      }
+    },
+    {
+      question: "A request chain — gateway, recommendation engine, personalization service, and a third-party ad provider — sometimes exceeds 4 seconds. Your team suspects the external ad provider is the bottleneck. How do you confirm it and see exactly how much time it is consuming?",
+      answer: "traces",
+      explanations: {
+        correct:  "Traces confirm it directly. Each hop is a span with a measured duration. If the ad provider span is the long bar in the waterfall, the trace makes that unmistakable — and you can see exactly how much of the 4 seconds it consumed versus your own services.",
+        logs:     "Your own services' logs can show that the outbound call to the ad provider started and ended, but they cannot cleanly measure the provider's contribution versus the other hops, and they cannot visualize the cross-service timeline.",
+        metrics:  "Metrics for the ad provider might show its average latency, but they aggregate across all calls — they cannot tell you how much of one specific slow request was consumed by that provider versus the other services in the same chain."
+      }
+    }
+  ];
+
+  var current = 0;
+  var score   = 0;
+  var answered = false;
+
+  function render() {
+    var s = scenarios[current];
+    document.getElementById('scenarioQuestion').textContent = s.question;
+    document.getElementById('progressLabel').textContent   = (current + 1) + ' / ' + scenarios.length;
+    document.getElementById('progressFill').style.width    = ((current / scenarios.length) * 100) + '%';
+
+    ['logs', 'metrics', 'traces'].forEach(function(sig) {
+      var btn = document.getElementById('btn-' + sig);
+      btn.disabled = false;
+      btn.className = 'signal-btn';
+    });
+
+    var fb = document.getElementById('feedback');
+    fb.className = 'feedback';
+    document.getElementById('nextWrap').className = 'next-wrap';
+    answered = false;
+  }
+
+  function answer(chosen) {
+    if (answered) return;
+    answered = true;
+
+    var s      = scenarios[current];
+    var isRight = (chosen === s.answer);
+
+    if (isRight) score++;
+
+    ['logs', 'metrics', 'traces'].forEach(function(sig) {
+      var btn = document.getElementById('btn-' + sig);
+      btn.disabled = true;
+      if (sig === s.answer) {
+        btn.className = 'signal-btn state-correct';
+      } else if (sig === chosen) {
+        btn.className = 'signal-btn state-wrong';
+      } else {
+        btn.className = 'signal-btn state-neutral-off';
+      }
+    });
+
+    var fb = document.getElementById('feedback');
+    var bodyText;
+    if (isRight) {
+      fb.className = 'feedback fb-correct show';
+      document.getElementById('feedbackVerdict').textContent = 'Correct.';
+      bodyText = s.explanations.correct;
+    } else {
+      var correctName = s.answer.charAt(0).toUpperCase() + s.answer.slice(1);
+      fb.className = 'feedback fb-wrong show';
+      document.getElementById('feedbackVerdict').textContent = 'Not quite — the answer is ' + correctName + '.';
+      bodyText = s.explanations[chosen];
+    }
+    document.getElementById('feedbackBody').textContent = bodyText;
+
+    var nw = document.getElementById('nextWrap');
+    nw.className = 'next-wrap show';
+    document.getElementById('nextBtn').textContent =
+      current === scenarios.length - 1 ? 'See results →' : 'Next scenario →';
+  }
+
+  function next() {
+    current++;
+    if (current >= scenarios.length) {
+      showFinal();
+    } else {
+      render();
+    }
+  }
+
+  function showFinal() {
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('finalScreen').className  = 'final-screen show';
+
+    document.getElementById('finalScore').textContent = score + ' / ' + scenarios.length;
+
+    var verdict;
+    if (score === scenarios.length) {
+      verdict = 'Perfect. You matched every scenario correctly.';
+    } else if (score >= Math.ceil(scenarios.length * 0.8)) {
+      verdict = 'Strong work. Nearly there — one more run will make it automatic.';
+    } else if (score >= Math.ceil(scenarios.length * 0.5)) {
+      verdict = 'Good start. Review the explanations above, then try again.';
+    } else {
+      verdict = 'The signals are easy to confuse at first. Read the summaries below, then try again.';
+    }
+    document.getElementById('finalVerdict').textContent = verdict;
+  }
+
+  function restart() {
+    current  = 0;
+    score    = 0;
+    answered = false;
+    document.getElementById('quizArea').style.display  = '';
+    document.getElementById('finalScreen').className   = 'final-screen';
+    render();
+  }
+
+  render();
+</script>
+</body>
+</html>

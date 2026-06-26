@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What Breaks a Consumer</title>
+<style>
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    font-size: 18px;
+    color: #1A1A1A;
+    background: #FFFFFF;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 700px;
+  }
+
+  /* ── Hint header ── */
+  .hint-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+  }
+
+  .hint-header svg {
+    flex-shrink: 0;
+  }
+
+  .hint-text {
+    font-size: 18px;
+    color: #1A1A1A;
+  }
+
+  @keyframes cursor-wiggle {
+    0%   { transform: rotate(0deg); }
+    17%  { transform: rotate(-10deg); }
+    33%  { transform: rotate(10deg); }
+    50%  { transform: rotate(-8deg); }
+    67%  { transform: rotate(6deg); }
+    83%  { transform: rotate(-3deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  .hint-header svg {
+    animation: cursor-wiggle 4s infinite;
+    transform-origin: center center;
+  }
+
+  /* ── Progress ── */
+  .progress-bar {
+    height: 4px;
+    background: rgba(0,0,0,0.08);
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: #1878DC;
+    transition: width 0.4s ease;
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px 0;
+  }
+
+  .progress-label {
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+    font-family: 'Suisse Intl Mono', monospace;
+  }
+
+  .score-tally {
+    display: flex;
+    gap: 16px;
+  }
+
+  .tally-item {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tally-correct { color: #328F51; }
+  .tally-wrong   { color: #DE4C45; }
+
+  /* ── Scenario area ── */
+  .scenario-area {
+    padding: 24px;
+  }
+
+  .scenario-card {
+    background: #F2F1EE;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .scenario-label {
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+    font-family: 'Suisse Intl Mono', monospace;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .scenario-text {
+    font-size: 18px;
+    line-height: 1.6;
+    color: #1A1A1A;
+  }
+
+  code {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    background: rgba(0,0,0,0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* ── Choice buttons ── */
+  .choice-buttons {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .choice-btn {
+    flex: 1;
+    padding: 16px 12px;
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    font-size: 18px;
+    border: 2px solid rgba(0,0,0,0.14);
+    border-radius: 12px;
+    cursor: pointer;
+    background: #FFFFFF;
+    color: #1A1A1A;
+    transition: border-color 0.15s, background 0.15s, color 0.15s, opacity 0.15s;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .choice-btn:hover:not(:disabled) {
+    background: #F2F1EE;
+  }
+
+  .breaking-btn:hover:not(:disabled) {
+    border-color: #DE4C45;
+    color: #DE4C45;
+  }
+
+  .additive-btn:hover:not(:disabled) {
+    border-color: #328F51;
+    color: #328F51;
+  }
+
+  .choice-btn.state-correct {
+    background: #328F51;
+    border-color: #328F51;
+    color: #FFFFFF;
+    cursor: default;
+  }
+
+  .choice-btn.state-wrong {
+    background: #DE4C45;
+    border-color: #DE4C45;
+    color: #FFFFFF;
+    opacity: 0.55;
+    cursor: default;
+    text-decoration: line-through;
+  }
+
+  .choice-btn.state-reveal {
+    border-color: #328F51;
+    color: #328F51;
+    cursor: default;
+  }
+
+  .choice-btn.state-neutral {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  /* ── Feedback ── */
+  .feedback {
+    display: none;
+    padding: 16px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .feedback.is-correct {
+    background: rgba(50, 143, 81, 0.10);
+    border: 1px solid rgba(50, 143, 81, 0.30);
+  }
+
+  .feedback.is-wrong {
+    background: rgba(222, 76, 69, 0.08);
+    border: 1px solid rgba(222, 76, 69, 0.25);
+  }
+
+  .feedback-label {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .feedback.is-correct .feedback-label { color: #328F51; }
+  .feedback.is-wrong   .feedback-label { color: #DE4C45; }
+
+  /* ── Next button ── */
+  .next-btn {
+    display: none;
+    width: 100%;
+    padding: 16px;
+    background: #1A1A1A;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .next-btn:hover {
+    background: #333;
+  }
+
+  /* ── Results ── */
+  .results-area {
+    display: none;
+    padding: 32px 24px;
+  }
+
+  .results-inner {
+    text-align: center;
+  }
+
+  .results-badge {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 120px;
+    height: 120px;
+    border-radius: 16px;
+    background: #F2F1EE;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    margin-bottom: 20px;
+  }
+
+  .results-score {
+    font-size: 40px;
+    font-family: 'Suisse Intl Mono', monospace;
+    color: #1A1A1A;
+    line-height: 1;
+  }
+
+  .results-denom {
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+    font-family: 'Suisse Intl Mono', monospace;
+    margin-top: 4px;
+  }
+
+  .results-heading {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #1A1A1A;
+  }
+
+  .results-message {
+    font-size: 16px;
+    line-height: 1.6;
+    padding: 20px;
+    background: #F2F1EE;
+    border-radius: 12px;
+    text-align: left;
+    margin-bottom: 24px;
+    color: #1A1A1A;
+  }
+
+  .restart-btn {
+    padding: 16px 32px;
+    background: #1878DC;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Suisse Intl', system-ui, sans-serif;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .restart-btn:hover {
+    background: #1565C0;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .hint-header  { padding: 12px 16px; }
+    .meta-row     { padding: 12px 16px 0; }
+    .scenario-area { padding: 16px; }
+    .choice-buttons { flex-direction: column; }
+    .results-area { padding: 24px 16px; }
+    .hint-text { font-size: 16px; }
+  }
+
+  @media (max-width: 325px) {
+    .hint-text { font-size: 14px; }
+    .scenario-text { font-size: 16px; }
+    .choice-btn { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Read each proposed API change and decide: breaking or additive?</span>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+  </div>
+
+  <!-- Meta row: step label + score tally -->
+  <div class="meta-row" id="metaRow">
+    <div class="progress-label" id="progressLabel">1 of 7</div>
+    <div class="score-tally">
+      <span class="tally-item tally-correct">&#10003;&nbsp;<span id="correctCount">0</span></span>
+      <span class="tally-item tally-wrong">&#10007;&nbsp;<span id="wrongCount">0</span></span>
+    </div>
+  </div>
+
+  <!-- Scenario area -->
+  <div class="scenario-area" id="scenarioArea">
+    <div class="scenario-card">
+      <div class="scenario-label">Proposed change</div>
+      <div class="scenario-text" id="scenarioText"></div>
+    </div>
+
+    <div class="choice-buttons">
+      <button class="choice-btn breaking-btn" id="breakingBtn" onclick="choose('breaking')">Breaking</button>
+      <button class="choice-btn additive-btn" id="additiveBtn" onclick="choose('additive')">Additive</button>
+    </div>
+
+    <div class="feedback" id="feedbackBox">
+      <div class="feedback-label" id="feedbackLabel"></div>
+      <div id="feedbackBody"></div>
+    </div>
+
+    <button class="next-btn" id="nextBtn" onclick="advance()">Next &#8594;</button>
+  </div>
+
+  <!-- Results area -->
+  <div class="results-area" id="resultsArea">
+    <div class="results-inner">
+      <div class="results-badge">
+        <div class="results-score" id="resultsScore">0</div>
+        <div class="results-denom" id="resultsDenom">/ 7 correct</div>
+      </div>
+      <div class="results-heading" id="resultsHeading"></div>
+      <div class="results-message" id="resultsMessage"></div>
+      <button class="restart-btn" onclick="restart()">Try again</button>
+    </div>
+  </div>
+
+</div>
+<script>
+var scenarios = [
+  {
+    text: 'Rename the response field <code>username</code> to <code>userName</code> to match a new naming convention. The value and its meaning are exactly the same.',
+    answer: 'breaking',
+    explanation: 'A rename is a remove plus an add from the consumer\'s point of view. Code that reads <code>username</code> finds nothing and fails. The value being identical is irrelevant — consumers match on the exact field name, not the meaning.'
+  },
+  {
+    text: 'Add a new optional field <code>discountCode</code> to an existing order response. Consumers that do not know about it are unaffected.',
+    answer: 'additive',
+    explanation: 'Adding an optional response field is the definition of a safe change. Well-built consumers read the fields they know and silently ignore everything else. No existing path is altered or removed.'
+  },
+  {
+    text: 'Add a new <strong>required</strong> field <code>currency</code> to the request body of an existing payment endpoint.',
+    answer: 'breaking',
+    explanation: 'Adding is only safe when the new thing is optional. A required field means every existing request that omits it is now rejected. All existing consumers break immediately, even though the word "add" sounds harmless.'
+  },
+  {
+    text: 'Change the type of the <code>id</code> field from a <strong>number</strong> to a <strong>string</strong>. The value looks the same in the payload.',
+    answer: 'breaking',
+    explanation: 'Code that expected a number — doing arithmetic, strict equality checks, or numeric parsing — will fail when it receives a string. The field still exists, but its contract has changed in a way that breaks consumers silently.'
+  },
+  {
+    text: 'Add a brand new endpoint <code>GET /api/v1/reports/summary</code>. No existing endpoints are modified.',
+    answer: 'additive',
+    explanation: 'Nobody was calling an endpoint that did not exist. Existing consumers carry on completely unchanged. Introducing a new endpoint is always an additive change.'
+  },
+  {
+    text: 'Change what <code>status: "active"</code> means so that trial accounts are no longer included. The response shape is identical.',
+    answer: 'breaking',
+    explanation: 'Changing the meaning of a value in place is a silent breaking change — no errors fire, but every consumer that relied on the old meaning now computes wrong results. Because it produces no errors, it is far harder to detect than a loud failure.'
+  },
+  {
+    text: 'Add a new optional query parameter <code>?sort=asc</code> to an existing list endpoint. Consumers that omit it receive the same default behavior they always had.',
+    answer: 'additive',
+    explanation: 'Adding an optional parameter leaves all existing behavior intact. Consumers that do not send it get the same results as before. Nothing was altered or removed.'
+  }
+];
+
+var currentIndex = 0;
+var correctCount = 0;
+var wrongCount = 0;
+var answered = false;
+
+function renderScenario() {
+  var s = scenarios[currentIndex];
+  document.getElementById('scenarioText').innerHTML = s.text;
+  document.getElementById('progressLabel').textContent = (currentIndex + 1) + ' of ' + scenarios.length;
+  document.getElementById('progressFill').style.width = ((currentIndex / scenarios.length) * 100) + '%';
+
+  var breaking = document.getElementById('breakingBtn');
+  var additive = document.getElementById('additiveBtn');
+  breaking.className = 'choice-btn breaking-btn';
+  additive.className = 'choice-btn additive-btn';
+  breaking.disabled = false;
+  additive.disabled = false;
+
+  var fb = document.getElementById('feedbackBox');
+  fb.style.display = 'none';
+  fb.className = 'feedback';
+
+  document.getElementById('nextBtn').style.display = 'none';
+  answered = false;
+}
+
+function choose(choice) {
+  if (answered) return;
+  answered = true;
+
+  var s = scenarios[currentIndex];
+  var isCorrect = (choice === s.answer);
+
+  var breaking = document.getElementById('breakingBtn');
+  var additive = document.getElementById('additiveBtn');
+  breaking.disabled = true;
+  additive.disabled = true;
+
+  if (isCorrect) {
+    correctCount++;
+    document.getElementById('correctCount').textContent = correctCount;
+    if (choice === 'breaking') {
+      breaking.className = 'choice-btn breaking-btn state-correct';
+      additive.className  = 'choice-btn additive-btn state-neutral';
+    } else {
+      additive.className  = 'choice-btn additive-btn state-correct';
+      breaking.className  = 'choice-btn breaking-btn state-neutral';
+    }
+  } else {
+    wrongCount++;
+    document.getElementById('wrongCount').textContent = wrongCount;
+    if (choice === 'breaking') {
+      breaking.className = 'choice-btn breaking-btn state-wrong';
+      additive.className  = 'choice-btn additive-btn state-reveal';
+    } else {
+      additive.className  = 'choice-btn additive-btn state-wrong';
+      breaking.className  = 'choice-btn breaking-btn state-reveal';
+    }
+  }
+
+  var fb = document.getElementById('feedbackBox');
+  fb.style.display = 'block';
+  fb.className = isCorrect ? 'feedback is-correct' : 'feedback is-wrong';
+  document.getElementById('feedbackLabel').textContent = isCorrect ? 'Correct' : 'Not quite';
+  document.getElementById('feedbackBody').innerHTML = s.explanation;
+
+  var nextBtn = document.getElementById('nextBtn');
+  nextBtn.style.display = 'block';
+  nextBtn.textContent = (currentIndex < scenarios.length - 1) ? 'Next →' : 'See results';
+}
+
+function advance() {
+  currentIndex++;
+  if (currentIndex >= scenarios.length) {
+    showResults();
+  } else {
+    renderScenario();
+  }
+}
+
+function showResults() {
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('scenarioArea').style.display = 'none';
+  document.getElementById('metaRow').style.display = 'none';
+
+  document.getElementById('resultsScore').textContent = correctCount;
+  document.getElementById('resultsDenom').textContent = '/ ' + scenarios.length + ' correct';
+
+  var pct = correctCount / scenarios.length;
+  var heading, message;
+
+  if (pct === 1) {
+    heading = 'Perfect score.';
+    message = 'You\'ve internalized the key principle: compatibility is defined by the consumer, not by your intent. The renames, type changes, required-field additions, and semantic shifts you caught are exactly the kinds of change that cause real production incidents when shipped without this discipline.';
+  } else if (pct >= 0.71) {
+    heading = 'Strong result.';
+    message = 'The core rule: a change is breaking if any existing consumer code stops working, regardless of how small the diff looks to you. Review the ones you missed and ask what a consumer relying on the old behavior would actually experience.';
+  } else {
+    heading = 'Keep building the instinct.';
+    message = 'The key shift is to judge every change from the consumer\'s point of view. Adding is only safe when the new thing is optional. A rename removes a field from the consumer\'s perspective. And changing what a value means in place causes silent failures with no error to alert anyone — which is the most dangerous kind.';
+  }
+
+  document.getElementById('resultsHeading').textContent = heading;
+  document.getElementById('resultsMessage').textContent = message;
+  document.getElementById('resultsArea').style.display = 'block';
+}
+
+function restart() {
+  currentIndex = 0;
+  correctCount = 0;
+  wrongCount = 0;
+  answered = false;
+
+  document.getElementById('correctCount').textContent = '0';
+  document.getElementById('wrongCount').textContent = '0';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('metaRow').style.display = '';
+  document.getElementById('scenarioArea').style.display = 'block';
+  document.getElementById('resultsArea').style.display = 'none';
+
+  renderScenario();
+}
+
+renderScenario();
+</script>
+</body>
+</html>

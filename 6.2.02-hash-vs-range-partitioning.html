@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hash vs Range Partitioning</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  min-height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ---- Hint header ---- */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.hint-header span {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  10%  { transform: rotate(-10deg); }
+  20%  { transform: rotate(10deg); }
+  30%  { transform: rotate(-8deg); }
+  40%  { transform: rotate(6deg); }
+  50%  { transform: rotate(-3deg); }
+  60%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.hint-icon {
+  animation: cursor-wiggle 4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ---- Mode tabs ---- */
+.mode-tabs {
+  display: flex;
+  padding: 24px 24px 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.5);
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  line-height: 1;
+}
+
+.tab-btn:first-child {
+  border-radius: 10px 0 0 10px;
+}
+
+.tab-btn:last-child {
+  border-radius: 0 10px 10px 0;
+  border-left: none;
+}
+
+.tab-btn.active {
+  background: #1878DC;
+  color: #fff;
+  border-color: #1878DC;
+}
+
+.tab-btn:last-child.active {
+  border-left: 1.5px solid #1878DC;
+}
+
+/* ---- Strategy description ---- */
+.strategy-desc {
+  padding: 12px 24px 20px;
+  font-size: 16px;
+  color: rgba(0,0,0,0.5);
+  line-height: 1.55;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+  min-height: 64px;
+}
+
+.strategy-desc code {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  background: rgba(0,0,0,0.07);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #1A1A1A;
+}
+
+/* ---- Shards ---- */
+.shards-section {
+  padding: 20px 24px 0;
+}
+
+.section-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.shards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.shard {
+  flex: 1;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color 0.25s, box-shadow 0.25s, opacity 0.25s;
+  min-height: 148px;
+}
+
+.shard.highlighted {
+  border-color: #1878DC;
+  box-shadow: 0 0 0 2.5px rgba(24,120,220,0.22), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.shard.hotspot {
+  border-color: #DE4C45;
+  box-shadow: 0 0 0 2.5px rgba(222,76,69,0.22), 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.shard.idle {
+  opacity: 0.32;
+}
+
+.shard-head {
+  padding: 8px 12px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+}
+
+.shard-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.shard-range-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+  margin-top: 4px;
+}
+
+.shard-body {
+  padding: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-content: flex-start;
+  min-height: 88px;
+}
+
+.key-chip {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  color: #1A1A1A;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.key-chip.match {
+  background: #1878DC;
+  color: #fff;
+  border-color: #1878DC;
+}
+
+.key-chip.new-write {
+  background: #328F51;
+  color: #fff;
+  border-color: #328F51;
+  animation: chip-pop 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+.key-chip.hotspot-write {
+  background: #DE4C45;
+  color: #fff;
+  border-color: #DE4C45;
+  animation: chip-pop 0.32s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
+@keyframes chip-pop {
+  0%   { transform: scale(0); opacity: 0; }
+  70%  { transform: scale(1.14); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.key-chip.hotspot-write:nth-child(5) { animation-delay: 0.07s; }
+.key-chip.hotspot-write:nth-child(6) { animation-delay: 0.14s; }
+.key-chip.new-write:nth-child(5)    { animation-delay: 0.07s; }
+
+/* ---- Scenarios ---- */
+.scenarios-section {
+  padding: 0 24px 20px;
+}
+
+.action-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  text-align: left;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1.4;
+}
+
+.action-btn:hover {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.22);
+}
+
+.action-btn.active {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.22);
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.icon-blue   { background: #E3EFF9; }
+.icon-orange { background: #FAF0E8; }
+.icon-green  { background: #E6F3EA; }
+
+/* ---- Result ---- */
+.result-panel {
+  margin: 0 24px 28px;
+  padding: 16px;
+  background: #F2F1EE;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  display: none;
+}
+
+.result-panel.visible { display: block; }
+
+.result-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+.result-body {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1A1A1A;
+}
+
+.result-verdict {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0,0,0,0.10);
+}
+
+.verdict-badge {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.05em;
+}
+
+.badge-fast  { background: #D2EDD9; color: #1A5230; }
+.badge-slow  { background: #FADADB; color: #7A1E1E; }
+.badge-even  { background: #D2EDD9; color: #1A5230; }
+.badge-hot   { background: #FADADB; color: #7A1E1E; }
+
+.verdict-text {
+  font-size: 16px;
+  color: rgba(0,0,0,0.6);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 480px) {
+  .shards { flex-direction: column; gap: 8px; }
+
+  .hint-header,
+  .mode-tabs,
+  .shards-section,
+  .scenarios-section { padding-left: 16px; padding-right: 16px; }
+
+  .result-panel { margin-left: 16px; margin-right: 16px; }
+}
+
+@media (max-width: 360px) {
+  .hint-header span { font-size: 16px; }
+  .tab-btn { font-size: 15px; padding: 10px 12px; }
+  .action-btn { font-size: 15px; padding: 10px 12px; }
+  .result-body { font-size: 15px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Switch the strategy, then run each scenario to see how rows are routed.</span>
+  </div>
+
+  <!-- Mode tabs -->
+  <div class="mode-tabs">
+    <button class="tab-btn active" id="tab-hash" onclick="setMode('hash')">Hash partitioning</button>
+    <button class="tab-btn" id="tab-range" onclick="setMode('range')">Range partitioning</button>
+  </div>
+
+  <!-- Strategy description -->
+  <div class="strategy-desc" id="strategy-desc">
+    Placement rule: <code>hash(key) % 3 &rarr; shard.</code> Similar keys scatter to different shards &mdash; load spreads evenly, but nearby keys end up apart.
+  </div>
+
+  <!-- Shards visualization -->
+  <div class="shards-section">
+    <div class="section-label">3 shards &mdash; 9 starting rows (keys 1&ndash;9)</div>
+    <div class="shards" id="shards-container"></div>
+  </div>
+
+  <!-- Scenario buttons -->
+  <div class="scenarios-section">
+    <div class="section-label">Run a scenario</div>
+    <div class="action-btns">
+      <button class="action-btn" id="btn-lookup" onclick="runScenario('lookup')">
+        <span class="btn-icon icon-blue">&#128269;</span>
+        <span>Single lookup &mdash; find key&nbsp;5</span>
+      </button>
+      <button class="action-btn" id="btn-rangeq" onclick="runScenario('range_query')">
+        <span class="btn-icon icon-orange">&#128202;</span>
+        <span>Range query &mdash; keys&nbsp;4 through 6</span>
+      </button>
+      <button class="action-btn" id="btn-writes" onclick="runScenario('writes')">
+        <span class="btn-icon icon-green">&#9997;&#65039;</span>
+        <span>Write stream &mdash; 3 new rows (keys 10, 11, 12)</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Result panel -->
+  <div class="result-panel" id="result-panel">
+    <div class="result-label">Result</div>
+    <div class="result-body" id="result-body"></div>
+    <div class="result-verdict" id="result-verdict"></div>
+  </div>
+
+</div>
+
+<script>
+// Hash distribution: shard_index = key % 3 (0=A, 1=B, 2=C)
+// key 1→B, 2→C, 3→A, 4→B, 5→C, 6→A, 7→B, 8→C, 9→A
+const HASH = { A: [3, 6, 9], B: [1, 4, 7], C: [2, 5, 8] };
+
+// Range distribution: A=1-3, B=4-6, C=7+
+const RANGE = { A: [1, 2, 3], B: [4, 5, 6], C: [7, 8, 9] };
+const RANGE_LABELS = { A: 'keys 1–3', B: 'keys 4–6', C: 'keys 7+' };
+
+let mode = 'hash';
+let extraKeys = { A: [], B: [], C: [] };
+
+function setMode(m) {
+  mode = m;
+  extraKeys = { A: [], B: [], C: [] };
+
+  document.getElementById('tab-hash').classList.toggle('active', m === 'hash');
+  document.getElementById('tab-range').classList.toggle('active', m === 'range');
+
+  const desc = document.getElementById('strategy-desc');
+  if (m === 'hash') {
+    desc.innerHTML = 'Placement rule: <code>hash(key) % 3 &rarr; shard.</code> Similar keys scatter to different shards &mdash; load spreads evenly, but nearby keys end up apart.';
+  } else {
+    desc.innerHTML = 'Placement rule: <code>key range &rarr; shard.</code> Each shard owns a contiguous slice of the key space. Range scans are efficient, but monotonically increasing keys pile writes onto one shard.';
+  }
+
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('result-panel').classList.remove('visible');
+  renderShards();
+}
+
+function getDist() {
+  return mode === 'hash' ? HASH : RANGE;
+}
+
+function renderShards(highlighted, matchKeys, writeType) {
+  highlighted = highlighted || [];
+  matchKeys = matchKeys || [];
+  writeType = writeType || null;
+
+  const dist = getDist();
+  const container = document.getElementById('shards-container');
+  container.innerHTML = '';
+
+  ['A', 'B', 'C'].forEach(s => {
+    const isHL = highlighted.includes(s);
+    const isIdle = highlighted.length > 0 && !isHL;
+    const isHot = writeType === 'hot' && isHL;
+
+    const shard = document.createElement('div');
+    const classes = ['shard'];
+    if (isHL && !isHot) classes.push('highlighted');
+    if (isHot) classes.push('hotspot');
+    if (isIdle) classes.push('idle');
+    shard.className = classes.join(' ');
+
+    const head = document.createElement('div');
+    head.className = 'shard-head';
+    head.innerHTML = '<div class="shard-name">Shard ' + s + '</div>' +
+      (mode === 'range' ? '<div class="shard-range-label">' + RANGE_LABELS[s] + '</div>' : '');
+
+    const body = document.createElement('div');
+    body.className = 'shard-body';
+
+    // Base keys
+    dist[s].forEach(function(k) {
+      const chip = document.createElement('span');
+      chip.className = 'key-chip' + (matchKeys.includes(k) ? ' match' : '');
+      chip.textContent = 'k' + k;
+      body.appendChild(chip);
+    });
+
+    // Extra keys from write stream
+    extraKeys[s].forEach(function(item) {
+      const chip = document.createElement('span');
+      chip.className = 'key-chip ' + (item.type === 'hot' ? 'hotspot-write' : 'new-write');
+      chip.textContent = 'k' + item.key;
+      body.appendChild(chip);
+    });
+
+    shard.appendChild(head);
+    shard.appendChild(body);
+    container.appendChild(shard);
+  });
+}
+
+function runScenario(scenario) {
+  extraKeys = { A: [], B: [], C: [] };
+
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+  var btnMap = { lookup: 'btn-lookup', range_query: 'btn-rangeq', writes: 'btn-writes' };
+  document.getElementById(btnMap[scenario]).classList.add('active');
+
+  var panel = document.getElementById('result-panel');
+  var body = document.getElementById('result-body');
+  var verdict = document.getElementById('result-verdict');
+  panel.classList.add('visible');
+
+  if (scenario === 'lookup') {
+    // key 5: hash → 5%3=2 → C; range → keys 4-6 → B
+    var shard = mode === 'hash' ? 'C' : 'B';
+    renderShards([shard], [5]);
+    body.innerHTML = 'Looking up <strong>key&nbsp;5</strong>: the placement rule identifies <strong>Shard&nbsp;' + shard + '</strong> immediately. The query goes to exactly one shard &mdash; both strategies handle point lookups equally well.';
+    verdict.innerHTML = '<span class="verdict-badge badge-fast">FAST</span><span class="verdict-text">1 shard contacted.</span>';
+
+  } else if (scenario === 'range_query') {
+    if (mode === 'hash') {
+      // key 4 → B (4%3=1), key 5 → C (5%3=2), key 6 → A (6%3=0)  — all three shards
+      renderShards(['A', 'B', 'C'], [4, 5, 6]);
+      body.innerHTML = 'Range query <strong>keys&nbsp;4&ndash;6</strong>: hash partitioning scattered key&nbsp;4 to Shard&nbsp;B, key&nbsp;5 to Shard&nbsp;C, and key&nbsp;6 to Shard&nbsp;A. The database must <strong>fan out to all 3 shards</strong>, collect partial results, and merge them.';
+      verdict.innerHTML = '<span class="verdict-badge badge-slow">FAN-OUT</span><span class="verdict-text">3 shards contacted &mdash; all must respond.</span>';
+    } else {
+      // keys 4-6 all live on Shard B
+      renderShards(['B'], [4, 5, 6]);
+      body.innerHTML = 'Range query <strong>keys&nbsp;4&ndash;6</strong>: range partitioning keeps all three keys together on Shard&nbsp;B. The database contacts <strong>exactly one shard</strong> and performs a single efficient scan &mdash; no fan-out needed.';
+      verdict.innerHTML = '<span class="verdict-badge badge-fast">EFFICIENT</span><span class="verdict-text">1 shard contacted &mdash; direct scan.</span>';
+    }
+
+  } else if (scenario === 'writes') {
+    if (mode === 'hash') {
+      // key 10 → 10%3=1 → B; key 11 → 11%3=2 → C; key 12 → 12%3=0 → A
+      extraKeys['B'].push({ key: 10, type: 'even' });
+      extraKeys['C'].push({ key: 11, type: 'even' });
+      extraKeys['A'].push({ key: 12, type: 'even' });
+      renderShards([], [], null);
+      body.innerHTML = 'Writing <strong>keys 10, 11, 12</strong>: hash partitioning routes key&nbsp;10 to Shard&nbsp;B, key&nbsp;11 to Shard&nbsp;C, and key&nbsp;12 to Shard&nbsp;A. New writes spread evenly &mdash; no machine is overloaded.';
+      verdict.innerHTML = '<span class="verdict-badge badge-even">EVEN LOAD</span><span class="verdict-text">Writes distributed across all 3 shards.</span>';
+    } else {
+      // keys 10, 11, 12 are all > 9, so they all land on Shard C (keys 7+)
+      extraKeys['C'].push({ key: 10, type: 'hot' });
+      extraKeys['C'].push({ key: 11, type: 'hot' });
+      extraKeys['C'].push({ key: 12, type: 'hot' });
+      renderShards(['C'], [], 'hot');
+      body.innerHTML = 'Writing <strong>keys 10, 11, 12</strong>: because keys only ever increase, every new write belongs to Shard&nbsp;C (the newest range). <strong>All write traffic concentrates on one machine</strong> while Shards A and B sit nearly idle &mdash; a hot shard.';
+      verdict.innerHTML = '<span class="verdict-badge badge-hot">HOT SHARD</span><span class="verdict-text">All 3 writes land on Shard&nbsp;C.</span>';
+    }
+  }
+}
+
+// Initialize on load
+renderShards();
+</script>
+</body>
+</html>

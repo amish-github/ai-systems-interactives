@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strong vs Eventual Consistency</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ─────────────────────────────────────────── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon { flex-shrink: 0; }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .cursor-icon svg { animation: cursor-wiggle 4s ease-in-out infinite; display: block; }
+
+    .hint-text {
+      font-size: 18px;
+      line-height: 1.4;
+      color: #1A1A1A;
+    }
+
+    /* ── Main body ───────────────────────────────────────────── */
+    .main { padding: 24px 20px 28px; }
+
+    /* ── Progress bar ────────────────────────────────────────── */
+    .progress-bar {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 24px;
+    }
+    .progress-seg {
+      height: 4px;
+      flex: 1;
+      border-radius: 2px;
+      background: rgba(0,0,0,0.12);
+      transition: background 0.35s ease;
+    }
+    .progress-seg.done { background: #1A1A1A; }
+
+    /* ── Scenario strip ──────────────────────────────────────── */
+    .scenario-strip {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.55);
+    }
+    .val-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .val-chip.old { background: rgba(0,0,0,0.10); color: rgba(0,0,0,0.55); }
+    .val-chip.new { background: #1A1A1A; color: #FFFFFF; }
+
+    /* ── Two-column grid ─────────────────────────────────────── */
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 480px) {
+      .cols { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .panel-head {
+      padding: 10px 14px;
+      font-size: 15px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-head.strong-head {
+      background: rgba(24,120,220,0.07);
+      color: #1878DC;
+    }
+    .panel-head.eventual-head {
+      background: rgba(211,87,34,0.07);
+      color: #D35722;
+    }
+
+    .panel-body { padding: 12px 14px; }
+
+    /* Acknowledged badge */
+    .ack-badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Suisse Intl Mono', monospace;
+      display: none;
+    }
+    .ack-badge.visible { display: inline-block; }
+    .ack-badge.ack-yes { background: rgba(50,143,81,0.12); color: #328F51; }
+    .ack-badge.ack-wait { background: rgba(244,142,0,0.12); color: #F48E00; }
+
+    /* ── Replicas ────────────────────────────────────────────── */
+    .replicas { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+
+    .replica {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.12);
+      background: #FFFFFF;
+      transition: background 0.3s ease, border-color 0.3s ease;
+      font-size: 14px;
+      min-height: 40px;
+    }
+    .replica.state-idle      { background: #FFFFFF; border-color: rgba(0,0,0,0.12); }
+    .replica.state-locking   { background: rgba(24,120,220,0.05); border-color: rgba(24,120,220,0.35); }
+    .replica.state-confirmed { background: rgba(50,143,81,0.06); border-color: rgba(50,143,81,0.4); }
+    .replica.state-synced    { background: rgba(50,143,81,0.06); border-color: rgba(50,143,81,0.4); }
+    .replica.state-stale     { background: rgba(211,87,34,0.05); border-color: rgba(211,87,34,0.30); }
+
+    .rep-name {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      min-width: 20px;
+    }
+
+    .rep-val {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 17px;
+      min-width: 28px;
+      transition: color 0.3s ease;
+    }
+    .rep-val.v-old   { color: rgba(0,0,0,0.35); }
+    .rep-val.v-new   { color: #328F51; }
+    .rep-val.v-pend  { color: rgba(0,0,0,0.25); }
+
+    .rep-status {
+      margin-left: auto;
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .rep-status.st-idle      { display: none; }
+    .rep-status.st-locking   { background: rgba(24,120,220,0.10); color: #1878DC; }
+    .rep-status.st-confirmed { background: rgba(50,143,81,0.10); color: #328F51; }
+    .rep-status.st-synced    { background: rgba(50,143,81,0.10); color: #328F51; }
+    .rep-status.st-stale     { background: rgba(211,87,34,0.10); color: #D35722; }
+
+    /* ── Read result box ─────────────────────────────────────── */
+    .read-box {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.10);
+      min-height: 56px;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    .read-box.rb-good   { background: rgba(50,143,81,0.07); border-color: rgba(50,143,81,0.30); }
+    .read-box.rb-stale  { background: rgba(211,87,34,0.07); border-color: rgba(211,87,34,0.25); }
+    .read-box.rb-wait   { background: rgba(244,142,0,0.07); border-color: rgba(244,142,0,0.25); }
+
+    .read-label {
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 4px;
+      letter-spacing: 0.03em;
+    }
+
+    .read-val {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #1A1A1A;
+      transition: color 0.3s ease;
+    }
+    .read-val.rv-good  { color: #328F51; }
+    .read-val.rv-stale { color: #D35722; }
+    .read-val.rv-wait  { color: #F48E00; }
+    .read-val.rv-dim   { color: rgba(0,0,0,0.40); }
+
+    /* ── Phase description ───────────────────────────────────── */
+    .phase-desc {
+      padding: 16px 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      min-height: 80px;
+      transition: opacity 0.2s ease;
+    }
+    .phase-tag {
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .phase-text {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+    .phase-text strong { font-weight: 600; }
+    .phase-text em { font-style: normal; color: rgba(0,0,0,0.55); }
+
+    /* ── Controls ────────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    button {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 15px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s ease, transform 0.1s ease;
+      line-height: 1;
+    }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button:disabled { opacity: 0.35; cursor: default; }
+
+    .btn-primary {
+      background: #1A1A1A;
+      color: #FFFFFF;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: 0.80; }
+
+    .btn-reset {
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.14);
+    }
+    .btn-reset:hover:not(:disabled) { background: #E9E8E5; }
+
+    .dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-left: auto;
+    }
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.25s ease;
+    }
+    .dot.active { background: #1A1A1A; }
+
+    /* ── Key insight callout (shown at step 4) ───────────────── */
+    .key-insight {
+      display: none;
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      border-left: 3px solid #1878DC;
+      background: rgba(24,120,220,0.06);
+      font-size: 15px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+    .key-insight.visible { display: block; }
+    .key-insight strong { font-weight: 600; color: #1878DC; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <div class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="hint-text">Click <strong>Send Write</strong>, then step forward to see what each replica returns.</span>
+  </div>
+
+  <div class="main">
+
+    <!-- Progress bar -->
+    <div class="progress-bar" id="progress-bar"></div>
+
+    <!-- Scenario strip -->
+    <div class="scenario-strip">
+      <span>Client writes</span>
+      <span class="val-chip new">balance = 99</span>
+      <span style="color:rgba(0,0,0,0.30)">previously</span>
+      <span class="val-chip old">balance = 42</span>
+    </div>
+
+    <!-- Two columns -->
+    <div class="cols">
+
+      <!-- Strong -->
+      <div class="panel" id="panel-strong">
+        <div class="panel-head strong-head">
+          <span>Strong Consistency</span>
+          <span class="ack-badge" id="strong-ack"></span>
+        </div>
+        <div class="panel-body">
+          <div class="replicas" id="strong-replicas"></div>
+          <div class="read-box" id="strong-rb">
+            <div class="read-label">READ → returns</div>
+            <div class="read-val" id="strong-rv">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Eventual -->
+      <div class="panel" id="panel-eventual">
+        <div class="panel-head eventual-head">
+          <span>Eventual Consistency</span>
+          <span class="ack-badge" id="eventual-ack"></span>
+        </div>
+        <div class="panel-body">
+          <div class="replicas" id="eventual-replicas"></div>
+          <div class="read-box" id="eventual-rb">
+            <div class="read-label">READ → returns</div>
+            <div class="read-val" id="eventual-rv">—</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Phase description -->
+    <div class="phase-desc" id="phase-desc">
+      <div class="phase-tag" id="phase-tag"></div>
+      <div class="phase-text" id="phase-text"></div>
+    </div>
+
+    <!-- Key insight (step 4 only) -->
+    <div class="key-insight" id="key-insight">
+      <strong>Key point:</strong> Eventual consistency is not just strong consistency with a delay. It changes what a read is <em>allowed to return</em>. During the convergence window, a read can return a value that is already out of date — and your code must remain correct when that happens.
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn-primary" id="btn-main">Send Write</button>
+      <button class="btn-reset" id="btn-reset" onclick="resetSim()">Reset</button>
+      <div class="dots" id="dots"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ─── Data ─────────────────────────────────────────────────── */
+const OLD = '42', NEW = '99';
+
+const STEPS = [
+  // 0 — initial
+  {
+    sReps: [
+      { name:'R1', val:OLD, state:'idle',  status:'idle' },
+      { name:'R2', val:OLD, state:'idle',  status:'idle' },
+      { name:'R3', val:OLD, state:'idle',  status:'idle' },
+    ],
+    eReps: [
+      { name:'R1', val:OLD, state:'idle',  status:'idle' },
+      { name:'R2', val:OLD, state:'idle',  status:'idle' },
+      { name:'R3', val:OLD, state:'idle',  status:'idle' },
+    ],
+    sRead:  { text:'—',          cls:'',          box:'' },
+    eRead:  { text:'—',          cls:'',          box:'' },
+    sAck:   null,
+    eAck:   null,
+    tag:    'STEP 0 OF 4 — INITIAL STATE',
+    html:   'All three replicas hold <strong>balance = 42</strong>. Click <em>Send Write</em> to send a new value.',
+    btn:    'Send Write',
+  },
+  // 1 — write in flight
+  {
+    sReps: [
+      { name:'R1', val:'…',  state:'locking',   status:'locking' },
+      { name:'R2', val:'…',  state:'locking',   status:'locking' },
+      { name:'R3', val:'…',  state:'locking',   status:'locking' },
+    ],
+    eReps: [
+      { name:'R1', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R2', val:OLD,  state:'stale',     status:'stale' },
+      { name:'R3', val:OLD,  state:'stale',     status:'stale' },
+    ],
+    sRead:  { text:'write not yet acknowledged — no reads yet',  cls:'rv-wait', box:'rb-wait' },
+    eRead:  { text:'READ now may return 42 from R2 or R3',       cls:'rv-stale', box:'rb-stale' },
+    sAck:   { text:'waiting…', cls:'ack-wait' },
+    eAck:   { text:'write ✓',  cls:'ack-yes'  },
+    tag:    'STEP 1 OF 4 — WRITE IN FLIGHT',
+    html:   '<strong>Strong:</strong> propagating to all three replicas and waiting for each to confirm. The client has <em>not yet received an acknowledgment</em>.<br><br><strong>Eventual:</strong> the primary (R1) accepted the write and <em>immediately acknowledged it</em>. R2 and R3 are syncing asynchronously.',
+    btn:    'Next →',
+  },
+  // 2 — partial propagation
+  {
+    sReps: [
+      { name:'R1', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R2', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R3', val:'…',  state:'locking',   status:'locking'  },
+    ],
+    eReps: [
+      { name:'R1', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R2', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R3', val:OLD,  state:'stale',     status:'stale'  },
+    ],
+    sRead:  { text:'still waiting for R3 — no acknowledgment yet', cls:'rv-wait', box:'rb-wait' },
+    eRead:  { text:'READ from R3 still returns 42',                  cls:'rv-stale', box:'rb-stale' },
+    sAck:   { text:'waiting…', cls:'ack-wait' },
+    eAck:   { text:'write ✓',  cls:'ack-yes'  },
+    tag:    'STEP 2 OF 4 — CONVERGENCE WINDOW',
+    html:   '<strong>Strong:</strong> R1 and R2 confirmed; still waiting for R3 before the write is acknowledged. The client is still blocked.<br><br><strong>Eventual:</strong> the client already got acknowledgment. But R3 is still stale — a READ from R3 returns the old value. This is the <em>convergence window</em>.',
+    btn:    'Next →',
+  },
+  // 3 — all done
+  {
+    sReps: [
+      { name:'R1', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R2', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R3', val:NEW,  state:'confirmed', status:'confirmed' },
+    ],
+    eReps: [
+      { name:'R1', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R2', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R3', val:NEW,  state:'synced',    status:'synced' },
+    ],
+    sRead:  { text:'READ always returns 99 ✓',  cls:'rv-good', box:'rb-good' },
+    eRead:  { text:'READ returns 99 ✓ (converged)', cls:'rv-good', box:'rb-good' },
+    sAck:   { text:'write ✓', cls:'ack-yes' },
+    eAck:   { text:'write ✓', cls:'ack-yes' },
+    tag:    'STEP 3 OF 4 — COMPLETE',
+    html:   'Both models now show 99 on all replicas. But the <em>paths were different</em>: strong delayed the write until every replica confirmed. Eventual acknowledged immediately — but there was a window where reads could return 42. Click <em>See Summary</em> for the key takeaway.',
+    btn:    'See Summary →',
+  },
+  // 4 — summary
+  {
+    sReps: [
+      { name:'R1', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R2', val:NEW,  state:'confirmed', status:'confirmed' },
+      { name:'R3', val:NEW,  state:'confirmed', status:'confirmed' },
+    ],
+    eReps: [
+      { name:'R1', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R2', val:NEW,  state:'synced',    status:'synced' },
+      { name:'R3', val:NEW,  state:'synced',    status:'synced' },
+    ],
+    sRead:  { text:'always returned 99 — no stale window possible', cls:'rv-good', box:'rb-good' },
+    eRead:  { text:'briefly returned 42, then converged to 99',      cls:'rv-stale', box:'rb-stale' },
+    sAck:   { text:'write ✓', cls:'ack-yes' },
+    eAck:   { text:'write ✓', cls:'ack-yes' },
+    tag:    'STEP 4 OF 4 — SUMMARY',
+    html:   'Choose <strong>strong consistency</strong> when a stale read causes a real problem (account balance, inventory count). Choose <strong>eventual consistency</strong> when a brief delay does no harm (like count, activity feed) — it buys availability and horizontal scale in exchange.',
+    btn:    'Reset',
+  },
+];
+
+const TOTAL = STEPS.length - 1;
+let step = 0;
+
+/* ─── Render ────────────────────────────────────────────────── */
+function render() {
+  const s = STEPS[step];
+
+  // Progress bar
+  const pb = document.getElementById('progress-bar');
+  pb.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const seg = document.createElement('div');
+    seg.className = 'progress-seg' + (i < step ? ' done' : '');
+    pb.appendChild(seg);
+  }
+
+  // Dots
+  const dotsEl = document.getElementById('dots');
+  dotsEl.innerHTML = '';
+  for (let i = 0; i <= TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === step ? ' active' : '');
+    dotsEl.appendChild(d);
+  }
+
+  // Replicas
+  renderReplicas('strong-replicas', s.sReps);
+  renderReplicas('eventual-replicas', s.eReps);
+
+  // Read boxes
+  setReadBox('strong-rb', 'strong-rv', s.sRead);
+  setReadBox('eventual-rb', 'eventual-rv', s.eRead);
+
+  // Ack badges
+  setAck('strong-ack', s.sAck);
+  setAck('eventual-ack', s.eAck);
+
+  // Phase description
+  document.getElementById('phase-tag').textContent = s.tag;
+  document.getElementById('phase-text').innerHTML = s.html;
+
+  // Key insight
+  const ki = document.getElementById('key-insight');
+  ki.className = 'key-insight' + (step === TOTAL ? ' visible' : '');
+
+  // Button
+  const btn = document.getElementById('btn-main');
+  btn.textContent = s.btn;
+  if (step === TOTAL) {
+    btn.onclick = resetSim;
+    btn.className = 'btn-reset';
+  } else {
+    btn.onclick = advance;
+    btn.className = 'btn-primary';
+  }
+}
+
+function renderReplicas(containerId, reps) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = '';
+  reps.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'replica state-' + r.state;
+
+    const valCls = r.val === NEW ? 'v-new' : (r.val === '…' ? 'v-pend' : 'v-old');
+    const stCls  = 'st-' + r.status;
+
+    const statusLabels = {
+      idle:      '',
+      locking:   'waiting',
+      confirmed: 'confirmed ✓',
+      synced:    'synced ✓',
+      stale:     'stale',
+    };
+
+    div.innerHTML =
+      `<span class="rep-name">${r.name}</span>` +
+      `<span class="rep-val ${valCls}">${r.val}</span>` +
+      `<span class="rep-status ${stCls}">${statusLabels[r.status] || ''}</span>`;
+
+    c.appendChild(div);
+  });
+}
+
+function setReadBox(boxId, valId, rd) {
+  const box = document.getElementById(boxId);
+  const val = document.getElementById(valId);
+  box.className = 'read-box' + (rd.box ? ' ' + rd.box : '');
+  val.className = 'read-val' + (rd.cls ? ' ' + rd.cls : '');
+  val.textContent = rd.text;
+}
+
+function setAck(id, ack) {
+  const el = document.getElementById(id);
+  if (!ack) {
+    el.className = 'ack-badge';
+    el.textContent = '';
+  } else {
+    el.className = 'ack-badge visible ' + ack.cls;
+    el.textContent = ack.text;
+  }
+}
+
+/* ─── Navigation ────────────────────────────────────────────── */
+function advance() {
+  if (step < TOTAL) { step++; render(); }
+}
+
+function resetSim() {
+  step = 0;
+  render();
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

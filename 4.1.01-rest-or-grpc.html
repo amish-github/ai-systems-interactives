@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REST or gRPC? — Scenario Practice</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ─────────────────────────────────── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s infinite;
+  transform-origin: 4px 4px;
+}
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  10%  { transform: rotate(-10deg); }
+  20%  { transform: rotate(10deg); }
+  30%  { transform: rotate(-8deg); }
+  40%  { transform: rotate(6deg); }
+  50%  { transform: rotate(-3deg); }
+  60%  { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.hint-text {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+/* ── Progress ─────────────────────────────────────── */
+.progress-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 0;
+}
+
+.progress-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  white-space: nowrap;
+}
+
+.progress-bar-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(0,0,0,0.14);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: #1878DC;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+/* ── Score chips ──────────────────────────────────── */
+.score-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 24px 0;
+}
+
+.score-chip {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.50);
+  transition: background 0.2s, color 0.2s;
+}
+
+.score-chip.has-correct {
+  background: #E8F5ED;
+  color: #328F51;
+}
+
+.score-chip.has-wrong {
+  background: #FDECEA;
+  color: #DE4C45;
+}
+
+/* ── Scenario card ────────────────────────────────── */
+.scenario-card {
+  margin: 16px 24px 0;
+  padding: 20px;
+  background: #F2F1EE;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.14);
+}
+
+.scenario-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.scenario-text {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.55;
+}
+
+.context-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.tag {
+  font-size: 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.07);
+  color: rgba(0,0,0,0.60);
+}
+
+/* ── Choice buttons ───────────────────────────────── */
+.choice-row {
+  display: flex;
+  gap: 12px;
+  padding: 0 24px;
+  margin-top: 12px;
+}
+
+.choice-btn {
+  flex: 1;
+  padding: 16px 12px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  color: #1A1A1A;
+  text-align: center;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s, border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.choice-btn:hover:not(:disabled) {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 4px 8px 0 rgba(0,0,0,0.12);
+}
+
+.choice-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.choice-btn:disabled {
+  cursor: default;
+}
+
+.choice-btn .protocol-name {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.choice-btn .protocol-sub {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* Button outcome states */
+.choice-btn.correct-pick {
+  background: #E8F5ED;
+  border-color: #328F51;
+  color: #328F51;
+}
+.choice-btn.correct-pick .protocol-sub { color: rgba(50,143,81,0.65); }
+
+.choice-btn.wrong-pick {
+  background: #FDECEA;
+  border-color: #DE4C45;
+  color: #DE4C45;
+}
+.choice-btn.wrong-pick .protocol-sub { color: rgba(222,76,69,0.65); }
+
+.choice-btn.reveal-correct {
+  background: #E8F5ED;
+  border-color: #328F51;
+  color: #328F51;
+}
+.choice-btn.reveal-correct .protocol-sub { color: rgba(50,143,81,0.65); }
+
+/* ── Feedback box ─────────────────────────────────── */
+.feedback-box {
+  margin: 12px 24px 0;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.14);
+  display: none;
+  animation: fadeUp 0.25s ease;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.feedback-box.correct  { background: #E8F5ED; border-color: #328F51; }
+.feedback-box.incorrect { background: #FDECEA; border-color: #DE4C45; }
+
+.feedback-result {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.feedback-box.correct   .feedback-result { color: #328F51; }
+.feedback-box.incorrect .feedback-result { color: #DE4C45; }
+
+.feedback-explanation {
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 1.55;
+}
+
+.reason-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.reason-chip {
+  font-size: 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.07);
+  color: #1A1A1A;
+}
+
+/* ── Next button ──────────────────────────────────── */
+.next-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 24px 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.next-row.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.next-btn {
+  padding: 12px 24px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: background 0.15s, transform 0.1s;
+}
+
+.next-btn:hover {
+  background: #333;
+  transform: translateY(-1px);
+}
+
+.next-btn:active { transform: translateY(0); }
+
+/* ── Summary panel ────────────────────────────────── */
+.summary-panel {
+  margin: 16px 24px;
+  padding: 28px 24px;
+  background: #F2F1EE;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.14);
+  text-align: center;
+  display: none;
+  animation: fadeUp 0.3s ease;
+}
+
+.summary-big-score {
+  font-size: 52px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: #1A1A1A;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.summary-sub {
+  font-size: 16px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 16px;
+}
+
+.summary-message {
+  font-size: 16px;
+  color: #1A1A1A;
+  line-height: 1.55;
+  margin-bottom: 20px;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.restart-btn {
+  padding: 12px 28px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.restart-btn:hover { background: #333; }
+
+/* ── Quick reference ──────────────────────────────── */
+.key-guide {
+  margin: 0 24px 24px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  display: none;
+  animation: fadeUp 0.3s ease;
+}
+
+.key-guide-title {
+  font-size: 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.50);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.key-guide-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.key-guide-row:last-child { margin-bottom: 0; }
+
+.key-badge {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.key-badge.rest  { background: #E4EEFB; color: #1878DC; }
+.key-badge.grpc  { background: #EDE8FF; color: #8754FD; }
+
+/* ── Responsive ───────────────────────────────────── */
+@media (max-width: 480px) {
+  .hint-header,
+  .progress-area,
+  .score-row { padding-left: 16px; padding-right: 16px; }
+
+  .scenario-card,
+  .feedback-box,
+  .summary-panel,
+  .key-guide {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .choice-row {
+    flex-direction: column;
+    padding: 0 16px;
+  }
+
+  .next-row { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Read each scenario and pick the better protocol — REST or gRPC.</span>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-area">
+    <span class="progress-label" id="progress-label">1 / 5</span>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-bar" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- Score chips -->
+  <div class="score-row">
+    <span class="score-chip" id="chip-correct">0 correct</span>
+    <span class="score-chip" id="chip-wrong">0 wrong</span>
+  </div>
+
+  <!-- Scenario card -->
+  <div class="scenario-card" id="scenario-card">
+    <div class="scenario-label" id="scenario-label">Scenario 1 of 5</div>
+    <div class="scenario-text" id="scenario-text"></div>
+    <div class="context-tags" id="context-tags"></div>
+  </div>
+
+  <!-- Choice buttons -->
+  <div class="choice-row" id="choice-row">
+    <button class="choice-btn" id="btn-rest" onclick="pick('REST')">
+      <span class="protocol-name">REST</span>
+      <span class="protocol-sub">HTTP + JSON</span>
+    </button>
+    <button class="choice-btn" id="btn-grpc" onclick="pick('gRPC')">
+      <span class="protocol-name">gRPC</span>
+      <span class="protocol-sub">Protobuf binary</span>
+    </button>
+  </div>
+
+  <!-- Feedback -->
+  <div class="feedback-box" id="feedback-box">
+    <div class="feedback-result" id="feedback-result"></div>
+    <div class="feedback-explanation" id="feedback-explanation"></div>
+    <div class="reason-chips" id="reason-chips"></div>
+  </div>
+
+  <!-- Next button -->
+  <div class="next-row" id="next-row">
+    <button class="next-btn" id="next-btn" onclick="nextScenario()">Next scenario →</button>
+  </div>
+
+  <!-- Summary (shown at end) -->
+  <div class="summary-panel" id="summary-panel">
+    <div class="summary-big-score" id="summary-score"></div>
+    <div class="summary-sub">scenarios correct</div>
+    <div class="summary-message" id="summary-message"></div>
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+  <!-- Quick reference (shown at end) -->
+  <div class="key-guide" id="key-guide">
+    <div class="key-guide-title">Quick reference</div>
+    <div class="key-guide-row">
+      <span class="key-badge rest">REST</span>
+      <span>Public-facing APIs, browsers, third-party clients — anywhere you value readability and broad compatibility.</span>
+    </div>
+    <div class="key-guide-row">
+      <span class="key-badge grpc">gRPC</span>
+      <span>Internal service-to-service calls — especially high-volume traffic, strict typed contracts, or streaming.</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const scenarios = [
+  {
+    text: "Your team is launching a public e-commerce storefront. Customers browse products directly in their web browser and the browser must call your backend API to load product listings in real time.",
+    tags: ["public API", "browser client", "external users"],
+    answer: "REST",
+    explanation: "Browsers cannot make gRPC calls without a special proxy in between. REST travels as plain HTTP that every browser handles natively — no extra tooling, no proxy layer. For a public browser-facing edge, REST is the simpler, natural fit.",
+    reasons: ["browser limitation", "public API", "no proxy needed"],
+  },
+  {
+    text: "Two internal microservices exchange 50,000 messages per minute. Both teams keep hitting subtle production bugs because they occasionally disagree on whether a shared field is a string or an integer.",
+    tags: ["internal services", "high volume", "contract mismatch bugs"],
+    answer: "gRPC",
+    explanation: "gRPC's protobuf contract is defined once and generates typed code for both sides. A field-type mismatch surfaces as a build error rather than a production failure. The high message volume also makes gRPC's compact binary encoding worthwhile.",
+    reasons: ["typed contract", "code generation", "high volume"],
+  },
+  {
+    text: "A third-party developer at a partner company wants to integrate with your search API. They may use Python, Ruby, or Go — you do not know which — and they want to test endpoints interactively with curl before writing any code.",
+    tags: ["external partner", "unknown client stack", "interactive exploration"],
+    answer: "REST",
+    explanation: "REST with JSON is human-readable, works with curl out of the box, and needs no special tooling in any language. External partners benefit from that familiarity. Asking them to install protobuf toolchains and generated stubs adds friction for no meaningful gain.",
+    reasons: ["external partner", "human-readable", "any tool works"],
+  },
+  {
+    text: "An order-tracking service must push a continuous stream of real-time status updates to a fulfillment service. Updates arrive steadily for the full lifetime of each order — not as a single request and response.",
+    tags: ["internal services", "streaming data", "long-lived exchange"],
+    answer: "gRPC",
+    explanation: "gRPC has first-class support for server-side streaming built into the protocol. A plain REST call is a single request followed by a single response, which does not naturally fit a continuous, long-lived flow of messages. gRPC server streaming is precisely designed for this pattern.",
+    reasons: ["built-in streaming", "internal services", "long-lived connection"],
+  },
+  {
+    text: "A mobile app displays live sports scores. The iOS and Android clients need to receive real-time score pushes. The mobile team is using the native platform networking stack, and there is no server-side proxy in the architecture.",
+    tags: ["mobile client", "real-time updates", "no proxy available"],
+    answer: "REST",
+    explanation: "Like browsers, native mobile clients cannot use gRPC directly without a proxy translating the calls — and the team has ruled that out. REST with WebSockets or long-polling handles this scenario cleanly. gRPC's streaming benefits are inaccessible without the proxy infrastructure.",
+    reasons: ["browser limitation applies", "no proxy", "mobile native client"],
+  },
+];
+
+let current = 0;
+let correctCount = 0;
+let wrongCount = 0;
+let answered = false;
+
+function render() {
+  const s = scenarios[current];
+
+  document.getElementById('scenario-label').textContent = `Scenario ${current + 1} of ${scenarios.length}`;
+  document.getElementById('scenario-text').textContent = s.text;
+
+  const tagsEl = document.getElementById('context-tags');
+  tagsEl.innerHTML = s.tags.map(t => `<span class="tag">${t}</span>`).join('');
+
+  document.getElementById('progress-label').textContent = `${current + 1} / ${scenarios.length}`;
+  document.getElementById('progress-bar').style.width = `${(current / scenarios.length) * 100}%`;
+
+  // Reset buttons
+  const btnRest = document.getElementById('btn-rest');
+  const btnGrpc = document.getElementById('btn-grpc');
+  btnRest.className = 'choice-btn';
+  btnRest.disabled = false;
+  btnGrpc.className = 'choice-btn';
+  btnGrpc.disabled = false;
+
+  // Hide feedback
+  const fb = document.getElementById('feedback-box');
+  fb.style.display = 'none';
+  fb.className = 'feedback-box';
+
+  // Hide next button
+  document.getElementById('next-row').className = 'next-row';
+
+  answered = false;
+}
+
+function pick(choice) {
+  if (answered) return;
+  answered = true;
+
+  const s = scenarios[current];
+  const isCorrect = choice === s.answer;
+
+  if (isCorrect) correctCount++; else wrongCount++;
+
+  updateScoreChips();
+
+  const btnRest = document.getElementById('btn-rest');
+  const btnGrpc = document.getElementById('btn-grpc');
+  btnRest.disabled = true;
+  btnGrpc.disabled = true;
+
+  const chosenBtn = choice === 'REST' ? btnRest : btnGrpc;
+  const correctBtn = s.answer === 'REST' ? btnRest : btnGrpc;
+
+  if (isCorrect) {
+    chosenBtn.className = 'choice-btn correct-pick';
+  } else {
+    chosenBtn.className = 'choice-btn wrong-pick';
+    correctBtn.className = 'choice-btn reveal-correct';
+  }
+
+  // Show feedback
+  const fb = document.getElementById('feedback-box');
+  fb.style.display = 'block';
+  fb.className = `feedback-box ${isCorrect ? 'correct' : 'incorrect'}`;
+  document.getElementById('feedback-result').textContent = isCorrect
+    ? 'Correct.'
+    : `Not quite — ${s.answer} is the better fit here.`;
+  document.getElementById('feedback-explanation').textContent = s.explanation;
+  document.getElementById('reason-chips').innerHTML = s.reasons.map(r => `<span class="reason-chip">${r}</span>`).join('');
+
+  // Show next button
+  const nextBtn = document.getElementById('next-btn');
+  nextBtn.textContent = current === scenarios.length - 1 ? 'See results →' : 'Next scenario →';
+  document.getElementById('next-row').className = 'next-row visible';
+}
+
+function nextScenario() {
+  current++;
+  if (current >= scenarios.length) {
+    showSummary();
+    return;
+  }
+  render();
+}
+
+function updateScoreChips() {
+  const cc = document.getElementById('chip-correct');
+  const cw = document.getElementById('chip-wrong');
+
+  cc.textContent = `${correctCount} correct`;
+  cc.className = correctCount > 0 ? 'score-chip has-correct' : 'score-chip';
+
+  cw.textContent = `${wrongCount} wrong`;
+  cw.className = wrongCount > 0 ? 'score-chip has-wrong' : 'score-chip';
+}
+
+function showSummary() {
+  document.getElementById('scenario-card').style.display = 'none';
+  document.getElementById('choice-row').style.display = 'none';
+  document.getElementById('feedback-box').style.display = 'none';
+  document.getElementById('next-row').style.display = 'none';
+
+  document.getElementById('progress-bar').style.width = '100%';
+  document.getElementById('progress-label').textContent = `${scenarios.length} / ${scenarios.length}`;
+
+  document.getElementById('summary-score').textContent = `${correctCount}/${scenarios.length}`;
+
+  let msg = '';
+  if (correctCount === scenarios.length) {
+    msg = 'Excellent judgment. You applied the REST vs gRPC decision framework correctly across all five scenarios.';
+  } else if (correctCount >= 3) {
+    msg = 'Good work. Review the scenarios you missed — they tend to involve the browser limitation or built-in streaming, the two properties that most often determine the choice.';
+  } else {
+    msg = 'Keep at it. The core rule: browsers and external clients require REST; internal high-volume or streaming calls are where gRPC earns its extra cost.';
+  }
+  document.getElementById('summary-message').textContent = msg;
+
+  document.getElementById('summary-panel').style.display = 'block';
+  document.getElementById('key-guide').style.display = 'block';
+}
+
+function restart() {
+  current = 0;
+  correctCount = 0;
+  wrongCount = 0;
+  answered = false;
+
+  updateScoreChips();
+
+  document.getElementById('scenario-card').style.display = '';
+  document.getElementById('choice-row').style.display = '';
+  document.getElementById('next-row').style.display = '';
+  document.getElementById('summary-panel').style.display = 'none';
+  document.getElementById('key-guide').style.display = 'none';
+
+  render();
+}
+
+// Init
+render();
+</script>
+</body>
+</html>

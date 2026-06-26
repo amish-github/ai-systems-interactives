@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capacity Estimate — Interactive Calculator</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  line-height: 1.5;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 24px 0;
+  font-size: 18px;
+  color: #1A1A1A;
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s ease-in-out infinite;
+}
+
+@keyframes cursor-wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+  90%     { transform: rotate(0deg); }
+}
+
+/* ── Section labels ── */
+.section-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 24px 24px 12px;
+}
+
+/* ── Assumptions grid ── */
+.assumptions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 24px;
+}
+
+@media (max-width: 480px) {
+  .assumptions-grid { grid-template-columns: 1fr; }
+}
+
+.assumption-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px;
+  background: #F2F1EE;
+  border-radius: 10px;
+  gap: 8px;
+  transition: background 0.15s;
+}
+
+.assumption-chip.just-changed {
+  background: #E8E7E3;
+}
+
+.assumption-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+  line-height: 1.35;
+  flex: 1;
+  min-width: 0;
+}
+
+.assumption-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.assumption-value {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  color: #1A1A1A;
+  min-width: 60px;
+  text-align: center;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.btn-adj {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  color: #1A1A1A;
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s, transform 0.08s;
+  line-height: 1;
+  font-family: 'Suisse Intl', sans-serif;
+  user-select: none;
+}
+
+.btn-adj:hover:not(:disabled) {
+  background: #1878DC;
+  color: #fff;
+  border-color: #1878DC;
+}
+
+.btn-adj:active:not(:disabled) {
+  transform: scale(0.90);
+}
+
+.btn-adj:disabled {
+  opacity: 0.30;
+  cursor: default;
+}
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: rgba(0,0,0,0.12);
+  margin: 20px 24px 0;
+}
+
+/* ── Insight banner ── */
+.insight-banner {
+  margin: 16px 24px;
+  padding: 12px 16px;
+  background: #F2F1EE;
+  border-radius: 10px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.65);
+  line-height: 1.55;
+  min-height: 52px;
+  transition: opacity 0.2s;
+}
+
+.insight-banner strong {
+  color: #1A1A1A;
+}
+
+/* ── Output cards ── */
+.outputs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 0 24px 28px;
+}
+
+@media (max-width: 540px) {
+  .outputs-grid { grid-template-columns: 1fr; }
+}
+
+.output-card {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+}
+
+.output-card.flash-blue {
+  animation: flash-blue 0.75s ease-out forwards;
+}
+.output-card.flash-green {
+  animation: flash-green 0.75s ease-out forwards;
+}
+.output-card.flash-orange {
+  animation: flash-orange 0.75s ease-out forwards;
+}
+
+@keyframes flash-blue {
+  0%   { background: #D6E9FA; border-color: #1878DC; box-shadow: 0 0 0 3px rgba(24,120,220,0.15); }
+  100% { background: #FFFFFF; border-color: rgba(0,0,0,0.12); box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15); }
+}
+@keyframes flash-green {
+  0%   { background: #D4EDDB; border-color: #328F51; box-shadow: 0 0 0 3px rgba(50,143,81,0.15); }
+  100% { background: #FFFFFF; border-color: rgba(0,0,0,0.12); box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15); }
+}
+@keyframes flash-orange {
+  0%   { background: #FAE5D6; border-color: #D35722; box-shadow: 0 0 0 3px rgba(211,87,34,0.15); }
+  100% { background: #FFFFFF; border-color: rgba(0,0,0,0.12); box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15); }
+}
+
+.card-title {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 400;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-blue   { background: #1878DC; }
+.dot-green  { background: #328F51; }
+.dot-orange { background: #D35722; }
+
+.out-row {
+  margin-bottom: 10px;
+}
+.out-row:last-child { margin-bottom: 0; }
+
+.out-label {
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+  margin-bottom: 1px;
+  line-height: 1.3;
+}
+
+.out-value {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 15px;
+  color: #1A1A1A;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Adjust an assumption — watch which outputs respond.
+  </div>
+
+  <!-- Assumptions -->
+  <div class="section-label">Assumptions</div>
+  <div class="assumptions-grid" id="assumptions-grid"></div>
+
+  <div class="divider"></div>
+
+  <!-- Insight -->
+  <div class="insight-banner" id="insight-banner">
+    Change <strong>Daily active users</strong> to see it affect every output at once — it is the single assumption that drives traffic, storage, and bandwidth together.
+  </div>
+
+  <!-- Outputs -->
+  <div class="section-label">Derived outputs</div>
+  <div class="outputs-grid">
+    <div class="output-card" id="card-traffic">
+      <div class="card-title"><span class="dot dot-blue"></span>Traffic</div>
+      <div class="out-row">
+        <div class="out-label">Requests / day</div>
+        <div class="out-value" id="o-rpd">—</div>
+      </div>
+      <div class="out-row">
+        <div class="out-label">Avg req / s</div>
+        <div class="out-value" id="o-avg-rps">—</div>
+      </div>
+      <div class="out-row">
+        <div class="out-label">Peak req / s</div>
+        <div class="out-value" id="o-peak-rps">—</div>
+      </div>
+    </div>
+
+    <div class="output-card" id="card-storage">
+      <div class="card-title"><span class="dot dot-green"></span>Storage</div>
+      <div class="out-row">
+        <div class="out-label">New data / day</div>
+        <div class="out-value" id="o-day-storage">—</div>
+      </div>
+      <div class="out-row">
+        <div class="out-label">Raw total</div>
+        <div class="out-value" id="o-raw-storage">—</div>
+      </div>
+      <div class="out-row">
+        <div class="out-label">With overhead</div>
+        <div class="out-value" id="o-total-storage">—</div>
+      </div>
+    </div>
+
+    <div class="output-card" id="card-bw">
+      <div class="card-title"><span class="dot dot-orange"></span>Bandwidth</div>
+      <div class="out-row">
+        <div class="out-label">Avg outbound</div>
+        <div class="out-value" id="o-avg-bw">—</div>
+      </div>
+      <div class="out-row">
+        <div class="out-label">Peak outbound</div>
+        <div class="out-value" id="o-peak-bw">—</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── Assumption definitions ──────────────────────────────────────────
+const ASSUMPTIONS = [
+  {
+    id: 'dau',
+    label: 'Daily active users',
+    vals: [1e4, 1e5, 1e6, 1e7, 1e8],
+    def: 2,
+    fmt: v => fmtSI(v),
+    affects: ['traffic', 'storage', 'bandwidth']
+  },
+  {
+    id: 'sessions',
+    label: 'Sessions / user / day',
+    vals: [1, 2, 5, 10, 20],
+    def: 2,
+    fmt: v => String(v),
+    affects: ['traffic', 'bandwidth']
+  },
+  {
+    id: 'actions',
+    label: 'Actions / session',
+    vals: [5, 10, 20, 50, 100],
+    def: 2,
+    fmt: v => String(v),
+    affects: ['traffic', 'bandwidth']
+  },
+  {
+    id: 'photos',
+    label: 'Photos / user / day',
+    vals: [0.1, 0.5, 1, 5, 10],
+    def: 2,
+    fmt: v => String(v),
+    affects: ['storage']
+  },
+  {
+    id: 'photoSize',
+    label: 'Bytes / photo',
+    vals: [1e4, 1e5, 1e6, 1e7, 1e8],
+    def: 2,
+    fmt: v => fmtBytes(v),
+    affects: ['storage']
+  },
+  {
+    id: 'respSize',
+    label: 'Avg response size',
+    vals: [1e3, 1e4, 1e5, 1e6, 1e7],
+    def: 2,
+    fmt: v => fmtBytes(v),
+    affects: ['bandwidth']
+  },
+  {
+    id: 'peak',
+    label: 'Peak factor',
+    vals: [2, 5, 10, 20, 50],
+    def: 2,
+    fmt: v => v + '×',
+    affects: ['traffic', 'bandwidth']
+  },
+  {
+    id: 'retention',
+    label: 'Retention (days)',
+    vals: [30, 100, 365, 1000, 3650],
+    def: 3,
+    fmt: v => v >= 365
+          ? (v / 365 % 1 === 0 ? v/365 : (v/365).toFixed(1)) + ' yr'
+          : v + ' d',
+    affects: ['storage']
+  },
+  {
+    id: 'overhead',
+    label: 'Storage overhead',
+    vals: [1, 1.5, 2, 3, 4],
+    def: 2,
+    fmt: v => v + '×',
+    affects: ['storage']
+  }
+];
+
+// ── State ───────────────────────────────────────────────────────────
+const state = {};
+const idxState = {};
+ASSUMPTIONS.forEach(a => {
+  idxState[a.id] = a.def;
+  state[a.id] = a.vals[a.def];
+});
+
+// ── Format helpers ──────────────────────────────────────────────────
+function fmtSI(n) {
+  if (n >= 1e9) return trim(n / 1e9) + 'B';
+  if (n >= 1e6) return trim(n / 1e6) + 'M';
+  if (n >= 1e3) return trim(n / 1e3) + 'K';
+  return String(n);
+}
+
+function fmtBytes(b) {
+  if (b >= 1e15) return trim(b / 1e15) + ' PB';
+  if (b >= 1e12) return trim(b / 1e12) + ' TB';
+  if (b >= 1e9)  return trim(b / 1e9)  + ' GB';
+  if (b >= 1e6)  return trim(b / 1e6)  + ' MB';
+  if (b >= 1e3)  return trim(b / 1e3)  + ' KB';
+  return b + ' B';
+}
+
+function fmtRPS(r) {
+  if (r >= 1e6) return trim(r / 1e6) + 'M / s';
+  if (r >= 1e3) return trim(r / 1e3) + 'K / s';
+  return Math.round(r) + ' / s';
+}
+
+function fmtRPD(n) {
+  if (n >= 1e9) return trim(n / 1e9) + 'B / day';
+  if (n >= 1e6) return trim(n / 1e6) + 'M / day';
+  if (n >= 1e3) return trim(n / 1e3) + 'K / day';
+  return n + ' / day';
+}
+
+function trim(v) {
+  return parseFloat(v.toFixed(1)).toString();
+}
+
+// ── Compute ─────────────────────────────────────────────────────────
+function compute() {
+  const { dau, sessions, actions, photos, photoSize, respSize, peak, retention, overhead } = state;
+  const rpd      = dau * sessions * actions;
+  const avgRps   = rpd / 86400;
+  const peakRps  = avgRps * peak;
+  const dayBytes = dau * photos * photoSize;
+  const rawBytes = dayBytes * retention;
+  const totBytes = rawBytes * overhead;
+  const avgBw    = avgRps * respSize;
+  const peakBw   = peakRps * respSize;
+  return { rpd, avgRps, peakRps, dayBytes, rawBytes, totBytes, avgBw, peakBw };
+}
+
+// ── DOM updates ─────────────────────────────────────────────────────
+function setText(id, v) {
+  document.getElementById(id).textContent = v;
+}
+
+function updateOutputs(affects) {
+  const r = compute();
+  setText('o-rpd',          fmtRPD(r.rpd));
+  setText('o-avg-rps',      fmtRPS(r.avgRps));
+  setText('o-peak-rps',     fmtRPS(r.peakRps));
+  setText('o-day-storage',  fmtBytes(r.dayBytes) + ' / day');
+  setText('o-raw-storage',  fmtBytes(r.rawBytes));
+  setText('o-total-storage',fmtBytes(r.totBytes));
+  setText('o-avg-bw',       fmtBytes(r.avgBw) + ' / s');
+  setText('o-peak-bw',      fmtBytes(r.peakBw) + ' / s');
+
+  if (affects) {
+    if (affects.includes('traffic'))   flash('card-traffic',  'flash-blue');
+    if (affects.includes('storage'))   flash('card-storage',  'flash-green');
+    if (affects.includes('bandwidth')) flash('card-bw',       'flash-orange');
+  }
+}
+
+function flash(id, cls) {
+  const el = document.getElementById(id);
+  el.classList.remove('flash-blue', 'flash-green', 'flash-orange');
+  void el.offsetWidth; // force reflow
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 760);
+}
+
+// ── Insight messages ────────────────────────────────────────────────
+const INSIGHTS = {
+  dau:       'Changed <strong>Daily active users</strong> — it multiplies into every chain, so traffic, storage, and bandwidth all moved together. This is the assumption that matters most.',
+  sessions:  'Changed <strong>Sessions / user / day</strong> — only the request count shifts. Storage (driven by uploads, not sessions) stayed put.',
+  actions:   'Changed <strong>Actions / session</strong> — same as sessions: only the request rate moves; storage is untouched.',
+  photos:    'Changed <strong>Photos / user / day</strong> — only new writes change, so only storage was affected. The request rate is unchanged.',
+  photoSize: 'Changed <strong>Bytes / photo</strong> — a bigger file means more bytes stored per day. Traffic and bandwidth are unaffected.',
+  respSize:  'Changed <strong>Avg response size</strong> — this scales bandwidth directly; storage and the request count stay the same.',
+  peak:      'Changed <strong>Peak factor</strong> — only the <em>peak</em> figures shift; average traffic, storage, and average bandwidth are unchanged.',
+  retention: 'Changed <strong>Retention</strong> — keeping data longer multiplies total storage. Traffic and bandwidth are unaffected.',
+  overhead:  'Changed <strong>Storage overhead</strong> — replication and indexes scale total storage only. Nothing else moves.',
+};
+
+function updateInsight(id) {
+  document.getElementById('insight-banner').innerHTML = INSIGHTS[id] || '';
+}
+
+// ── Render assumptions ──────────────────────────────────────────────
+function renderAssumptions() {
+  const grid = document.getElementById('assumptions-grid');
+  grid.innerHTML = '';
+
+  ASSUMPTIONS.forEach(a => {
+    const chip = document.createElement('div');
+    chip.className = 'assumption-chip';
+    chip.id = 'chip-' + a.id;
+
+    const idx = idxState[a.id];
+    chip.innerHTML = `
+      <div class="assumption-label">${a.label}</div>
+      <div class="assumption-controls">
+        <button class="btn-adj" id="dec-${a.id}" aria-label="Decrease ${a.label}">−</button>
+        <div class="assumption-value" id="val-${a.id}">${a.fmt(a.vals[idx])}</div>
+        <button class="btn-adj" id="inc-${a.id}" aria-label="Increase ${a.label}">+</button>
+      </div>
+    `;
+    grid.appendChild(chip);
+
+    refreshChipButtons(a);
+
+    chip.querySelector('#dec-' + a.id).addEventListener('click', () => step(a, -1));
+    chip.querySelector('#inc-' + a.id).addEventListener('click', () => step(a, +1));
+  });
+}
+
+function step(a, dir) {
+  const newIdx = idxState[a.id] + dir;
+  if (newIdx < 0 || newIdx >= a.vals.length) return;
+  idxState[a.id] = newIdx;
+  state[a.id] = a.vals[newIdx];
+  document.getElementById('val-' + a.id).textContent = a.fmt(a.vals[newIdx]);
+  refreshChipButtons(a);
+  const chip = document.getElementById('chip-' + a.id);
+  chip.classList.add('just-changed');
+  setTimeout(() => chip.classList.remove('just-changed'), 300);
+  updateOutputs(a.affects);
+  updateInsight(a.id);
+}
+
+function refreshChipButtons(a) {
+  const idx = idxState[a.id];
+  const dec = document.getElementById('dec-' + a.id);
+  const inc = document.getElementById('inc-' + a.id);
+  dec.disabled = (idx === 0);
+  inc.disabled = (idx === a.vals.length - 1);
+}
+
+// ── Boot ────────────────────────────────────────────────────────────
+renderAssumptions();
+updateOutputs(null);
+</script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error Response Consistency — Status Codes &amp; Error Handling in FastAPI</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400; font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400; font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ── */
+    .hint {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    .hint svg {
+      flex-shrink: 0;
+      margin-top: 2px;
+      animation: wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes wiggle {
+      0%, 84%, 100% { transform: rotate(0deg); }
+      14%  { transform: rotate(-10deg); }
+      28%  { transform: rotate(10deg); }
+      42%  { transform: rotate(-8deg); }
+      56%  { transform: rotate(6deg); }
+      70%  { transform: rotate(-3deg); }
+    }
+
+    /* ── Toggle ── */
+    .toggle-wrap {
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .toggle {
+      display: flex;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.14);
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .toggle button {
+      flex: 1;
+      padding: 10px 16px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-right: 1px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      color: rgba(0,0,0,0.5);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .toggle button:last-child { border-right: none; }
+
+    .toggle button.on {
+      background: #1A1A1A;
+      color: #FFFFFF;
+    }
+
+    .toggle button:hover:not(.on) {
+      background: rgba(0,0,0,0.07);
+      color: #1A1A1A;
+    }
+
+    /* ── Shape banner ── */
+    .banner {
+      margin: 16px 20px 4px;
+    }
+
+    .banner-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: background 0.25s, color 0.25s;
+    }
+
+    .banner-pill.bad  { background: rgba(222,76,69,0.10);  color: #9C2820; }
+    .banner-pill.good { background: rgba(50,143,81,0.10);   color: #1F6636; }
+
+    /* ── Cards ── */
+    .cards {
+      padding: 12px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      border-radius: 16px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: border-color 0.25s;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      min-height: 44px;
+      flex-wrap: wrap;
+      row-gap: 4px;
+    }
+
+    .mb {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .mb-post { background: rgba(50,143,81,0.15);  color: #267A41; }
+    .mb-get  { background: rgba(24,120,220,0.15); color: #1163B5; }
+
+    .ep-path {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      flex: 1;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sb {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .sb-4xx { background: rgba(222,76,69,0.12); color: #C0382F; }
+
+    .card-icon {
+      flex-shrink: 0;
+      margin-left: 4px;
+      font-size: 15px;
+      transition: color 0.25s;
+    }
+
+    .card-body {
+      padding: 14px 16px;
+      background: #1A1A1C;
+      overflow-x: auto;
+    }
+
+    .card-body pre {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      white-space: pre;
+    }
+
+    /* JSON token colors */
+    .tk { color: rgba(255,255,255,0.28); }  /* braces, colons, commas */
+    .ko { color: #A78BFA; }                  /* canonical key — soft purple */
+    .kb { color: #F87171; }                  /* inconsistent key — soft red */
+    .vs { color: #FBBF24; }                  /* string value — amber */
+
+    /* ── Callout ── */
+    .callout {
+      margin: 0 20px 20px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 15px;
+      line-height: 1.55;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .callout.bad {
+      background: rgba(222,76,69,0.07);
+      border: 1px solid rgba(222,76,69,0.18);
+      color: #8B2421;
+    }
+
+    .callout.good {
+      background: rgba(50,143,81,0.07);
+      border: 1px solid rgba(50,143,81,0.18);
+      color: #1A5C33;
+    }
+
+    .callout-ico { flex-shrink: 0; }
+
+    code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 0.9em;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hint        { font-size: 16px; padding: 12px 16px; }
+      .toggle-wrap { padding: 12px 16px; }
+      .banner      { margin: 12px 16px 4px; }
+      .cards       { padding: 12px 16px 16px; }
+      .callout     { margin: 0 16px 16px; font-size: 14px; }
+      .card-body pre { font-size: 12px; }
+    }
+
+    @media (max-width: 360px) {
+      .hint { font-size: 14px; }
+      .ep-path { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Toggle between approaches to see how error response shapes drift apart or stay consistent
+  </div>
+
+  <!-- Toggle -->
+  <div class="toggle-wrap">
+    <div class="toggle">
+      <button type="button" id="btn-a" onclick="show('adhoc')">Ad-hoc handling</button>
+      <button type="button" id="btn-c" onclick="show('central')">Centralized handler</button>
+    </div>
+  </div>
+
+  <!-- Shape banner -->
+  <div class="banner">
+    <span class="banner-pill bad" id="banner-pill">&#x26A0; 3 endpoints &middot; 3 different shapes</span>
+  </div>
+
+  <!-- Response cards -->
+  <div class="cards">
+    <div class="card" id="card-0">
+      <div class="card-head">
+        <span class="mb mb-post">POST</span>
+        <span class="ep-path">/accounts</span>
+        <span class="sb sb-4xx">409 Conflict</span>
+        <span class="card-icon" id="icon-0">&#x26A0;</span>
+      </div>
+      <div class="card-body"><pre id="pre-0"></pre></div>
+    </div>
+
+    <div class="card" id="card-1">
+      <div class="card-head">
+        <span class="mb mb-get">GET</span>
+        <span class="ep-path">/users/99</span>
+        <span class="sb sb-4xx">404 Not Found</span>
+        <span class="card-icon" id="icon-1">&#x26A0;</span>
+      </div>
+      <div class="card-body"><pre id="pre-1"></pre></div>
+    </div>
+
+    <div class="card" id="card-2">
+      <div class="card-head">
+        <span class="mb mb-post">POST</span>
+        <span class="ep-path">/items</span>
+        <span class="sb sb-4xx">409 Conflict</span>
+        <span class="card-icon" id="icon-2">&#x26A0;</span>
+      </div>
+      <div class="card-body"><pre id="pre-2"></pre></div>
+    </div>
+  </div>
+
+  <!-- Footer callout -->
+  <div class="callout bad" id="callout">
+    <span class="callout-ico">&#x26A0;</span>
+    <span>Three endpoints, three different body shapes &mdash; a client cannot write one reliable code path to handle all of them.</span>
+  </div>
+
+</div>
+<script>
+  // Pre-rendered HTML for each approach.
+  // Keys in ad-hoc bodies are .kb (red) to show inconsistency.
+  // Keys in centralized bodies are .ko (purple) to show canonical shape.
+  var B = {
+    adhoc: [
+      // POST /accounts — handler wraps body under "detail", omits "code"
+      '<span class="tk">{</span>\n' +
+      '  <span class="kb">"detail"</span><span class="tk">: {</span>\n' +
+      '    <span class="kb">"message"</span><span class="tk">: </span><span class="vs">"Email already taken."</span>\n' +
+      '  <span class="tk">}</span>\n' +
+      '<span class="tk">}</span>',
+
+      // GET /users/99 — handler uses a bare "error" string key
+      '<span class="tk">{</span>\n' +
+      '  <span class="kb">"error"</span><span class="tk">: </span><span class="vs">"User not found."</span>\n' +
+      '<span class="tk">}</span>',
+
+      // POST /items — handler uses "msg" + "type" — yet another shape
+      '<span class="tk">{</span>\n' +
+      '  <span class="kb">"msg"</span><span class="tk">: </span><span class="vs">"Item already exists."</span><span class="tk">,</span>\n' +
+      '  <span class="kb">"type"</span><span class="tk">: </span><span class="vs">"conflict"</span>\n' +
+      '<span class="tk">}</span>',
+    ],
+    central: [
+      // All three share the same canonical shape: code + message
+      '<span class="tk">{</span>\n' +
+      '  <span class="ko">"code"</span><span class="tk">: </span><span class="vs">"account_already_exists"</span><span class="tk">,</span>\n' +
+      '  <span class="ko">"message"</span><span class="tk">: </span><span class="vs">"An account with that email already exists."</span>\n' +
+      '<span class="tk">}</span>',
+
+      '<span class="tk">{</span>\n' +
+      '  <span class="ko">"code"</span><span class="tk">: </span><span class="vs">"user_not_found"</span><span class="tk">,</span>\n' +
+      '  <span class="ko">"message"</span><span class="tk">: </span><span class="vs">"No user with that ID was found."</span>\n' +
+      '<span class="tk">}</span>',
+
+      '<span class="tk">{</span>\n' +
+      '  <span class="ko">"code"</span><span class="tk">: </span><span class="vs">"item_already_exists"</span><span class="tk">,</span>\n' +
+      '  <span class="ko">"message"</span><span class="tk">: </span><span class="vs">"An item with that key already exists."</span>\n' +
+      '<span class="tk">}</span>',
+    ],
+  };
+
+  function show(mode) {
+    var isAdhoc = mode === 'adhoc';
+
+    document.getElementById('btn-a').classList.toggle('on', isAdhoc);
+    document.getElementById('btn-c').classList.toggle('on', !isAdhoc);
+
+    var pill = document.getElementById('banner-pill');
+    if (isAdhoc) {
+      pill.innerHTML = '&#x26A0; 3 endpoints &middot; 3 different shapes';
+      pill.className = 'banner-pill bad';
+    } else {
+      pill.innerHTML = '&#x2713; 3 endpoints &middot; 1 consistent shape';
+      pill.className = 'banner-pill good';
+    }
+
+    for (var i = 0; i < 3; i++) {
+      document.getElementById('pre-' + i).innerHTML = B[mode][i];
+      var card = document.getElementById('card-' + i);
+      var icon = document.getElementById('icon-' + i);
+      if (isAdhoc) {
+        card.style.borderColor = 'rgba(222,76,69,0.35)';
+        icon.innerHTML = '&#x26A0;';
+        icon.style.color = '#DE4C45';
+      } else {
+        card.style.borderColor = 'rgba(50,143,81,0.35)';
+        icon.innerHTML = '&#x2713;';
+        icon.style.color = '#328F51';
+      }
+    }
+
+    var co = document.getElementById('callout');
+    if (isAdhoc) {
+      co.className = 'callout bad';
+      co.innerHTML =
+        '<span class="callout-ico">&#x26A0;</span>' +
+        '<span>Three endpoints, three different body shapes &mdash; a client cannot write one reliable code path to handle all of them.</span>';
+    } else {
+      co.className = 'callout good';
+      co.innerHTML =
+        '<span class="callout-ico">&#x2713;</span>' +
+        '<span>One exception handler formats every error. All three responses share the same shape: <code>code</code> and <code>message</code>, always. A client handles them identically regardless of which endpoint sent them.</span>';
+    }
+  }
+
+  // Start on the problem side so learners see the drift first
+  show('adhoc');
+</script>
+</body>
+</html>

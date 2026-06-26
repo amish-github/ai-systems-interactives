@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Queues, Backpressure, and Load Shedding</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.outer {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.inner {
+  padding: 24px 16px 36px;
+}
+
+/* ── Hint header ── */
+.hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+.hint-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  animation: wiggle 4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+@keyframes wiggle {
+  0%, 55%, 100% { transform: rotate(0deg); }
+  10%  { transform: rotate(-10deg); }
+  20%  { transform: rotate(10deg); }
+  30%  { transform: rotate(-8deg); }
+  40%  { transform: rotate(6deg); }
+  50%  { transform: rotate(-3deg); }
+}
+
+/* ── Simulation card ── */
+.sim-card {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 20px 16px 16px;
+  margin-bottom: 12px;
+}
+
+/* ── Flow row ── */
+.flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.producers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.prod-chip {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: 'Suisse Intl Mono', monospace;
+  text-align: center;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color .2s, color .2s, background .2s;
+  white-space: nowrap;
+}
+.prod-chip .sub {
+  display: block;
+  font-size: 11px;
+  color: rgba(0,0,0,0.40);
+  margin-top: 2px;
+  transition: color .2s;
+}
+.prod-chip.throttled {
+  border-color: #D35722;
+  background: #FFF5EE;
+  color: #D35722;
+}
+.prod-chip.throttled .sub { color: #D35722; }
+
+.flow-arrow {
+  color: rgba(0,0,0,0.30);
+  font-size: 20px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* Queue section */
+.queue-section {
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+}
+.queue-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.queue-meta-label {
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+}
+.queue-meta-num {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+}
+
+.queue-bar-outer {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.queue-cells {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  align-items: stretch;
+}
+.qcell {
+  flex: 1;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.06);
+  transition: background .12s;
+}
+.qcell.c-blue   { background: #1878DC; }
+.qcell.c-orange { background: #F48E00; }
+.qcell.c-red    { background: #DE4C45; }
+
+/* Consumer chip */
+.consumer-chip {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: 'Suisse Intl Mono', monospace;
+  text-align: center;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  flex-shrink: 0;
+  transition: border-color .2s, color .2s;
+  white-space: nowrap;
+}
+.consumer-chip .sub {
+  display: block;
+  font-size: 11px;
+  color: rgba(0,0,0,0.40);
+  margin-top: 2px;
+  transition: color .2s;
+}
+.consumer-chip.busy {
+  border-color: #328F51;
+  color: #328F51;
+}
+.consumer-chip.busy .sub { color: #328F51; }
+
+/* ── Signal rows ── */
+.signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 26px;
+  font-size: 13px;
+  transition: opacity .25s;
+}
+.signal-row.off { opacity: 0; pointer-events: none; }
+.signal-row.on  { opacity: 1; }
+
+.bp-arrows {
+  color: #D35722;
+  font-size: 14px;
+  animation: blink 0.85s ease-in-out infinite;
+}
+.bp-label { color: #D35722; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.25; }
+}
+
+.shed-note { color: rgba(0,0,0,0.45); font-size: 13px; }
+.shed-badge {
+  background: #DE4C45;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+/* ── Status banner ── */
+.banner {
+  background: rgba(0,0,0,0.05);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+  text-align: center;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  transition: background .25s, color .25s;
+  line-height: 1.4;
+}
+.banner.good   { background: #EDF7F1; color: #1A5C2E; }
+.banner.warn   { background: #FFF4EB; color: #8B3A0A; }
+.banner.danger { background: #FEF0F0; color: #8B1A1A; }
+
+/* ── Toggles ── */
+.toggles {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.toggle-card {
+  flex: 1;
+  min-width: 200px;
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color .15s, background .15s;
+}
+.toggle-card:hover { border-color: rgba(0,0,0,0.25); }
+.toggle-card.on { border-color: #1878DC; background: #F0F6FF; }
+
+.pill {
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: rgba(0,0,0,0.14);
+  position: relative;
+  flex-shrink: 0;
+  transition: background .15s;
+}
+.pill::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform .15s;
+}
+.toggle-card.on .pill { background: #1878DC; }
+.toggle-card.on .pill::after { transform: translateX(18px); }
+
+.toggle-text strong { display: block; font-size: 15px; }
+.toggle-text span   { font-size: 13px; color: rgba(0,0,0,0.50); }
+
+/* ── Stats ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.stat {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  padding: 8px 4px;
+  text-align: center;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.stat-val {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 22px;
+  line-height: 1.1;
+  color: #1A1A1A;
+  transition: color .2s;
+}
+.stat-val.g { color: #328F51; }
+.stat-val.w { color: #D35722; }
+.stat-val.r { color: #DE4C45; }
+.stat-lbl {
+  font-size: 11px;
+  color: rgba(0,0,0,0.45);
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+/* ── Buttons ── */
+.btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  align-items: center;
+}
+.btn {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: opacity .15s, transform .1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary   { background: #1A1A1A; color: #FFFFFF; }
+.btn-secondary { background: #F2F1EE; color: #1A1A1A; border: 1.5px solid rgba(0,0,0,0.14); }
+.btn-burst     { background: #D35722; color: #FFFFFF; }
+.btn:hover     { opacity: 0.82; }
+
+/* ── Sliders ── */
+.sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+}
+.slider-label { width: 104px; flex-shrink: 0; }
+.slider-row input[type=range] {
+  flex: 1;
+  accent-color: #1878DC;
+  cursor: pointer;
+}
+.slider-val {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 460px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 400px) {
+  .flow { flex-wrap: wrap; justify-content: flex-start; }
+  .queue-section { max-width: 100%; flex-basis: 100%; order: 3; }
+  .flow-arrow:first-of-type { display: none; }
+  .flow-arrow:last-of-type  { display: none; }
+  .producers { flex-direction: row; }
+  .prod-chip { flex: 1; }
+}
+@media (max-width: 360px) {
+  .inner { padding: 16px 12px 28px; }
+  .toggles { flex-direction: column; }
+  .toggle-card { min-width: 0; }
+}
+</style>
+</head>
+<body>
+<div class="outer">
+<div class="inner">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Start the simulation, then toggle backpressure and load shedding to see how each defense layer changes the outcome when arrivals outpace processing.</span>
+  </div>
+
+  <!-- Simulation card -->
+  <div class="sim-card">
+
+    <!-- Flow diagram: Producers → Queue → Consumer -->
+    <div class="flow">
+      <div class="producers">
+        <div class="prod-chip" id="p1">Producer 1<span class="sub" id="p1-sub">—</span></div>
+        <div class="prod-chip" id="p2">Producer 2<span class="sub" id="p2-sub">—</span></div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="queue-section">
+        <div class="queue-meta">
+          <span class="queue-meta-label">Queue (max 20)</span>
+          <span class="queue-meta-num"><span id="qdepth">0</span>/20</span>
+        </div>
+        <div class="queue-bar-outer">
+          <div class="queue-cells" id="qcells"></div>
+        </div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="consumer-chip" id="consumer">Consumer<span class="sub" id="consumer-sub">idle</span></div>
+    </div>
+
+    <!-- Backpressure signal (shown when BP is active) -->
+    <div class="signal-row off" id="bp-row">
+      <span class="bp-arrows">◀◀◀</span>
+      <span class="bp-label">backpressure: slow down</span>
+    </div>
+
+    <!-- Load shedding signal (shown when items have been shed) -->
+    <div class="signal-row off" id="shed-row">
+      <span class="shed-note">queue full →</span>
+      <span class="shed-badge" id="shed-badge">0 shed</span>
+      <span class="shed-note">low-priority dropped</span>
+    </div>
+
+    <!-- Status banner -->
+    <div class="banner" id="banner">Press Start to begin. The default rates show a persistent overload scenario.</div>
+
+  </div><!-- /.sim-card -->
+
+  <!-- Toggles -->
+  <div class="toggles">
+    <div class="toggle-card" id="tc-bp" onclick="toggleBP()">
+      <div class="pill"></div>
+      <div class="toggle-text">
+        <strong>Backpressure</strong>
+        <span>Throttle producers when queue is &ge;75% full</span>
+      </div>
+    </div>
+    <div class="toggle-card" id="tc-shed" onclick="toggleShed()">
+      <div class="pill"></div>
+      <div class="toggle-text">
+        <strong>Load shedding</strong>
+        <span>Drop low-priority work when queue is full</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-val" id="sv-served">0</div>
+      <div class="stat-lbl">Served</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="sv-rejected">0</div>
+      <div class="stat-lbl">Rejected (full)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="sv-shed">0</div>
+      <div class="stat-lbl">Shed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="sv-wait">—</div>
+      <div class="stat-lbl">Avg wait</div>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btns">
+    <button class="btn btn-primary"   id="btn-start" onclick="toggleRun()">Start</button>
+    <button class="btn btn-secondary"               onclick="doReset()">Reset</button>
+    <button class="btn btn-burst"                   onclick="doBurst()">Send burst</button>
+  </div>
+
+  <!-- Sliders -->
+  <div class="sliders">
+    <div class="slider-row">
+      <span class="slider-label">Arrival rate</span>
+      <input type="range" min="1" max="20" value="8" id="sl-arrive" oninput="setArrival(+this.value)">
+      <span class="slider-val" id="lbl-arrive">8/s</span>
+    </div>
+    <div class="slider-row">
+      <span class="slider-label">Process rate</span>
+      <input type="range" min="1" max="20" value="4" id="sl-process" oninput="setProcess(+this.value)">
+      <span class="slider-val" id="lbl-process">4/s</span>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ─── Constants ───────────────────────────────────────────────────────────────
+const Q_MAX     = 20;
+const BP_THRESH = 0.75;   // backpressure fires above this fill fraction
+const TICK_MS   = 250;    // simulation tick in ms (4 ticks/sec)
+
+// ─── Simulation state ────────────────────────────────────────────────────────
+let running       = false;
+let timer         = null;
+let tickCount     = 0;
+let queue         = [];   // {id, priority:'high'|'low', tick}
+let jid           = 0;
+let accumArrive   = 0;
+let accumProcess  = 0;
+let totalServed   = 0;
+let totalRejected = 0;
+let totalShed     = 0;
+let totalWaitTicks = 0;
+let waitSamples   = 0;
+let bpOn          = false;
+let shedOn        = false;
+let arrRate       = 8;
+let procRate      = 4;
+let burstCooldown = 0;
+
+// ─── Build queue cells ───────────────────────────────────────────────────────
+(function () {
+  const row = document.getElementById('qcells');
+  for (let i = 0; i < Q_MAX; i++) {
+    const d = document.createElement('div');
+    d.className = 'qcell';
+    d.id = 'qc' + i;
+    row.appendChild(d);
+  }
+}());
+
+// ─── Simulation tick ─────────────────────────────────────────────────────────
+function step() {
+  tickCount++;
+  if (burstCooldown > 0) burstCooldown--;
+
+  const fill      = queue.length / Q_MAX;
+  const bpActive  = bpOn && fill >= BP_THRESH;
+
+  // Effective arrival rate (backpressure linearly reduces up to 85% at full queue)
+  let effArrival = arrRate;
+  if (bpActive) {
+    const excess   = (fill - BP_THRESH) / (1 - BP_THRESH); // 0→1
+    effArrival     = arrRate * (1 - 0.85 * excess);
+  }
+
+  const sec = TICK_MS / 1000;
+  accumArrive  += effArrival * sec;
+  accumProcess += procRate   * sec;
+
+  const newJobs  = Math.floor(accumArrive);   accumArrive  -= newJobs;
+  const doneJobs = Math.floor(accumProcess);  accumProcess -= doneJobs;
+
+  // Enqueue arrivals (or reject / shed)
+  for (let i = 0; i < newJobs; i++) {
+    // 65% of incoming work is high-priority, 35% low-priority
+    const priority = (Math.random() < 0.65) ? 'high' : 'low';
+    if (queue.length < Q_MAX) {
+      queue.push({ id: jid++, priority, tick: tickCount });
+    } else if (shedOn) {
+      const li = firstLowPri();
+      if (li >= 0) {
+        queue.splice(li, 1);
+        totalShed++;
+        queue.push({ id: jid++, priority, tick: tickCount });
+      } else {
+        totalRejected++;   // queue full of high-priority, reject new arrival
+      }
+    } else {
+      totalRejected++;
+    }
+  }
+
+  // Process (drain from front of queue)
+  for (let i = 0; i < doneJobs && queue.length > 0; i++) {
+    const job = queue.shift();
+    totalServed++;
+    totalWaitTicks += (tickCount - job.tick);
+    waitSamples++;
+  }
+
+  render();
+}
+
+function firstLowPri() {
+  for (let i = 0; i < queue.length; i++) {
+    if (queue[i].priority === 'low') return i;
+  }
+  return -1;
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function render() {
+  const depth    = queue.length;
+  const fill     = depth / Q_MAX;
+  const bpActive = bpOn && fill >= BP_THRESH;
+
+  // Queue cells
+  for (let i = 0; i < Q_MAX; i++) {
+    const cell = document.getElementById('qc' + i);
+    if (i >= depth) {
+      cell.className = 'qcell';
+    } else if (fill >= 0.9) {
+      cell.className = 'qcell c-red';
+    } else if (fill >= BP_THRESH) {
+      cell.className = 'qcell c-orange';
+    } else {
+      cell.className = 'qcell c-blue';
+    }
+  }
+  document.getElementById('qdepth').textContent = depth;
+
+  // Producer chips
+  const p1  = document.getElementById('p1');
+  const p1s = document.getElementById('p1-sub');
+  const p2  = document.getElementById('p2');
+  const p2s = document.getElementById('p2-sub');
+
+  if (!running) {
+    p1.className = 'prod-chip'; p1s.textContent = '—';
+    p2.className = 'prod-chip'; p2s.textContent = '—';
+  } else if (bpActive) {
+    p1.className = 'prod-chip throttled'; p1s.textContent = 'throttled ↓';
+    p2.className = 'prod-chip throttled'; p2s.textContent = 'throttled ↓';
+  } else {
+    p1.className = 'prod-chip'; p1s.textContent = Math.ceil(arrRate / 2) + '/s';
+    p2.className = 'prod-chip'; p2s.textContent = Math.floor(arrRate / 2) + '/s';
+  }
+
+  // Consumer chip
+  const cons  = document.getElementById('consumer');
+  const consS = document.getElementById('consumer-sub');
+  if (running && depth > 0) {
+    cons.className = 'consumer-chip busy';
+    consS.textContent = procRate + '/s';
+  } else {
+    cons.className = 'consumer-chip';
+    consS.textContent = running ? 'waiting' : 'idle';
+  }
+
+  // Backpressure signal row
+  document.getElementById('bp-row').className =
+    'signal-row ' + (running && bpActive ? 'on' : 'off');
+
+  // Load shedding signal row
+  document.getElementById('shed-badge').textContent = totalShed + ' shed';
+  document.getElementById('shed-row').className =
+    'signal-row ' + (shedOn && totalShed > 0 ? 'on' : 'off');
+
+  // Stats
+  const avgWaitMs = waitSamples > 0
+    ? Math.round((totalWaitTicks * TICK_MS) / waitSamples) : 0;
+
+  setStatVal('sv-served',   totalServed,   totalServed   > 0 ? 'g' : '');
+  setStatVal('sv-rejected', totalRejected, totalRejected > 0 ? 'r' : '');
+  setStatVal('sv-shed',     totalShed,     totalShed     > 0 ? 'w' : '');
+
+  const wEl = document.getElementById('sv-wait');
+  wEl.textContent = avgWaitMs > 0
+    ? (avgWaitMs >= 1000 ? (avgWaitMs / 1000).toFixed(1) + 's' : avgWaitMs + 'ms') : '—';
+  wEl.className = 'stat-val' +
+    (avgWaitMs > 3000 ? ' r' : avgWaitMs > 1000 ? ' w' : '');
+
+  updateBanner();
+}
+
+function setStatVal(id, val, cls) {
+  const el = document.getElementById(id);
+  el.textContent = val;
+  el.className = 'stat-val' + (cls ? ' ' + cls : '');
+}
+
+function updateBanner() {
+  const el    = document.getElementById('banner');
+  const depth = queue.length;
+  const fill  = depth / Q_MAX;
+  const bpActive = bpOn && fill >= BP_THRESH;
+
+  let text = '', cls = '';
+
+  if (!running && tickCount === 0) {
+    text = 'Press Start to begin. The default rates show a persistent overload scenario.';
+  } else if (!running) {
+    text = 'Paused.';
+  } else if (arrRate <= procRate) {
+    text = 'Queue is draining — arrival rate ≤ process rate. Try raising arrivals to see overload.';
+    cls = 'good';
+  } else if (fill < BP_THRESH) {
+    text = 'Queue filling — producers (' + arrRate + '/s) are faster than the consumer (' + procRate + '/s). Watch what happens.';
+  } else if (bpActive && fill < 1.0) {
+    text = 'Backpressure active — producers are being throttled. The queue is stabilizing.';
+    cls = 'warn';
+  } else if (fill >= 1.0 && shedOn) {
+    text = 'Queue at limit — low-priority work is being shed so high-priority requests still get through.';
+    cls = 'warn';
+  } else if (fill >= 1.0 && !bpOn && !shedOn) {
+    text = 'Queue full — new requests are rejected. Turn on a defense layer and compare.';
+    cls = 'danger';
+  } else if (totalRejected > 0) {
+    text = totalRejected + ' requests rejected. Enable backpressure or load shedding and Reset to compare.';
+    cls = 'danger';
+  } else {
+    text = 'Running — arrival: ' + arrRate + '/s · processing: ' + procRate + '/s';
+  }
+
+  el.textContent = text;
+  el.className = 'banner' + (cls ? ' ' + cls : '');
+}
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+function toggleRun() {
+  running = !running;
+  const btn = document.getElementById('btn-start');
+  if (running) {
+    btn.textContent = 'Pause';
+    timer = setInterval(step, TICK_MS);
+  } else {
+    btn.textContent = 'Resume';
+    clearInterval(timer);
+    render();
+  }
+}
+
+function doReset() {
+  clearInterval(timer);
+  running = false;
+  timer = null;
+  queue = [];
+  tickCount = 0; jid = 0;
+  accumArrive = 0; accumProcess = 0;
+  totalServed = 0; totalRejected = 0; totalShed = 0;
+  totalWaitTicks = 0; waitSamples = 0;
+  burstCooldown = 0;
+  document.getElementById('btn-start').textContent = 'Start';
+  render();
+}
+
+function doBurst() {
+  if (burstCooldown > 0) return;
+
+  const fill     = queue.length / Q_MAX;
+  const bpActive = bpOn && fill >= BP_THRESH;
+  const BURST    = 14;
+  let added = 0, blocked = 0, rejected = 0, shed = 0;
+
+  for (let i = 0; i < BURST; i++) {
+    // Backpressure blocks 80% of burst items
+    if (bpActive && Math.random() < 0.80) { blocked++; continue; }
+
+    const priority = (Math.random() < 0.5) ? 'high' : 'low';
+    if (queue.length < Q_MAX) {
+      queue.push({ id: jid++, priority, tick: tickCount });
+      added++;
+    } else if (shedOn) {
+      const li = firstLowPri();
+      if (li >= 0) {
+        queue.splice(li, 1); shed++; totalShed++;
+        queue.push({ id: jid++, priority, tick: tickCount });
+        added++;
+      } else {
+        rejected++; totalRejected++;
+      }
+    } else {
+      rejected++; totalRejected++;
+    }
+  }
+
+  burstCooldown = 5;
+  render();
+
+  // Override banner with burst result
+  const el = document.getElementById('banner');
+  if (bpActive) {
+    el.textContent = 'Burst of ' + BURST + ' — backpressure blocked ' + blocked + ', only ' + added + ' entered the queue.';
+    el.className = 'banner warn';
+  } else if (shed > 0) {
+    el.textContent = 'Burst of ' + BURST + ' — load shedding cleared ' + shed + ' low-priority jobs to make room for ' + added + ' new ones.';
+    el.className = 'banner warn';
+  } else if (rejected > 0) {
+    el.textContent = 'Burst of ' + BURST + ' — queue full, ' + rejected + ' requests rejected immediately.';
+    el.className = 'banner danger';
+  } else {
+    el.textContent = 'Burst of ' + BURST + ' jobs added to queue.';
+    el.className = 'banner';
+  }
+}
+
+function toggleBP() {
+  bpOn = !bpOn;
+  document.getElementById('tc-bp').classList.toggle('on', bpOn);
+  render();
+}
+
+function toggleShed() {
+  shedOn = !shedOn;
+  document.getElementById('tc-shed').classList.toggle('on', shedOn);
+  render();
+}
+
+function setArrival(v) {
+  arrRate = v;
+  document.getElementById('lbl-arrive').textContent = v + '/s';
+}
+
+function setProcess(v) {
+  procRate = v;
+  document.getElementById('lbl-process').textContent = v + '/s';
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>

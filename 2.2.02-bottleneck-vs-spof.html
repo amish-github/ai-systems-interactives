@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bottleneck vs. Single Point of Failure</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .hint-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+    @keyframes cursor-wiggle {
+      0%, 60%, 100% { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+    }
+    .hint-text { font-size: 18px; line-height: 1.3; }
+
+    /* Pass selector */
+    .pass-selector {
+      display: flex;
+      gap: 8px;
+      padding: 20px 20px 0;
+    }
+    .pass-btn {
+      flex: 1;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      padding: 12px 16px;
+      background: #F2F1EE;
+      cursor: pointer;
+      font-family: inherit;
+      color: rgba(0,0,0,0.45);
+      text-align: left;
+      transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    }
+    .pass-btn .btn-title {
+      font-size: 16px;
+      display: block;
+    }
+    .pass-btn .btn-sub {
+      font-size: 13px;
+      display: block;
+      margin-top: 2px;
+      color: rgba(0,0,0,0.35);
+    }
+    .pass-btn:hover { background: #eae9e4; color: #1A1A1A; }
+    .pass-btn.active {
+      background: #FFFFFF;
+      color: #1A1A1A;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .pass-btn.active .btn-sub { color: rgba(0,0,0,0.45); }
+    #btn-capacity.active   { border-color: #1878DC; }
+    #btn-redundancy.active { border-color: #D35722; }
+
+    /* Description */
+    .pass-desc {
+      padding: 12px 20px 0;
+      font-size: 15px;
+      color: rgba(0,0,0,0.55);
+      line-height: 1.5;
+    }
+    .pass-desc strong { color: #1A1A1A; }
+
+    /* Components list */
+    .components {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 20px 0;
+    }
+
+    .component-card {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #FFFFFF;
+      transition: border-color 0.22s, background 0.22s;
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .c-name { font-size: 16px; }
+
+    .badge {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+    .badge-bottleneck { background: #DE4C45; color: #fff; }
+    .badge-spof       { background: #D35722; color: #fff; }
+    .badge-redundant  { background: #328F51; color: #fff; }
+
+    /* Gauge */
+    .gauge-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gauge-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%;
+      border-radius: 4px;
+      transform-origin: left center;
+      animation: fill-bar 0.5s ease-out;
+    }
+    @keyframes fill-bar {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+    .gauge-pct {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      min-width: 40px;
+      text-align: right;
+    }
+    .gauge-label {
+      font-size: 13px;
+      color: rgba(0,0,0,0.4);
+      margin-top: 4px;
+    }
+
+    /* Redundancy row */
+    .redund-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .redund-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .redund-note {
+      font-size: 14px;
+      color: rgba(0,0,0,0.55);
+    }
+
+    /* Highlighted card states */
+    .card-bottleneck { border-color: #DE4C45 !important; background: #FFF5F5 !important; }
+    .card-spof       { border-color: #D35722 !important; background: #FFF8F3 !important; }
+    .card-redundant  { border-color: rgba(50,143,81,0.35) !important; }
+
+    /* Summary */
+    .summary {
+      margin: 12px 20px 24px;
+      padding: 16px;
+      border-radius: 12px;
+      background: #F2F1EE;
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.6;
+    }
+    .summary em { font-style: normal; font-weight: 600; }
+
+    @media (max-width: 400px) {
+      .pass-btn { padding: 10px 10px; }
+      .pass-btn .btn-title { font-size: 14px; }
+      .pass-btn .btn-sub   { font-size: 12px; }
+    }
+    @media (max-width: 325px) {
+      .hint-header,
+      .pass-selector,
+      .components,
+      .pass-desc,
+      .summary { padding-left: 12px; padding-right: 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-header">
+    <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Switch between passes to reveal different risks in the same system.</span>
+  </div>
+
+  <div class="pass-selector">
+    <button class="pass-btn active" id="btn-capacity" onclick="setPass('capacity')">
+      <span class="btn-title">Pass 1 — Capacity</span>
+      <span class="btn-sub">Find the bottleneck</span>
+    </button>
+    <button class="pass-btn" id="btn-redundancy" onclick="setPass('redundancy')">
+      <span class="btn-title">Pass 2 — Redundancy</span>
+      <span class="btn-sub">Find single points of failure</span>
+    </button>
+  </div>
+
+  <div class="pass-desc" id="pass-desc"></div>
+  <div class="components" id="components"></div>
+  <div class="summary" id="summary"></div>
+
+</div>
+<script>
+  var components = [
+    {
+      name: "Load Balancer",
+      resource: "connection rate",
+      loadPct: 38,
+      hasRedundancy: true,
+      redundancyNote: "Active–active pair"
+    },
+    {
+      name: "App Servers",
+      resource: "CPU threads",
+      loadPct: 64,
+      hasRedundancy: true,
+      redundancyNote: "Cluster of 4 instances"
+    },
+    {
+      name: "DB Connection Pool",
+      resource: "connection slots",
+      loadPct: 98,
+      hasRedundancy: false,
+      redundancyNote: "Single instance — no replica ready"
+    },
+    {
+      name: "Config Service",
+      resource: "CPU",
+      loadPct: 12,
+      hasRedundancy: false,
+      redundancyNote: "Single instance — no backup"
+    },
+    {
+      name: "Cache",
+      resource: "memory bandwidth",
+      loadPct: 54,
+      hasRedundancy: true,
+      redundancyNote: "Primary + read replica"
+    }
+  ];
+
+  var descs = {
+    capacity: "Trace estimated load through each component and compare it to capacity. The first resource to saturate is the <strong>bottleneck</strong> — the binding constraint on throughput.",
+    redundancy: "Ask a separate question: if this component failed right now, could the system keep serving traffic? Every component with no backup is a <strong>single point of failure</strong>."
+  };
+
+  var summaries = {
+    capacity: "The <em>DB connection pool</em> saturates first at 98% — it is the <em>bottleneck</em>. The other components have room to spare, so adding capacity anywhere else does not improve throughput.",
+    redundancy: "Two single points of failure: the <em>DB connection pool</em> and the <em>Config Service</em>. The Config Service runs at only 12% CPU — it is nowhere near the bottleneck — but it has no backup. A separate redundancy pass is the only way to catch it."
+  };
+
+  function gaugeColor(pct, isBottleneck) {
+    if (isBottleneck) return '#DE4C45';
+    if (pct >= 70) return '#F48E00';
+    return '#1878DC';
+  }
+
+  function render(pass) {
+    var bottleneckIdx = 0;
+    components.forEach(function(c, i) {
+      if (c.loadPct > components[bottleneckIdx].loadPct) bottleneckIdx = i;
+    });
+
+    document.getElementById('pass-desc').innerHTML = descs[pass];
+    document.getElementById('summary').innerHTML = summaries[pass];
+
+    var html = components.map(function(c, i) {
+      var isBottleneck = (i === bottleneckIdx);
+      var isSPOF = !c.hasRedundancy;
+      var cardClass = 'component-card';
+      var badgeHtml = '';
+      var bodyHtml = '';
+
+      if (pass === 'capacity') {
+        if (isBottleneck) {
+          cardClass += ' card-bottleneck';
+          badgeHtml = '<span class="badge badge-bottleneck">Bottleneck</span>';
+        }
+        var color = gaugeColor(c.loadPct, isBottleneck);
+        bodyHtml = '<div class="gauge-row">'
+          + '<div class="gauge-track"><div class="gauge-fill" style="width:' + c.loadPct + '%; background:' + color + ';"></div></div>'
+          + '<span class="gauge-pct" style="color:' + color + '">' + c.loadPct + '%</span>'
+          + '</div>'
+          + '<div class="gauge-label">' + c.resource + '</div>';
+      } else {
+        if (isSPOF) {
+          cardClass += ' card-spof';
+          badgeHtml = '<span class="badge badge-spof">SPOF</span>';
+        } else {
+          cardClass += ' card-redundant';
+          badgeHtml = '<span class="badge badge-redundant">Redundant</span>';
+        }
+        var dotColor = c.hasRedundancy ? '#328F51' : '#D35722';
+        bodyHtml = '<div class="redund-row">'
+          + '<div class="redund-dot" style="background:' + dotColor + '"></div>'
+          + '<span class="redund-note">' + c.redundancyNote + '</span>'
+          + '</div>';
+      }
+
+      return '<div class="' + cardClass + '">'
+        + '<div class="card-top">'
+        + '<span class="c-name">' + c.name + '</span>'
+        + badgeHtml
+        + '</div>'
+        + bodyHtml
+        + '</div>';
+    }).join('');
+
+    document.getElementById('components').innerHTML = html;
+  }
+
+  function setPass(pass) {
+    document.getElementById('btn-capacity').classList.toggle('active', pass === 'capacity');
+    document.getElementById('btn-redundancy').classList.toggle('active', pass === 'redundancy');
+    render(pass);
+  }
+
+  render('capacity');
+</script>
+</body>
+</html>

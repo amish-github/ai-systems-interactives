@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Latency vs Throughput</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* Hint header */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 20px 24px 12px;
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    .hint .icon {
+      flex-shrink: 0;
+      animation: wiggle 4s ease-in-out infinite;
+      display: inline-block;
+    }
+
+    @keyframes wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .body {
+      padding: 0 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @media (max-width: 500px) {
+      .hint { padding: 16px 16px 12px; font-size: 16px; }
+      .body { padding: 0 16px 24px; }
+    }
+
+    /* Slider cards */
+    .sliders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 460px) {
+      .sliders { grid-template-columns: 1fr; }
+    }
+
+    .sc {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .sc-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+    }
+
+    .sc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sc-num {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 18px;
+      min-width: 68px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .lat-card .sc-num { color: #1878DC; }
+    .tput-card .sc-num { color: #328F51; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(0,0,0,0.14);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .lat-card input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #1878DC; cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .lat-card input[type=range]::-moz-range-thumb {
+      width: 20px; height: 20px; border: none; border-radius: 50%;
+      background: #1878DC; cursor: pointer;
+    }
+
+    .tput-card input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #328F51; cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .tput-card input[type=range]::-moz-range-thumb {
+      width: 20px; height: 20px; border: none; border-radius: 50%;
+      background: #328F51; cursor: pointer;
+    }
+
+    /* Pipeline canvas */
+    .pipeline {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 12px 16px 16px;
+    }
+
+    .pip-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 8px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+    }
+
+    /* Metrics row */
+    .metrics {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+    }
+
+    .m { flex: 1; text-align: center; }
+
+    .m-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+
+    .m-val {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 22px;
+      margin-bottom: 4px;
+      transition: color 0.25s;
+    }
+
+    .m-sub { font-size: 12px; color: rgba(0,0,0,0.40); }
+
+    .m.lat .m-val { color: #1878DC; }
+    .m.tput .m-val { color: #328F51; }
+    .m.inf .m-val { color: #D35722; }
+
+    .op {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 22px;
+      color: rgba(0,0,0,0.22);
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+
+    /* Little's Law note */
+    .formula {
+      text-align: center;
+      font-size: 14px;
+      color: rgba(0,0,0,0.40);
+      margin-top: -4px;
+    }
+
+    /* Quadrant insight card */
+    .insight {
+      border-radius: 12px;
+      padding: 16px 20px;
+      border: 1.5px solid rgba(0,0,0,0.10);
+      transition: border-color 0.3s ease, background 0.3s ease;
+    }
+
+    .ins-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .ins-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+
+    .ins-q {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: color 0.3s;
+    }
+
+    .ins-text {
+      font-size: 16px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="hint">
+    <span class="icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Drag the sliders — watch latency and throughput move independently
+  </div>
+
+  <div class="body">
+
+    <div class="sliders">
+      <div class="sc lat-card">
+        <div class="sc-label">Latency per request</div>
+        <div class="sc-row">
+          <input type="range" id="lat" min="50" max="1000" step="10" value="200">
+          <span class="sc-num" id="lat-val">200 ms</span>
+        </div>
+      </div>
+      <div class="sc tput-card">
+        <div class="sc-label">Throughput</div>
+        <div class="sc-row">
+          <input type="range" id="tput" min="1" max="30" step="1" value="8">
+          <span class="sc-num" id="tput-val">8 req/s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pipeline">
+      <div class="pip-labels">
+        <span>&#8592; request enters</span>
+        <span>request completes &#8594;</span>
+      </div>
+      <canvas id="c" height="64"></canvas>
+    </div>
+
+    <div class="metrics">
+      <div class="m lat">
+        <div class="m-label">Latency</div>
+        <div class="m-val" id="m-lat">200 ms</div>
+        <div class="m-sub">per request</div>
+      </div>
+      <div class="op">&times;</div>
+      <div class="m tput">
+        <div class="m-label">Throughput</div>
+        <div class="m-val" id="m-tput">8 /s</div>
+        <div class="m-sub">requests/sec</div>
+      </div>
+      <div class="op">=</div>
+      <div class="m inf">
+        <div class="m-label">In-flight</div>
+        <div class="m-val" id="m-inf">1.6</div>
+        <div class="m-sub">active requests</div>
+      </div>
+    </div>
+
+    <div class="formula">Little's Law&nbsp;&nbsp;&mdash;&nbsp;&nbsp;in-flight = throughput &times; latency</div>
+
+    <div class="insight" id="ins">
+      <div class="ins-head">
+        <div class="ins-dot" id="ins-dot"></div>
+        <div class="ins-q" id="ins-q"></div>
+      </div>
+      <div class="ins-text" id="ins-text"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const cvs = document.getElementById('c');
+  const ctx = cvs.getContext('2d');
+
+  let latMs = 200;
+  let tputRps = 8;
+  let reqs = [];
+  let spawnAcc = 0;
+  let lastTs = null;
+
+  function dpr() { return window.devicePixelRatio || 1; }
+  function cW()  { return cvs.offsetWidth; }
+
+  function initCvs() {
+    const d = dpr();
+    const w = cW();
+    if (w === 0) return;
+    cvs.width  = w * d;
+    cvs.height = 64 * d;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(d, d);
+  }
+
+  function rrect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function draw(ts) {
+    if (lastTs === null) lastTs = ts;
+    const dt = Math.min(ts - lastTs, 50);
+    lastTs = ts;
+
+    const W = cW();
+    const H = 64;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Track groove
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    rrect(0, H / 2 - 14, W, 28, 8);
+    ctx.fill();
+
+    // Spawn requests
+    spawnAcc += dt;
+    const si = 1000 / tputRps;
+    while (spawnAcc >= si) {
+      spawnAcc -= si;
+      reqs.push({ t0: ts - spawnAcc, lat: latMs });
+    }
+
+    // Draw and prune completed requests
+    reqs = reqs.filter(function (r) {
+      const progress = (ts - r.t0) / r.lat;
+      if (progress >= 1) return false;
+
+      const x = progress * W;
+      const y = H / 2;
+
+      // Soft glow ring
+      ctx.globalAlpha = 0.20;
+      ctx.fillStyle = '#1878DC';
+      ctx.beginPath();
+      ctx.arc(x, y, 16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Core circle
+      ctx.fillStyle = '#1878DC';
+      ctx.globalAlpha = 0.88;
+      ctx.beginPath();
+      ctx.arc(x, y, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      return true;
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  // Quadrant definitions
+  var QS = [
+    {
+      check: function (l, t) { return l <= 300 && t <= 12; },
+      label: 'Low latency · Low throughput',
+      color: '#1878DC',
+      text: 'Requests return quickly, but the system only handles a small number at a time. Fast but quiet — responsive to each caller, not yet built for high volume.'
+    },
+    {
+      check: function (l, t) { return l <= 300 && t > 12; },
+      label: 'Low latency · High throughput',
+      color: '#328F51',
+      text: 'Requests are fast and the system handles large volume simultaneously. This is the goal for most user-facing products. It is also the hardest combination to build and sustain.'
+    },
+    {
+      check: function (l, t) { return l > 300 && t <= 12; },
+      label: 'High latency · Low throughput',
+      color: '#DE4C45',
+      text: 'Requests are slow and the system handles little volume. This combination usually signals a system in trouble — congested, under-provisioned, or badly tuned.'
+    },
+    {
+      check: function (l, t) { return l > 300 && t > 12; },
+      label: 'High latency · High throughput',
+      color: '#D35722',
+      text: 'Each request is slow, yet the system finishes huge volume in total because many run in parallel. A batch pipeline that processes thousands of long jobs fits here. This is the quadrant that surprises most engineers.'
+    }
+  ];
+
+  function updateUI() {
+    document.getElementById('lat-val').textContent  = latMs + ' ms';
+    document.getElementById('tput-val').textContent = tputRps + ' req/s';
+    document.getElementById('m-lat').textContent    = latMs + ' ms';
+    document.getElementById('m-tput').textContent   = tputRps + ' /s';
+    document.getElementById('m-inf').textContent    = (tputRps * latMs / 1000).toFixed(1);
+
+    var q = null;
+    for (var i = 0; i < QS.length; i++) {
+      if (QS[i].check(latMs, tputRps)) { q = QS[i]; break; }
+    }
+    if (!q) return;
+
+    var ins = document.getElementById('ins');
+    document.getElementById('ins-dot').style.background = q.color;
+    var iq = document.getElementById('ins-q');
+    iq.textContent = q.label;
+    iq.style.color = q.color;
+    document.getElementById('ins-text').textContent = q.text;
+    ins.style.borderColor = q.color + '55';
+    ins.style.background  = q.color + '10';
+  }
+
+  document.getElementById('lat').addEventListener('input', function (e) {
+    latMs = parseInt(e.target.value, 10);
+    updateUI();
+  });
+
+  document.getElementById('tput').addEventListener('input', function (e) {
+    tputRps = parseInt(e.target.value, 10);
+    updateUI();
+  });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(initCvs).observe(cvs);
+  }
+
+  window.addEventListener('load', function () {
+    initCvs();
+    updateUI();
+    requestAnimationFrame(draw);
+  });
+}());
+</script>
+</body>
+</html>

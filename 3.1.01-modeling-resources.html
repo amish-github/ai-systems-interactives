@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Modeling Resources</title>
+<style>
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+
+  :root {
+    --ink:    #1A1A1A;
+    --ink-50: rgba(0,0,0,0.50);
+    --paper:  #FFFFFF;
+    --beige:  #F2F1EE;
+    --border: rgba(0,0,0,0.14);
+    --blue:   #1878DC;
+    --green:  #328F51;
+    --orange: #D35722;
+    --red:    #DE4C45;
+    --yellow: #F48E00;
+    --shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); }
+  body {
+    font-family: 'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+  }
+
+  .viz { width: 100%; max-width: 700px; }
+
+  /* ── hint header ── */
+  .hint { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 20px; }
+  .hint svg { flex-shrink: 0; transform-origin: center center; animation: cursor-wiggle 4s ease-in-out infinite; }
+  .hint p { font-size: 18px; line-height: 1.5; color: var(--ink); margin: 0; }
+  @keyframes cursor-wiggle {
+    0%   { transform: rotate(0);     }
+    2%   { transform: rotate(-10deg);}
+    6%   { transform: rotate(10deg); }
+    10%  { transform: rotate(-8deg); }
+    14%  { transform: rotate(6deg);  }
+    18%  { transform: rotate(-3deg); }
+    22%, 100% { transform: rotate(0); }
+  }
+
+  /* ── segmented control ── */
+  .modebar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .modebar .lbl { font-size: 14px; color: var(--ink-50); }
+  .seg { display: inline-flex; background: var(--beige); border-radius: 10px; padding: 4px; gap: 4px; }
+  .seg button {
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    border: none; background: transparent;
+    padding: 6px 12px; border-radius: 8px; cursor: pointer;
+    transition: background .15s, box-shadow .15s;
+  }
+  .seg button:hover { background: rgba(255,255,255,0.6); }
+  .seg button[aria-pressed="true"] { background: var(--paper); box-shadow: var(--shadow); }
+
+  /* ── endpoint list ── */
+  .elist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+
+  /* ── card wrapper ── */
+  .cw {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: border-color .18s, box-shadow .18s;
+    outline: none;
+  }
+  .cw:hover  { border-color: rgba(0,0,0,0.28); }
+  .cw:focus  { box-shadow: 0 0 0 2px var(--blue); }
+  .cw.open   { border-color: rgba(0,0,0,0.22); }
+
+  /* ── card row ── */
+  .crow { display: flex; align-items: stretch; }
+
+  .cbody { flex: 1; min-width: 0; padding: 12px 16px; }
+  .cdesc { font-size: 14px; color: var(--ink-50); margin-bottom: 4px; }
+  .cpath {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 15px; color: var(--ink);
+    word-break: break-all;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+
+  /* method badges */
+  .mbadge {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 11px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    flex-shrink: 0; letter-spacing: 0.04em;
+  }
+  .m-get    { background: rgba(24,120,220,0.10); color: #1878DC; }
+  .m-post   { background: rgba(50,143,81,0.10);  color: #328F51; }
+  .m-delete { background: rgba(222,76,69,0.10);  color: #DE4C45; }
+  .m-put    { background: rgba(244,142,0,0.10);  color: #F48E00; }
+
+  /* indicator column */
+  .cind {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    width: 44px; flex-shrink: 0; gap: 4px;
+    border-left: 1px solid var(--border);
+    transition: background .18s;
+  }
+  .cind.warn { background: rgba(211,87,34,0.06); color: var(--orange); }
+  .cind.good { background: rgba(50,143,81,0.06);  color: var(--green);  }
+  .cind-icon    { font-size: 16px; line-height: 1; }
+  .cind-chevron { font-size: 10px; opacity: 0.45; transition: transform .2s; }
+  .cw.open .cind-chevron { transform: rotate(180deg); }
+
+  /* ── expansion panel ── */
+  .exp {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.25s ease;
+  }
+  .exp.open { grid-template-rows: 1fr; }
+  .exp-inner { overflow: hidden; }
+  .exp-body {
+    padding: 12px 16px 14px;
+    background: var(--beige);
+    border-top: 1px solid var(--border);
+    font-size: 15px; line-height: 1.55; color: var(--ink);
+  }
+  .exp-rule {
+    margin-top: 8px; font-size: 14px; color: var(--ink-50);
+    display: flex; align-items: flex-start; gap: 6px;
+  }
+  .exp-rule::before { content: '→'; flex-shrink: 0; }
+
+  /* ── principle footer ── */
+  .principle {
+    padding: 14px 16px;
+    background: var(--beige);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 16px; color: var(--ink-50); text-align: center;
+  }
+  .principle strong { color: var(--ink); }
+
+  @media (max-width: 420px) {
+    .hint p { font-size: 16px; }
+    .seg button { font-size: 13px; padding: 6px 10px; }
+    .cbody { padding: 10px 12px; }
+    .cpath { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<div class="viz">
+
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p>Toggle between the two API styles, then click any row to see why.</p>
+  </div>
+
+  <div class="modebar">
+    <span class="lbl">Style:</span>
+    <div class="seg" role="group" aria-label="API design style">
+      <button id="btnAction"   aria-pressed="true" >&#9888; Action-based</button>
+      <button id="btnResource" aria-pressed="false">&#10003; Resource-based</button>
+    </div>
+  </div>
+
+  <div class="elist" id="elist"></div>
+
+  <div class="principle">
+    <strong>The rule:</strong> URL carries the <strong>noun</strong>&nbsp;&nbsp;·&nbsp;&nbsp;HTTP method carries the <strong>verb</strong>
+  </div>
+
+</div>
+<script>
+const data = [
+  {
+    label: 'Create a new order',
+    action: {
+      method: null, path: '/createOrder',
+      explain: 'The verb "create" is baked into the URL. This is a function call, not a resource name. As the API grows, every operation spawns its own endpoint — /updateOrder, /deleteOrder — and nobody can predict the shape of the next one.',
+      rule: 'The URL should name the thing (orders), not the operation to perform.'
+    },
+    resource: {
+      method: 'POST', path: '/orders',
+      explain: 'POST carries the "create" intent. The URL simply names the orders collection. Any developer who knows this endpoint can immediately guess that GET /orders returns the full list.',
+      rule: 'One noun, five HTTP methods — that is the full vocabulary for a REST resource.'
+    }
+  },
+  {
+    label: 'Fetch a specific user',
+    action: {
+      method: 'GET', path: '/getUserById',
+      explain: '"getUser" is a function name, not a resource name. "ById" leaks an internal detail — the client should not know or care how the server finds the record.',
+      rule: 'Replace the verb with a noun and put the identifier in the path.'
+    },
+    resource: {
+      method: 'GET', path: '/users/{id}',
+      explain: 'The noun is "user." The identifier belongs in the path. GET expresses the intent to read. No function names, no lookup details, no surprises.',
+      rule: 'Once a developer learns /users/{id}, they can correctly guess /products/{id} and /orders/{id}.'
+    }
+  },
+  {
+    label: 'Line items that belong to one order',
+    action: {
+      method: 'GET', path: '/getOrderItems/{orderId}',
+      explain: 'Flattening the relationship loses the ownership context. There is no way to tell from this URL that items are children of an order — they look like a standalone top-level resource.',
+      rule: 'When a thing only exists inside a parent, nest its path underneath the parent.'
+    },
+    resource: {
+      method: 'GET', path: '/orders/{id}/items',
+      explain: 'Nesting expresses ownership. Items are subordinate to their order and have no meaning without it. The parent-child relationship is visible directly in the URL.',
+      rule: 'Use nesting when the child belongs to exactly one parent and has no standalone identity.'
+    }
+  },
+  {
+    label: 'A product referenced by many orders',
+    action: {
+      method: 'GET', path: '/orders/{id}/products/{pid}',
+      explain: 'Products are shared across every order in the system. Nesting them under one order hides them from every other order that needs the same product.',
+      rule: 'Things referenced from many places should have their own top-level collection.'
+    },
+    resource: {
+      method: 'GET', path: '/products/{id}',
+      explain: 'Products stand on their own at the top level. An order references a product by its identifier field, but the product resource lives where every part of the API can reach it.',
+      rule: 'Top-level = shared by many; nested = owned by one specific parent.'
+    }
+  },
+  {
+    label: 'Remove an item from an order',
+    action: {
+      method: null, path: '/deleteOrderItem',
+      explain: 'The verb "delete" belongs in the HTTP method, not the URL. There is also no identifier anywhere, so this endpoint cannot even target a specific item or a specific order.',
+      rule: 'DELETE is an HTTP method — the URL should identify the resource, not describe the action.'
+    },
+    resource: {
+      method: 'DELETE', path: '/orders/{id}/items/{itemId}',
+      explain: 'DELETE carries the intent. The path identifies exactly which item inside which order. Every other operation on this resource is now just a different method on the same URL.',
+      rule: 'GET, POST, PATCH, and DELETE all act on /orders/{id}/items/{itemId} — one path, four operations.'
+    }
+  },
+  {
+    label: 'Users filtered by active status',
+    action: {
+      method: 'GET', path: '/getActiveUsersData',
+      explain: 'Three problems in one path: a verb prefix "get," an adjective "active" used as if it were a resource, and "Data" appended for no reason. The underlying resource is simply users.',
+      rule: 'Status is a filter on the /users collection, not a separate resource of its own.'
+    },
+    resource: {
+      method: 'GET', path: '/users?status=active',
+      explain: 'The resource is /users. The status filter is a query parameter that narrows the collection without creating a new endpoint. One resource handles unlimited combinations of filters.',
+      rule: 'Filtering, sorting, and pagination all go in query parameters — never in the path itself.'
+    }
+  }
+];
+
+let mode = 'action';
+let openIdx = null;
+
+function setMode(m) {
+  if (mode === m) return;
+  mode = m;
+  openIdx = null;
+  document.getElementById('btnAction').setAttribute('aria-pressed', String(m === 'action'));
+  document.getElementById('btnResource').setAttribute('aria-pressed', String(m === 'resource'));
+  render();
+}
+
+function toggleCard(i) {
+  openIdx = openIdx === i ? null : i;
+  render();
+}
+
+function badge(method) {
+  if (!method) return '';
+  const cls = { GET: 'm-get', POST: 'm-post', DELETE: 'm-delete', PUT: 'm-put', PATCH: 'm-put' }[method] || '';
+  return '<span class="mbadge ' + cls + '">' + method + '</span>';
+}
+
+function esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function render() {
+  const list = document.getElementById('elist');
+  list.innerHTML = data.map(function(item, i) {
+    const side   = mode === 'action' ? item.action : item.resource;
+    const isOpen = openIdx === i;
+    const indCls = mode === 'action' ? 'cind warn' : 'cind good';
+    const indIcon = mode === 'action' ? '&#9888;' : '&#10003;';
+    return (
+      '<div class="cw' + (isOpen ? ' open' : '') + '" data-idx="' + i + '" role="button" tabindex="0" aria-expanded="' + isOpen + '">' +
+        '<div class="crow">' +
+          '<div class="cbody">' +
+            '<div class="cdesc">' + esc(item.label) + '</div>' +
+            '<div class="cpath">' + badge(side.method) + esc(side.path) + '</div>' +
+          '</div>' +
+          '<div class="' + indCls + '">' +
+            '<span class="cind-icon">' + indIcon + '</span>' +
+            '<span class="cind-chevron">&#9660;</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="exp' + (isOpen ? ' open' : '') + '">' +
+          '<div class="exp-inner">' +
+            '<div class="exp-body">' +
+              esc(side.explain) +
+              '<div class="exp-rule">' + esc(side.rule) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+}
+
+// event delegation — one listener survives re-renders
+document.getElementById('elist').addEventListener('click', function(e) {
+  var card = e.target.closest('.cw');
+  if (!card) return;
+  toggleCard(Number(card.dataset.idx));
+});
+
+document.getElementById('elist').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var card = e.target.closest('.cw');
+  if (!card) return;
+  e.preventDefault();
+  toggleCard(Number(card.dataset.idx));
+});
+
+document.getElementById('btnAction').addEventListener('click', function()   { setMode('action');   });
+document.getElementById('btnResource').addEventListener('click', function() { setMode('resource'); });
+
+render();
+</script>
+</body>
+</html>

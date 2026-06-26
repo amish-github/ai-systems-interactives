@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Replication Works: Primary and Replicas</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400; font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400; font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .interactive {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ─── Hint header ─── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      line-height: 1.4;
+      color: #1A1A1A;
+    }
+
+    /* ─── Diagram ─── */
+    .diagram-wrap {
+      padding: 28px 24px 12px;
+    }
+
+    .diagram-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      overflow: visible;
+    }
+
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -12; }
+    }
+
+    /* ─── Buttons ─── */
+    .buttons {
+      display: flex;
+      gap: 12px;
+      padding: 8px 24px 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease, opacity 0.2s ease;
+      border: 1.5px solid;
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn:disabled {
+      opacity: 0.40;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-write {
+      border-color: #D35722;
+      color: #D35722;
+    }
+    .btn-write:hover:not(:disabled) {
+      background: rgba(211,87,34,0.06);
+    }
+
+    .btn-read {
+      border-color: #1878DC;
+      color: #1878DC;
+    }
+    .btn-read:hover:not(:disabled) {
+      background: rgba(24,120,220,0.06);
+    }
+
+    .btn-pip {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .btn-pip-write { background: #D35722; }
+    .btn-pip-read  { background: #1878DC; }
+
+    /* ─── Status ─── */
+    .status {
+      margin: 0 24px 28px;
+      padding: 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      font-size: 16px;
+      line-height: 1.5;
+      min-height: 80px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .status-icon {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .si-idle  { background: rgba(0,0,0,0.08);     color: rgba(0,0,0,0.45); }
+    .si-write { background: rgba(211,87,34,0.14);  color: #D35722; }
+    .si-read  { background: rgba(24,120,220,0.14); color: #1878DC; }
+    .si-sync  { background: rgba(135,84,253,0.14); color: #8754FD; }
+
+    .status-body { color: #1A1A1A; }
+    .status-body.idle { color: rgba(0,0,0,0.50); }
+
+    @media (max-width: 480px) {
+      .hint-header  { padding: 16px; }
+      .hint-text    { font-size: 16px; }
+      .diagram-wrap { padding: 20px 8px 8px; }
+      .buttons      { padding: 4px 16px 12px; gap: 8px; }
+      .status       { margin: 0 16px 24px; font-size: 15px; }
+      .btn          { font-size: 14px; padding: 9px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="interactive">
+
+    <!-- Hint header -->
+    <div class="hint-header">
+      <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="hint-text">Click "Send Write" or "Send Read" to trace where each query goes</span>
+    </div>
+
+    <!-- SVG Diagram -->
+    <div class="diagram-wrap">
+      <svg id="diagram" class="diagram-svg" viewBox="0 0 640 292" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="mk-default" markerWidth="9" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="rgba(0,0,0,0.22)"/>
+          </marker>
+          <marker id="mk-write" markerWidth="9" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#D35722"/>
+          </marker>
+          <marker id="mk-read" markerWidth="9" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#1878DC"/>
+          </marker>
+          <marker id="mk-sync" markerWidth="9" markerHeight="8" refX="7" refY="3.5" orient="auto">
+            <path d="M0,0.5 L0,6.5 L8,3.5 z" fill="#8754FD"/>
+          </marker>
+        </defs>
+
+        <!-- ── Arrows drawn behind nodes ── -->
+
+        <!-- Write: Application → Primary -->
+        <path id="ap-write"
+          fill="none"
+          stroke="rgba(0,0,0,0.22)"
+          stroke-width="1.5"
+          d="M 268 64 Q 168 112 148 152"
+          marker-end="url(#mk-default)"
+        />
+        <text id="lbl-write"
+          font-family="'Suisse Intl Mono', monospace"
+          font-size="11"
+          fill="rgba(0,0,0,0.38)"
+          x="187" y="98"
+          transform="rotate(-40 187 98)">writes</text>
+
+        <!-- Read: Application → Replica 1 -->
+        <path id="ap-read"
+          fill="none"
+          stroke="rgba(0,0,0,0.22)"
+          stroke-width="1.5"
+          d="M 372 64 Q 432 96 462 120"
+          marker-end="url(#mk-default)"
+        />
+        <text id="lbl-read"
+          font-family="'Suisse Intl Mono', monospace"
+          font-size="11"
+          fill="rgba(0,0,0,0.38)"
+          x="428" y="83"
+          transform="rotate(30 428 83)">reads</text>
+
+        <!-- Change log: Primary → Replica 1 -->
+        <path id="ap-sync1"
+          fill="none"
+          stroke="rgba(0,0,0,0.18)"
+          stroke-width="1.5"
+          d="M 222 178 Q 300 157 380 148"
+          marker-end="url(#mk-default)"
+        />
+
+        <!-- Change log: Primary → Replica 2 -->
+        <path id="ap-sync2"
+          fill="none"
+          stroke="rgba(0,0,0,0.18)"
+          stroke-width="1.5"
+          d="M 222 194 Q 300 221 380 230"
+          marker-end="url(#mk-default)"
+        />
+
+        <!-- Change log label (between the two sync arrows) -->
+        <text id="lbl-sync"
+          font-family="'Suisse Intl Mono', monospace"
+          font-size="10"
+          fill="rgba(0,0,0,0.32)"
+          text-anchor="middle"
+          x="296" y="196">change log</text>
+
+        <!-- ── Nodes drawn in front of arrows ── -->
+
+        <!-- Application -->
+        <g id="nd-app">
+          <rect id="rect-app" x="220" y="12" width="200" height="50" rx="10"
+            fill="#FFFFFF" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"
+            style="filter:drop-shadow(0 0 0.5px rgba(0,0,0,0.25)) drop-shadow(0 1px 3px rgba(0,0,0,0.12));"/>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="10"
+            fill="rgba(0,0,0,0.45)" text-anchor="middle" x="320" y="31">client</text>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="14" font-weight="500"
+            fill="#1A1A1A" text-anchor="middle" x="320" y="50">Application</text>
+        </g>
+
+        <!-- Primary -->
+        <g id="nd-primary">
+          <rect id="rect-primary" x="58" y="152" width="164" height="68" rx="10"
+            fill="#FFFFFF" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"
+            style="filter:drop-shadow(0 0 0.5px rgba(0,0,0,0.25)) drop-shadow(0 1px 3px rgba(0,0,0,0.12));"/>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="10"
+            fill="rgba(0,0,0,0.45)" text-anchor="middle" x="140" y="172">accepts all writes</text>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="14" font-weight="500"
+            fill="#1A1A1A" text-anchor="middle" x="140" y="192">Primary</text>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="10"
+            fill="rgba(0,0,0,0.40)" text-anchor="middle" x="140" y="210">source of truth</text>
+        </g>
+
+        <!-- Replica 1 -->
+        <g id="nd-r1">
+          <rect id="rect-r1" x="380" y="120" width="164" height="52" rx="10"
+            fill="#FFFFFF" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"
+            style="filter:drop-shadow(0 0 0.5px rgba(0,0,0,0.25)) drop-shadow(0 1px 3px rgba(0,0,0,0.12));"/>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="10"
+            fill="rgba(0,0,0,0.45)" text-anchor="middle" x="462" y="140">serves reads</text>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="14" font-weight="500"
+            fill="#1A1A1A" text-anchor="middle" x="462" y="159">Replica 1</text>
+        </g>
+
+        <!-- Replica 2 -->
+        <g id="nd-r2">
+          <rect id="rect-r2" x="380" y="206" width="164" height="52" rx="10"
+            fill="#FFFFFF" stroke="rgba(0,0,0,0.14)" stroke-width="1.5"
+            style="filter:drop-shadow(0 0 0.5px rgba(0,0,0,0.25)) drop-shadow(0 1px 3px rgba(0,0,0,0.12));"/>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="10"
+            fill="rgba(0,0,0,0.45)" text-anchor="middle" x="462" y="226">serves reads</text>
+          <text font-family="'Suisse Intl', system-ui, sans-serif" font-size="14" font-weight="500"
+            fill="#1A1A1A" text-anchor="middle" x="462" y="245">Replica 2</text>
+        </g>
+
+      </svg>
+    </div>
+
+    <!-- Buttons -->
+    <div class="buttons">
+      <button class="btn btn-write" id="btn-write" onclick="sendWrite()">
+        <span class="btn-pip btn-pip-write"></span>
+        Send Write
+      </button>
+      <button class="btn btn-read" id="btn-read" onclick="sendRead()">
+        <span class="btn-pip btn-pip-read"></span>
+        Send Read
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div class="status" id="status-area">
+      <div class="status-icon si-idle" id="status-icon">?</div>
+      <div class="status-body idle" id="status-body">
+        Send a write or read query to trace its path through the database cluster.
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    var t1 = null, t2 = null;
+
+    var rects = {
+      app:     document.getElementById('rect-app'),
+      primary: document.getElementById('rect-primary'),
+      r1:      document.getElementById('rect-r1'),
+      r2:      document.getElementById('rect-r2'),
+    };
+
+    var paths = {
+      write: document.getElementById('ap-write'),
+      read:  document.getElementById('ap-read'),
+      sync1: document.getElementById('ap-sync1'),
+      sync2: document.getElementById('ap-sync2'),
+    };
+
+    var labels = {
+      write: document.getElementById('lbl-write'),
+      read:  document.getElementById('lbl-read'),
+      sync:  document.getElementById('lbl-sync'),
+    };
+
+    var RGB = {
+      '#D35722': '211,87,34',
+      '#1878DC': '24,120,220',
+      '#8754FD': '135,84,253',
+    };
+
+    function highlightRect(rect, color, alpha) {
+      rect.style.stroke = color;
+      rect.style.strokeWidth = '2';
+      rect.style.fill = 'rgba(' + RGB[color] + ',' + alpha + ')';
+      rect.style.transition = 'stroke 0.25s, fill 0.25s';
+    }
+
+    function resetRect(rect) {
+      rect.style.stroke = '';
+      rect.style.strokeWidth = '';
+      rect.style.fill = '';
+    }
+
+    function activatePath(path, color, marker) {
+      path.style.stroke = color;
+      path.style.strokeWidth = '2.5';
+      path.style.strokeDasharray = '8 4';
+      path.style.animation = 'dash-flow 0.5s linear infinite';
+      path.setAttribute('marker-end', 'url(#mk-' + marker + ')');
+    }
+
+    function resetPath(path) {
+      path.style.stroke = '';
+      path.style.strokeWidth = '';
+      path.style.strokeDasharray = '';
+      path.style.animation = '';
+      path.setAttribute('marker-end', 'url(#mk-default)');
+    }
+
+    function setStatus(iconText, iconClass, bodyHTML, isIdle) {
+      var icon = document.getElementById('status-icon');
+      var body = document.getElementById('status-body');
+      icon.className = 'status-icon ' + iconClass;
+      icon.textContent = iconText;
+      body.className = 'status-body' + (isIdle ? ' idle' : '');
+      body.innerHTML = bodyHTML;
+    }
+
+    function resetAll() {
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+      Object.values(rects).forEach(resetRect);
+      Object.values(paths).forEach(resetPath);
+      labels.write.style.fill = '';
+      labels.read.style.fill  = '';
+      labels.sync.style.fill  = '';
+      document.getElementById('btn-write').disabled = false;
+      document.getElementById('btn-read').disabled  = false;
+    }
+
+    function sendWrite() {
+      resetAll();
+      document.getElementById('btn-write').disabled = true;
+      document.getElementById('btn-read').disabled  = true;
+
+      // Phase 1 — write lands on primary
+      highlightRect(rects.app,     '#D35722', 0.04);
+      highlightRect(rects.primary, '#D35722', 0.05);
+      activatePath(paths.write, '#D35722', 'write');
+      labels.write.style.fill = '#D35722';
+
+      setStatus('W', 'si-write',
+        '<strong>Write → primary only.</strong> The application sends the write to the primary. The primary is the only database that accepts writes — the replicas receive nothing yet.',
+        false);
+
+      // Phase 2 — change log propagates to replicas
+      t1 = setTimeout(function () {
+        resetRect(rects.app);
+        resetPath(paths.write);
+        labels.write.style.fill = '';
+
+        highlightRect(rects.primary, '#8754FD', 0.04);
+        highlightRect(rects.r1,      '#8754FD', 0.04);
+        highlightRect(rects.r2,      '#8754FD', 0.04);
+        activatePath(paths.sync1, '#8754FD', 'sync');
+        activatePath(paths.sync2, '#8754FD', 'sync');
+        labels.sync.style.fill = '#8754FD';
+
+        setStatus('→', 'si-sync',
+          '<strong>Change log → replicas.</strong> The primary records the write in an ordered log. Each replica reads that log and replays the same change — arriving at the same state as the primary.',
+          false);
+
+        // Reset
+        t2 = setTimeout(function () {
+          resetAll();
+          setStatus('?', 'si-idle',
+            'Send a write or read query to trace its path through the database cluster.',
+            true);
+        }, 2800);
+      }, 2200);
+    }
+
+    function sendRead() {
+      resetAll();
+      document.getElementById('btn-write').disabled = true;
+      document.getElementById('btn-read').disabled  = true;
+
+      highlightRect(rects.app, '#1878DC', 0.04);
+      highlightRect(rects.r1,  '#1878DC', 0.05);
+      activatePath(paths.read, '#1878DC', 'read');
+      labels.read.style.fill = '#1878DC';
+
+      setStatus('R', 'si-read',
+        '<strong>Read → replica.</strong> The application routes the read to Replica 1. The primary is untouched and stays free for writes. Either replica could serve this query — adding more replicas adds more read capacity.',
+        false);
+
+      t1 = setTimeout(function () {
+        resetAll();
+        setStatus('?', 'si-idle',
+          'Send a write or read query to trace its path through the database cluster.',
+          true);
+      }, 2800);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Schema Design from Access Patterns</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .hint-cursor {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text { font-size: 18px; }
+
+    /* ── Progress bar ── */
+    .progress-bar {
+      height: 4px;
+      background: rgba(0,0,0,0.08);
+    }
+    .progress-fill {
+      height: 100%;
+      background: #1878DC;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Content area ── */
+    .content { padding: 24px; }
+
+    /* ── Step visibility ── */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    /* ── Labels ── */
+    .step-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 8px;
+    }
+    .step-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    /* ── Access pattern callout ── */
+    .access-pattern {
+      background: #F2F1EE;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 15px;
+      color: rgba(0,0,0,0.70);
+      line-height: 1.5;
+    }
+    .access-pattern strong { color: #1A1A1A; }
+
+    /* ── Choice cards ── */
+    .choice-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .choice-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .card:hover {
+      border-color: rgba(0,0,0,0.30);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .card.locked { cursor: default; }
+    .card.picked-wrong {
+      border-color: #DE4C45;
+      background: rgba(222,76,69,0.04);
+    }
+    .card.picked-right {
+      border-color: #328F51;
+      background: rgba(50,143,81,0.04);
+    }
+    .card.reveal-right {
+      border-color: #328F51;
+    }
+    .card.dim { opacity: 0.45; }
+
+    .card-tag {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .card-tag.neutral { color: rgba(0,0,0,0.40); }
+    .card-tag.blue    { color: #1878DC; }
+
+    .card-body {
+      font-size: 15px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+    .card-note {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-top: 8px;
+      line-height: 1.4;
+    }
+
+    /* ── Code blocks ── */
+    .code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      background: rgba(0,0,0,0.04);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      white-space: pre;
+    }
+    .hl-bad  { background: rgba(222,76,69,0.16);  border-radius: 3px; padding: 0 2px; }
+    .hl-good { background: rgba(50,143,81,0.16);   border-radius: 3px; padding: 0 2px; }
+    .hl-blue { background: rgba(24,120,220,0.12);  border-radius: 3px; padding: 0 2px; }
+
+    /* ── Feedback banners ── */
+    .feedback {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 15px;
+      line-height: 1.5;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .feedback.show { display: block; }
+    .feedback.wrong {
+      background: rgba(222,76,69,0.06);
+      border: 1px solid rgba(222,76,69,0.25);
+    }
+    .feedback.right {
+      background: rgba(50,143,81,0.06);
+      border: 1px solid rgba(50,143,81,0.25);
+    }
+    .feedback strong { font-weight: 600; }
+    .feedback.wrong strong { color: #DE4C45; }
+    .feedback.right strong { color: #328F51; }
+    code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      background: rgba(0,0,0,0.07);
+      border-radius: 3px;
+      padding: 0 3px;
+    }
+
+    /* ── Step 4 type-picker rows ── */
+    .type-row {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .type-row-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 10px;
+    }
+    .type-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .type-btn {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s, color 0.15s, opacity 0.15s;
+      color: #1A1A1A;
+    }
+    .type-btn:hover { border-color: rgba(0,0,0,0.30); }
+    .type-btn.locked { cursor: default; }
+    .type-fb {
+      display: none;
+      margin-top: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: rgba(0,0,0,0.70);
+    }
+    .type-fb.show { display: block; }
+
+    /* ── Navigation ── */
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-primary { background: #1A1A1A; color: #FFFFFF; }
+    .btn-primary:hover:not(:disabled) { background: #333; }
+    .btn-primary:disabled { background: rgba(0,0,0,0.18); cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: rgba(0,0,0,0.50);
+      border: 1px solid rgba(0,0,0,0.14);
+    }
+    .btn-ghost:hover { border-color: rgba(0,0,0,0.30); color: #1A1A1A; }
+
+    /* ── Completion ── */
+    .completion-head {
+      text-align: center;
+      padding: 16px 0 24px;
+    }
+    .completion-check {
+      width: 52px; height: 52px;
+      background: rgba(50,143,81,0.10);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 28px;
+    }
+    .completion-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #328F51;
+      margin-bottom: 8px;
+    }
+    .completion-body {
+      font-size: 16px;
+      color: rgba(0,0,0,0.60);
+      line-height: 1.6;
+      max-width: 420px;
+      margin: 0 auto;
+    }
+
+    .summary-box {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .summary-heading {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 12px;
+    }
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .legend-card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .legend-title { font-weight: 600; margin-bottom: 2px; }
+    .legend-title.blue   { color: #1878DC; }
+    .legend-title.green  { color: #328F51; }
+    .legend-desc { color: rgba(0,0,0,0.55); }
+
+    /* ── Responsive ── */
+    @media (max-width: 500px) {
+      .choice-grid { grid-template-columns: 1fr; }
+      .hint-header { padding: 12px 16px; }
+      .content { padding: 16px; }
+      .code { font-size: 12px; }
+    }
+    @media (max-width: 325px) {
+      .hint-text { font-size: 15px; }
+      .code { font-size: 11px; }
+      .legend-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click an option to make each schema design decision.</span>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress" style="width:0%"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- STEP 1 — Access patterns first -->
+    <div class="step active" id="step-1">
+      <div class="step-label">Decision 1 of 4</div>
+      <div class="step-title">Where do you start when designing a schema?</div>
+
+      <div class="access-pattern">
+        <strong>The feature:</strong> An e-commerce app. The most common screen loads
+        "all orders for a given customer, newest first."
+      </div>
+
+      <p style="font-size:16px;color:rgba(0,0,0,0.70);margin-bottom:16px;line-height:1.5">
+        You are about to create the <code>customers</code> and <code>orders</code> tables.
+        What should drive the first design choice?
+      </p>
+
+      <div class="choice-list">
+        <div class="card" id="c1-wrong" onclick="pick(1,'wrong')">
+          <div class="card-tag neutral">Option A</div>
+          <div class="card-body">
+            Model every entity in the abstract — customers, orders, products,
+            shipping addresses, promotions — and build a complete picture before
+            thinking about any specific query.
+          </div>
+        </div>
+        <div class="card" id="c1-right" onclick="pick(1,'right')">
+          <div class="card-tag blue">Option B</div>
+          <div class="card-body">
+            Write down the key access pattern — "orders for a customer, newest first"
+            — and shape the tables so that lookup is cheap.
+          </div>
+        </div>
+      </div>
+
+      <div class="feedback wrong" id="fb1-wrong">
+        <strong>Not quite.</strong> Modeling everything abstractly first is the habit this
+        lesson warns against. It produces tables that are awkward for the queries that
+        actually run, because no one asked what the schema would be used for.
+      </div>
+      <div class="feedback right" id="fb1-right">
+        <strong>Exactly.</strong> The access pattern "orders for a customer, newest first"
+        immediately tells you the <code>orders</code> table needs a <code>customer</code>
+        column and that lookup must be indexed. You only know that by looking at the real
+        query first.
+      </div>
+
+      <div class="nav">
+        <span></span>
+        <button class="btn btn-primary" id="next-1" disabled onclick="nextStep(1)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 2 — Natural vs surrogate key -->
+    <div class="step" id="step-2">
+      <div class="step-label">Decision 2 of 4</div>
+      <div class="step-title">What should the primary key of <code style="font-size:16px">customers</code> be?</div>
+
+      <div class="access-pattern">
+        <strong>The access pattern:</strong> Customers log in with their email.
+        The <code>orders</code> table will need to reference each customer.
+      </div>
+
+      <div class="choice-grid">
+        <div class="card" id="c2-wrong" onclick="pick(2,'wrong')">
+          <div class="card-tag neutral">Natural key</div>
+          <div class="code">CREATE TABLE customers (
+  <span class="hl-bad">email TEXT PRIMARY KEY</span>,
+  created_at TIMESTAMPTZ
+);</div>
+          <div class="card-note">Email is unique — use it as the identifier.</div>
+        </div>
+        <div class="card" id="c2-right" onclick="pick(2,'right')">
+          <div class="card-tag blue">Surrogate key</div>
+          <div class="code">CREATE TABLE customers (
+  <span class="hl-good">id BIGINT GENERATED
+  ALWAYS AS IDENTITY
+  PRIMARY KEY</span>,
+  email TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ
+);</div>
+          <div class="card-note">Generate a stable ID. Store email separately.</div>
+        </div>
+      </div>
+
+      <div class="feedback wrong" id="fb2-wrong">
+        <strong>Risky choice.</strong> Email addresses change. Once the <code>orders</code>
+        table stores email as a foreign key, updating one customer's email means updating
+        that value in every order row that references it. A surrogate key never changes
+        because it has no real-world meaning to update.
+      </div>
+      <div class="feedback right" id="fb2-right">
+        <strong>Right.</strong> The generated <code>id</code> never changes. Other tables
+        reference <code>id</code>, so a customer can update their email without cascading
+        rewrites across every row that points to them.
+      </div>
+
+      <div class="nav">
+        <button class="btn btn-ghost" onclick="prevStep(2)">← Back</button>
+        <button class="btn btn-primary" id="next-2" disabled onclick="nextStep(2)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3 — Foreign key placement -->
+    <div class="step" id="step-3">
+      <div class="step-label">Decision 3 of 4</div>
+      <div class="step-title">Where does the link between orders and customers go?</div>
+
+      <div class="access-pattern">
+        <strong>The access pattern:</strong> "Load all orders for a given customer."
+        One customer can have many orders.
+      </div>
+
+      <div class="choice-grid">
+        <div class="card" id="c3-wrong" onclick="pick(3,'wrong')">
+          <div class="card-tag neutral">Option A</div>
+          <div class="code">-- customers stores
+-- an array of order IDs
+CREATE TABLE customers (
+  id BIGINT PRIMARY KEY,
+  <span class="hl-bad">order_ids BIGINT[]</span>
+);</div>
+          <div class="card-note">The "one" side holds a list pointing to the "many" side.</div>
+        </div>
+        <div class="card" id="c3-right" onclick="pick(3,'right')">
+          <div class="card-tag blue">Option B</div>
+          <div class="code">-- each order points back
+-- to its customer
+CREATE TABLE orders (
+  id BIGINT PRIMARY KEY,
+  <span class="hl-good">customer_id BIGINT
+  REFERENCES customers(id)</span>,
+  placed_at TIMESTAMPTZ
+);</div>
+          <div class="card-note">The "many" side carries the foreign key.</div>
+        </div>
+      </div>
+
+      <div class="feedback wrong" id="fb3-wrong">
+        <strong>Not quite.</strong> Storing an array of IDs on the parent breaks relational
+        modeling and makes queries awkward. In a relational database, the "many" side carries
+        the foreign key — each <code>orders</code> row stores the <code>customer_id</code>
+        it belongs to.
+      </div>
+      <div class="feedback right" id="fb3-right">
+        <strong>Correct.</strong> Each order row stores a <code>customer_id</code> foreign
+        key. To answer "all orders for customer 42," the database looks for rows where
+        <code>customer_id = 42</code> — exactly what the access pattern requires.
+      </div>
+
+      <div class="nav">
+        <button class="btn btn-ghost" onclick="prevStep(3)">← Back</button>
+        <button class="btn btn-primary" id="next-3" disabled onclick="nextStep(3)">Next →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4 — Data types -->
+    <div class="step" id="step-4">
+      <div class="step-label">Decision 4 of 4</div>
+      <div class="step-title">Pick the right column type for production.</div>
+
+      <p style="font-size:16px;color:rgba(0,0,0,0.70);margin-bottom:16px;line-height:1.5">
+        Two columns still need their types chosen. Click the correct type for each.
+      </p>
+
+      <!-- Type row A: timestamp -->
+      <div class="type-row">
+        <div class="type-row-label">Column: <code>placed_at</code> — the moment an order was placed</div>
+        <div class="type-btns">
+          <button class="type-btn" id="ta-wrong" onclick="pickType('a','wrong')">TIMESTAMP</button>
+          <button class="type-btn" id="ta-right" onclick="pickType('a','right')">TIMESTAMPTZ</button>
+        </div>
+        <div class="type-fb" id="ta-fb"></div>
+      </div>
+
+      <!-- Type row B: money -->
+      <div class="type-row" style="margin-bottom:20px">
+        <div class="type-row-label">Column: <code>total</code> — the order total in dollars and cents</div>
+        <div class="type-btns">
+          <button class="type-btn" id="tb-wrong" onclick="pickType('b','wrong')">FLOAT</button>
+          <button class="type-btn" id="tb-right" onclick="pickType('b','right')">BIGINT (cents)</button>
+        </div>
+        <div class="type-fb" id="tb-fb"></div>
+      </div>
+
+      <div class="nav">
+        <button class="btn btn-ghost" onclick="prevStep(4)">← Back</button>
+        <button class="btn btn-primary" id="next-4" disabled onclick="nextStep(4)">See final schema →</button>
+      </div>
+    </div>
+
+    <!-- STEP 5 — Completion -->
+    <div class="step" id="step-5">
+      <div class="completion-head">
+        <div class="completion-check">✓</div>
+        <div class="completion-title">Schema designed from access patterns.</div>
+        <div class="completion-body">
+          Every column choice traces back to a concrete decision: the access pattern,
+          the key type, the FK placement, the column types.
+        </div>
+      </div>
+
+      <div class="summary-box">
+        <div class="summary-heading">Final schema</div>
+        <div class="code">CREATE TABLE customers (
+  <span class="hl-blue">id</span> BIGINT GENERATED ALWAYS AS IDENTITY <span class="hl-blue">PRIMARY KEY</span>,
+  email TEXT NOT NULL UNIQUE,
+  created_at <span class="hl-good">TIMESTAMPTZ</span> NOT NULL DEFAULT now()
+);</div>
+        <div class="code">CREATE TABLE orders (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  <span class="hl-blue">customer_id BIGINT NOT NULL REFERENCES customers(id)</span>,
+  total_cents <span class="hl-good">BIGINT</span> NOT NULL,
+  placed_at <span class="hl-good">TIMESTAMPTZ</span> NOT NULL DEFAULT now()
+);</div>
+
+        <div class="legend-grid">
+          <div class="legend-card">
+            <div class="legend-title blue">Surrogate PK</div>
+            <div class="legend-desc">Generated; never needs to change</div>
+          </div>
+          <div class="legend-card">
+            <div class="legend-title blue">FK on the "many" side</div>
+            <div class="legend-desc">Each order row carries <code>customer_id</code></div>
+          </div>
+          <div class="legend-card">
+            <div class="legend-title green">TIMESTAMPTZ</div>
+            <div class="legend-desc">Unambiguous across time zones</div>
+          </div>
+          <div class="legend-card">
+            <div class="legend-title green">BIGINT cents</div>
+            <div class="legend-desc">Exact integer — no floating point drift</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center">
+        <button class="btn btn-ghost" onclick="restart()">Start over</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /container -->
+
+<script>
+  // ── State ──
+  var answered  = { 1:false, 2:false, 3:false, 4:false };
+  var typesDone = { a:false, b:false };
+
+  // ── Progress bar ──
+  function setProgress(step) {
+    var pct = step <= 4 ? ((step - 1) / 4) * 100 : 100;
+    document.getElementById('progress').style.width = pct + '%';
+  }
+
+  // ── Card picks (steps 1–3) ──
+  function pick(step, choice) {
+    if (answered[step]) return;
+    answered[step] = true;
+
+    var wrongCard = document.getElementById('c' + step + '-wrong');
+    var rightCard = document.getElementById('c' + step + '-right');
+    var wrongFb   = document.getElementById('fb' + step + '-wrong');
+    var rightFb   = document.getElementById('fb' + step + '-right');
+
+    wrongCard.classList.add('locked');
+    rightCard.classList.add('locked');
+
+    if (choice === 'wrong') {
+      wrongCard.classList.add('picked-wrong');
+      rightCard.classList.add('reveal-right');
+      wrongFb.classList.add('show');
+    } else {
+      rightCard.classList.add('picked-right');
+      wrongCard.classList.add('dim');
+      rightFb.classList.add('show');
+    }
+
+    document.getElementById('next-' + step).disabled = false;
+  }
+
+  // ── Type picker (step 4) ──
+  function pickType(col, choice) {
+    if (typesDone[col]) return;
+    typesDone[col] = true;
+
+    var wrongBtn = document.getElementById('t' + col + '-wrong');
+    var rightBtn = document.getElementById('t' + col + '-right');
+    var fb       = document.getElementById('t' + col + '-fb');
+
+    wrongBtn.classList.add('locked');
+    rightBtn.classList.add('locked');
+
+    if (choice === 'wrong') {
+      wrongBtn.style.borderColor = '#DE4C45';
+      wrongBtn.style.background  = 'rgba(222,76,69,0.06)';
+      wrongBtn.style.color       = '#DE4C45';
+      rightBtn.style.borderColor = '#328F51';
+      rightBtn.style.background  = 'rgba(50,143,81,0.06)';
+      rightBtn.style.color       = '#328F51';
+
+      if (col === 'a') {
+        fb.innerHTML = '<strong style="color:#DE4C45">Wrong type.</strong> TIMESTAMP has no time zone. ' +
+          'Servers in different regions disagree about what the value means, and a daylight saving ' +
+          'change can silently shift your data by an hour.';
+      } else {
+        fb.innerHTML = '<strong style="color:#DE4C45">Wrong type.</strong> FLOAT cannot represent many ' +
+          'decimal values exactly. Totals drift by fractions of a cent and financial reports stop adding up.';
+      }
+    } else {
+      rightBtn.style.borderColor = '#328F51';
+      rightBtn.style.background  = 'rgba(50,143,81,0.06)';
+      rightBtn.style.color       = '#328F51';
+      wrongBtn.style.opacity     = '0.40';
+
+      if (col === 'a') {
+        fb.innerHTML = '<strong style="color:#328F51">Correct.</strong> TIMESTAMPTZ stores the moment ' +
+          'unambiguously regardless of server location or daylight saving changes.';
+      } else {
+        fb.innerHTML = '<strong style="color:#328F51">Correct.</strong> Storing cents as BIGINT is exact. ' +
+          '$12.99 becomes 1299 — no floating point drift is possible.';
+      }
+    }
+
+    fb.classList.add('show');
+
+    if (typesDone.a && typesDone.b) {
+      document.getElementById('next-4').disabled = false;
+    }
+  }
+
+  // ── Navigation ──
+  function nextStep(current) {
+    document.getElementById('step-' + current).classList.remove('active');
+    var next = current + 1;
+    document.getElementById('step-' + next).classList.add('active');
+    setProgress(next);
+  }
+
+  function prevStep(current) {
+    document.getElementById('step-' + current).classList.remove('active');
+    var prev = current - 1;
+    document.getElementById('step-' + prev).classList.add('active');
+    setProgress(prev);
+  }
+
+  // ── Restart ──
+  function restart() {
+    answered  = { 1:false, 2:false, 3:false, 4:false };
+    typesDone = { a:false, b:false };
+
+    // Reset steps 1–3 cards
+    [1,2,3].forEach(function(s) {
+      var w = document.getElementById('c' + s + '-wrong');
+      var r = document.getElementById('c' + s + '-right');
+      w.className = 'card';
+      r.className = 'card';
+      w.style.opacity = '';
+      r.style.opacity = '';
+      document.getElementById('fb' + s + '-wrong').classList.remove('show');
+      document.getElementById('fb' + s + '-right').classList.remove('show');
+      document.getElementById('next-' + s).disabled = true;
+    });
+
+    // Reset step 4 type buttons
+    ['a','b'].forEach(function(col) {
+      var w = document.getElementById('t' + col + '-wrong');
+      var r = document.getElementById('t' + col + '-right');
+      [w, r].forEach(function(btn) {
+        btn.style.borderColor = '';
+        btn.style.background  = '';
+        btn.style.color       = '';
+        btn.style.opacity     = '';
+        btn.className         = 'type-btn';
+      });
+      var fb = document.getElementById('t' + col + '-fb');
+      fb.classList.remove('show');
+      fb.innerHTML = '';
+    });
+    document.getElementById('next-4').disabled = true;
+
+    // Show step 1
+    document.querySelectorAll('.step').forEach(function(s) {
+      s.classList.remove('active');
+    });
+    document.getElementById('step-1').classList.add('active');
+    setProgress(1);
+  }
+</script>
+</body>
+</html>

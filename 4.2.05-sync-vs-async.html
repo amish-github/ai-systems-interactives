@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sync vs Async per Interaction</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.hint svg {
+  animation: wiggle 4s ease-in-out infinite;
+  transform-origin: 5px 5px;
+  flex-shrink: 0;
+}
+.hint p { font-size: 18px; line-height: 1.4; }
+.main { padding: 24px; }
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-wrap input { display: none; }
+.track {
+  width: 44px;
+  height: 24px;
+  background: rgba(0,0,0,0.14);
+  border-radius: 12px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 0 0.5px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.15);
+}
+.toggle-wrap input:checked ~ .track { background: #DE4C45; }
+.toggle-wrap input:checked ~ .track::after { transform: translateX(20px); }
+.toggle-lbl { font-size: 14px; color: rgba(0,0,0,0.6); }
+.btn-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #1878DC;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 0 0.5px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.15);
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.btn-send:hover:not(:disabled) { opacity: 0.85; }
+.btn-send:active:not(:disabled) { opacity: 0.7; }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 480px) { .panels { grid-template-columns: 1fr; } }
+.panel {
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 0 0.5px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.15);
+}
+.panel-title {
+  font-size: 13px;
+  color: rgba(0,0,0,0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+.svc {
+  background: #FFFFFF;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1A1A1A;
+  text-align: center;
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+.svc.s-active  { background: #1878DC; border-color: #1878DC; color: #FFFFFF; }
+.svc.s-done    { background: #328F51; border-color: #328F51; color: #FFFFFF; }
+.svc.s-failed  { background: #DE4C45; border-color: #DE4C45; color: #FFFFFF; }
+.svc.s-blocked { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); color: rgba(0,0,0,0.20); }
+.evlog {
+  background: #FFFFFF;
+  border: 1.5px dashed rgba(0,0,0,0.20);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: rgba(0,0,0,0.45);
+  text-align: center;
+  transition: background 0.3s, border-color 0.3s, color 0.3s;
+}
+.evlog.s-active {
+  background: #8754FD;
+  border-color: #8754FD;
+  border-style: solid;
+  color: #FFFFFF;
+}
+.evlog.s-done {
+  background: rgba(135,84,253,0.10);
+  border-color: #8754FD;
+  border-style: solid;
+  color: #8754FD;
+}
+.arr {
+  width: 2px;
+  height: 20px;
+  background: rgba(0,0,0,0.12);
+  margin: 0 auto;
+  position: relative;
+  transition: background 0.3s;
+  flex-shrink: 0;
+}
+.arr::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(0,0,0,0.12);
+  transition: border-top-color 0.3s;
+}
+.arr.a-active       { background: #1878DC; }
+.arr.a-active::after  { border-top-color: #1878DC; }
+.arr.a-done         { background: #328F51; }
+.arr.a-done::after    { border-top-color: #328F51; }
+.arr.a-failed       { background: #DE4C45; }
+.arr.a-failed::after  { border-top-color: #DE4C45; }
+.arr.a-ev           { background: #8754FD; }
+.arr.a-ev::after      { border-top-color: #8754FD; }
+.wait-note {
+  font-size: 11px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: #F48E00;
+  text-align: center;
+  height: 16px;
+  line-height: 16px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.wait-note.visible { opacity: 1; }
+.fan-section { margin-top: 0; }
+.fan-arrows {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.fan-arrow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.consumers-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+.outcomes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 480px) { .outcomes { grid-template-columns: 1fr; } }
+.outcome-card {
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 14px;
+  padding: 12px 16px;
+  min-height: 68px;
+  box-shadow: 0 0 0.5px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.15);
+}
+.outcome-lbl {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(0,0,0,0.45);
+  margin-bottom: 4px;
+}
+.outcome-val {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.30);
+  line-height: 1.5;
+  white-space: pre-line;
+  transition: color 0.3s;
+}
+.outcome-val.ok   { color: #328F51; }
+.outcome-val.fail { color: #DE4C45; }
+.banner {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.55;
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.35);
+  transition: background 0.4s, border-color 0.4s, color 0.4s;
+  box-shadow: 0 0 0.5px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.15);
+}
+.banner.b-ok {
+  background: rgba(50,143,81,0.08);
+  border-color: rgba(50,143,81,0.25);
+  color: #1A1A1A;
+}
+.banner.b-fail {
+  background: rgba(222,76,69,0.08);
+  border-color: rgba(222,76,69,0.25);
+  color: #1A1A1A;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <p>Toggle failure mode, then place an order to see how both patterns behave.</p>
+  </div>
+
+  <div class="main">
+    <div class="controls">
+      <label class="toggle-wrap">
+        <input type="checkbox" id="failToggle">
+        <div class="track"></div>
+        <span class="toggle-lbl">Simulate: Inventory unavailable</span>
+      </label>
+      <button class="btn-send" id="sendBtn">&#9654;&nbsp;Place Order</button>
+    </div>
+
+    <div class="panels">
+      <!-- SYNC PANEL -->
+      <div class="panel">
+        <div class="panel-title">Synchronous chain</div>
+        <div class="svc" id="sO">Order service</div>
+        <div class="wait-note" id="wn1"></div>
+        <div class="arr" id="a1"></div>
+        <div class="svc" id="sP">Payment service</div>
+        <div class="wait-note" id="wn2"></div>
+        <div class="arr" id="a2"></div>
+        <div class="svc" id="sI">Inventory service</div>
+        <div class="wait-note" id="wn3"></div>
+        <div class="arr" id="a3"></div>
+        <div class="svc" id="sSh">Shipping service</div>
+      </div>
+
+      <!-- ASYNC PANEL -->
+      <div class="panel">
+        <div class="panel-title">Event-driven flow</div>
+        <div class="svc" id="aO">Order service</div>
+        <div class="arr" id="aArr1"></div>
+        <div class="evlog" id="aEL">Event log &middot; OrderPlaced</div>
+        <div class="fan-section">
+          <div class="fan-arrows">
+            <div class="fan-arrow-col"><div class="arr" id="aArrP"></div></div>
+            <div class="fan-arrow-col"><div class="arr" id="aArrI"></div></div>
+            <div class="fan-arrow-col"><div class="arr" id="aArrSh"></div></div>
+          </div>
+          <div class="consumers-row">
+            <div class="svc" id="aP">Payment</div>
+            <div class="svc" id="aI">Inventory</div>
+            <div class="svc" id="aSh">Shipping</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="outcomes">
+      <div class="outcome-card">
+        <div class="outcome-lbl">Sync result</div>
+        <div class="outcome-val" id="syncResult">&#8212;</div>
+      </div>
+      <div class="outcome-card">
+        <div class="outcome-lbl">Async result</div>
+        <div class="outcome-val" id="asyncResult">&#8212;</div>
+      </div>
+    </div>
+
+    <div class="banner" id="banner">Place an order to see what happens.</div>
+  </div>
+</div>
+
+<script>
+var running = false;
+function delay(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+function sc(id, cls) {
+  var el = document.getElementById(id);
+  el.classList.remove('s-active','s-done','s-failed','s-blocked');
+  if (cls) el.classList.add(cls);
+}
+function sa(id, cls) {
+  var el = document.getElementById(id);
+  el.classList.remove('a-active','a-done','a-failed','a-ev');
+  if (cls) el.classList.add(cls);
+}
+function wn(id, show) {
+  var el = document.getElementById(id);
+  el.textContent = show ? 'waiting…' : '';
+  if (show) el.classList.add('visible'); else el.classList.remove('visible');
+}
+
+function reset() {
+  ['sO','sP','sI','sSh','aO','aP','aI','aSh'].forEach(function(id){ sc(id, null); });
+  var evlog = document.getElementById('aEL');
+  evlog.classList.remove('s-active','s-done');
+  ['a1','a2','a3','aArr1','aArrP','aArrI','aArrSh'].forEach(function(id){ sa(id, null); });
+  ['wn1','wn2','wn3'].forEach(function(id){ wn(id, false); });
+  var sr = document.getElementById('syncResult');
+  sr.textContent = '—'; sr.className = 'outcome-val';
+  var ar = document.getElementById('asyncResult');
+  ar.textContent = '—'; ar.className = 'outcome-val';
+  var bn = document.getElementById('banner');
+  bn.className = 'banner'; bn.textContent = 'Place an order to see what happens.';
+}
+
+async function runSync(fail) {
+  sc('sO','s-active');
+  await delay(350);
+
+  sa('a1','a-active'); wn('wn1',true);
+  await delay(350);
+  sc('sP','s-active');
+  await delay(600);
+  sc('sP','s-done'); sa('a1','a-done'); wn('wn1',false);
+  await delay(150);
+
+  sa('a2','a-active'); wn('wn2',true);
+  await delay(350);
+  sc('sI','s-active');
+  await delay(600);
+
+  if (fail) {
+    sc('sI','s-failed'); sa('a2','a-failed'); wn('wn2',false);
+    await delay(400);
+    sc('sSh','s-blocked'); sc('sO','s-failed');
+    var el = document.getElementById('syncResult');
+    el.textContent = '✕  Order failed\nInventory unreachable'; el.className = 'outcome-val fail';
+  } else {
+    sc('sI','s-done'); sa('a2','a-done'); wn('wn2',false);
+    await delay(150);
+    sa('a3','a-active'); wn('wn3',true);
+    await delay(350);
+    sc('sSh','s-active');
+    await delay(600);
+    sc('sSh','s-done'); sa('a3','a-done'); wn('wn3',false);
+    await delay(100);
+    sc('sO','s-done');
+    var el = document.getElementById('syncResult');
+    el.textContent = '✓  Order confirmed\nAll 3 hops completed'; el.className = 'outcome-val ok';
+  }
+}
+
+async function runAsync(fail) {
+  await delay(50);
+  sc('aO','s-active');
+  await delay(300);
+  sa('aArr1','a-ev');
+  await delay(300);
+  document.getElementById('aEL').classList.add('s-active');
+  await delay(350);
+
+  sc('aO','s-done');
+  var evlog = document.getElementById('aEL');
+  evlog.classList.remove('s-active'); evlog.classList.add('s-done');
+
+  var ar = document.getElementById('asyncResult');
+  ar.textContent = '✓  Order confirmed\nEvent published, moving on'; ar.className = 'outcome-val ok';
+
+  await delay(200);
+  sa('aArrP','a-ev'); sa('aArrI','a-ev'); sa('aArrSh','a-ev');
+  await delay(300);
+  sc('aP','s-active'); sc('aI','s-active'); sc('aSh','s-active');
+  await delay(600);
+  sc('aP','s-done'); sc('aSh','s-done');
+  sa('aArrP','a-done'); sa('aArrSh','a-done');
+  if (fail) {
+    sc('aI','s-failed'); sa('aArrI','a-failed');
+    ar.textContent = '✓  Order confirmed\nInventory will retry later'; ar.className = 'outcome-val ok';
+  } else {
+    sc('aI','s-done'); sa('aArrI','a-done');
+  }
+}
+
+document.getElementById('sendBtn').addEventListener('click', async function() {
+  if (running) return;
+  running = true;
+  document.getElementById('sendBtn').disabled = true;
+  reset();
+  var fail = document.getElementById('failToggle').checked;
+  document.getElementById('banner').textContent = 'Order in progress…';
+
+  await Promise.all([runSync(fail), runAsync(fail)]);
+
+  var bn = document.getElementById('banner');
+  if (fail) {
+    bn.className = 'banner b-fail';
+    bn.innerHTML = '<strong>Failure exposed the difference.</strong> The sync chain returned an error—the order couldn’t confirm because inventory was down. The event-driven flow confirmed the order immediately; inventory will retry when it recovers.';
+  } else {
+    bn.className = 'banner b-ok';
+    bn.innerHTML = '<strong>Both succeeded—but differently.</strong> The sync chain waited for every downstream hop before confirming. The event-driven flow confirmed as soon as the event was published, then each consumer processed it on its own schedule.';
+  }
+  running = false;
+  document.getElementById('sendBtn').disabled = false;
+});
+</script>
+</body>
+</html>

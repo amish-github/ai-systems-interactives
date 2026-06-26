@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From Brief to Architecture — Interactive</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      line-height: 1.5;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ─── Hint bar ─── */
+    .hint-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .hint-bar .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+    @keyframes cursor-wiggle {
+      0%, 90%, 100% { transform: rotate(0deg); }
+      15%            { transform: rotate(-10deg); }
+      30%            { transform: rotate(10deg); }
+      45%            { transform: rotate(-8deg); }
+      60%            { transform: rotate(6deg); }
+      75%            { transform: rotate(-3deg); }
+    }
+    .hint-text {
+      font-size: 18px;
+      color: rgba(0,0,0,0.83);
+    }
+
+    /* ─── Main content area ─── */
+    .content {
+      padding: 28px 20px 32px;
+    }
+
+    /* ─── Progress row ─── */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .progress-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.40);
+      white-space: nowrap;
+    }
+    .progress-track {
+      flex: 1;
+      height: 4px;
+      background: rgba(0,0,0,0.10);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #1878DC;
+      border-radius: 4px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ─── Brief card ─── */
+    .brief-card {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 0;
+    }
+    .brief-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 12px;
+    }
+    .brief-text {
+      font-size: 17px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+
+    /* ─── Arrow ─── */
+    .arrow-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 36px;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    .arrow-row.visible {
+      opacity: 1;
+    }
+
+    /* ─── Answer card ─── */
+    .answer-card {
+      border-radius: 12px;
+      border: 1px solid transparent;
+      padding: 20px 24px;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      margin-bottom: 0;
+      min-height: 56px;
+    }
+    .answer-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .answer-card.functional {
+      background: rgba(212,87,34,0.05);
+      border-color: rgba(212,87,34,0.22);
+    }
+    .answer-card.nonfunctional {
+      background: rgba(24,120,220,0.05);
+      border-color: rgba(24,120,220,0.22);
+    }
+
+    .req-kind {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 12px;
+    }
+    .req-kind.functional {
+      background: rgba(212,87,34,0.10);
+      color: #D35722;
+    }
+    .req-kind.nonfunctional {
+      background: rgba(24,120,220,0.10);
+      color: #1878DC;
+    }
+
+    .arch-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+    .arch-badge.no-mech {
+      background: rgba(0,0,0,0.07);
+      color: rgba(0,0,0,0.45);
+    }
+    .arch-badge.cache {
+      background: #1878DC;
+      color: #FFFFFF;
+    }
+    .arch-badge.autoscale {
+      background: #328F51;
+      color: #FFFFFF;
+    }
+    .arch-badge.slo {
+      background: #8754FD;
+      color: #FFFFFF;
+    }
+
+    .answer-explanation {
+      font-size: 16px;
+      color: rgba(0,0,0,0.65);
+      line-height: 1.55;
+    }
+
+    /* ─── Button row ─── */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 24px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      padding: 0 20px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1;
+      transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.12);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled {
+      opacity: 0.32;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .btn-ink {
+      background: #1A1A1A;
+      color: #FFFFFF;
+    }
+    .btn-ink:hover:not(:disabled) { background: #2e2e2e; }
+    .btn-ghost {
+      background: rgba(0,0,0,0.06);
+      color: #1A1A1A;
+      box-shadow: none;
+    }
+    .btn-ghost:hover:not(:disabled) { background: rgba(0,0,0,0.10); }
+
+    /* ─── Summary view ─── */
+    #summary-view { display: none; }
+    #summary-view.visible { display: block; }
+
+    .summary-heading {
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 20px;
+      font-family: 'Suisse Intl Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 460px) {
+      .summary-grid { grid-template-columns: 1fr; }
+    }
+
+    .summary-cell {
+      background: #FFFFFF;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      padding: 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.12);
+    }
+    .summary-req {
+      font-size: 14px;
+      color: rgba(0,0,0,0.55);
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+    .summary-arrow {
+      font-size: 12px;
+      color: rgba(0,0,0,0.25);
+      margin-bottom: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+    .summary-arch {
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.4;
+      margin-bottom: 10px;
+    }
+
+    @media (max-width: 400px) {
+      .content { padding: 20px 16px 28px; }
+      .hint-bar { padding: 12px 16px; }
+      .brief-card { padding: 20px; }
+      .answer-card { padding: 16px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hint bar -->
+  <div class="hint-bar">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click Reveal to see what each brief excerpt justifies</span>
+  </div>
+
+  <div class="content">
+
+    <!-- Step view -->
+    <div id="step-view">
+      <div class="progress-row">
+        <span class="progress-label" id="progress-label">1 / 4</span>
+        <div class="progress-track">
+          <div class="progress-fill" id="progress-fill" style="width: 25%"></div>
+        </div>
+      </div>
+
+      <div class="brief-card">
+        <div class="brief-label">Business brief excerpt</div>
+        <div class="brief-text" id="brief-text"></div>
+      </div>
+
+      <div class="arrow-row" id="arrow-row">
+        <svg width="14" height="22" viewBox="0 0 14 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M7 1v16M1 13l6 6 6-6" stroke="rgba(0,0,0,0.28)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="answer-card" id="answer-card">
+        <div class="req-kind" id="req-kind"></div>
+        <div class="arch-badge" id="arch-badge"></div>
+        <div class="answer-explanation" id="answer-explanation"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ink" id="btn-reveal" onclick="doReveal()">Reveal</button>
+        <button class="btn btn-ghost" id="btn-next" onclick="doNext()" disabled>Next &rarr;</button>
+      </div>
+    </div>
+
+    <!-- Summary view -->
+    <div id="summary-view">
+      <p class="summary-heading">All four — brief to architecture</p>
+      <div class="summary-grid" id="summary-grid"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="doRestart()">&larr; Start over</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    var steps = [
+      {
+        brief: "“Users must be able to create a project and invite teammates to it.”",
+        kind: "functional",
+        kindLabel: "Functional requirement",
+        badgeClass: "no-mech",
+        badgeText: "No architecture mechanism (yet)",
+        explanation: "This requirement says what the product must do, not how well it must do it. Features are necessary, but they carry no constraints on speed, scale, or availability. On their own they cannot justify any architectural component. The mechanism decision comes later, once you know the non-functional numbers."
+      },
+      {
+        brief: "“The project list must load in under 200 ms for 99% of requests, at a peak of 800 req/s, against data that rarely changes.”",
+        kind: "nonfunctional",
+        kindLabel: "Non-functional requirement",
+        badgeClass: "cache",
+        badgeText: "Justifies: Cache",
+        explanation: "A high read rate, a tight latency target, and data that rarely changes: this is exactly the condition a cache is designed to satisfy. The database alone cannot serve 800 fast reads per second affordably. The cache is not added because caches are interesting — it is added because this specific number makes it necessary."
+      },
+      {
+        brief: "“Traffic peaks at 800 req/s during business hours and drops to roughly 20 req/s overnight.”",
+        kind: "nonfunctional",
+        kindLabel: "Non-functional requirement",
+        badgeClass: "autoscale",
+        badgeText: "Justifies: Autoscaling",
+        explanation: "Traffic that rises and falls predictably through the day is what justifies autoscaling. Running at full capacity overnight would waste money. Autoscaling lets the system pay for the capacity it needs, when it needs it — a direct consequence of this number in the brief."
+      },
+      {
+        brief: "“The system must be available 99.9% of the time, meaning no more than about 8.7 hours of downtime per year.”",
+        kind: "nonfunctional",
+        kindLabel: "Non-functional requirement",
+        badgeClass: "slo",
+        badgeText: "Justifies: Service-level objective (SLO)",
+        explanation: "An availability percentage from the brief becomes a concrete, measurable promise: a service-level objective. The team monitors against this number and is alerted when the system drifts toward its limit. Without this figure in the brief there is no principled basis for setting the SLO in the first place."
+      }
+    ];
+
+    var summaryRows = [
+      { req: "Create a project, invite teammates",           arch: "No mechanism — defines a feature, not a constraint", badgeClass: "no-mech",   badgeText: "Functional" },
+      { req: "< 200 ms at 800 req/s, rarely-changing data", arch: "Cache in front of the database",                  badgeClass: "cache",     badgeText: "→ Cache" },
+      { req: "800 req/s peak → ~20 req/s overnight",    arch: "Autoscaling up and down with traffic",            badgeClass: "autoscale", badgeText: "→ Autoscaling" },
+      { req: "99.9% availability target",                    arch: "Service-level objective (SLO)",                 badgeClass: "slo",       badgeText: "→ SLO" }
+    ];
+
+    var current = 0;
+    var revealed = false;
+
+    function renderStep() {
+      var s = steps[current];
+      document.getElementById('brief-text').textContent = s.brief;
+
+      var n = steps.length;
+      document.getElementById('progress-label').textContent = (current + 1) + ' / ' + n;
+      document.getElementById('progress-fill').style.width = (((current + 1) / n) * 100) + '%';
+
+      var ac = document.getElementById('answer-card');
+      ac.className = 'answer-card';
+      document.getElementById('arrow-row').className = 'arrow-row';
+      document.getElementById('btn-reveal').disabled = false;
+      document.getElementById('btn-next').disabled = true;
+      revealed = false;
+    }
+
+    function doReveal() {
+      if (revealed) return;
+      revealed = true;
+      var s = steps[current];
+
+      document.getElementById('req-kind').textContent = s.kindLabel;
+      document.getElementById('req-kind').className = 'req-kind ' + s.kind;
+
+      var badge = document.getElementById('arch-badge');
+      badge.textContent = s.badgeText;
+      badge.className = 'arch-badge ' + s.badgeClass;
+
+      document.getElementById('answer-explanation').textContent = s.explanation;
+
+      document.getElementById('arrow-row').className = 'arrow-row visible';
+      var ac = document.getElementById('answer-card');
+      ac.className = 'answer-card ' + s.kind;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          ac.classList.add('visible');
+        });
+      });
+
+      document.getElementById('btn-reveal').disabled = true;
+      document.getElementById('btn-next').disabled = false;
+    }
+
+    function doNext() {
+      current++;
+      if (current >= steps.length) {
+        showSummary();
+      } else {
+        var ac = document.getElementById('answer-card');
+        ac.classList.remove('visible');
+        setTimeout(renderStep, 180);
+      }
+    }
+
+    function showSummary() {
+      document.getElementById('step-view').style.display = 'none';
+      var sv = document.getElementById('summary-view');
+      sv.classList.add('visible');
+
+      var grid = document.getElementById('summary-grid');
+      grid.innerHTML = '';
+      summaryRows.forEach(function(row) {
+        var cell = document.createElement('div');
+        cell.className = 'summary-cell';
+        cell.innerHTML =
+          '<div class="summary-req">' + row.req + '</div>' +
+          '<div class="summary-arrow">↓</div>' +
+          '<div class="summary-arch">' + row.arch + '</div>' +
+          '<span class="arch-badge ' + row.badgeClass + '">' + row.badgeText + '</span>';
+        grid.appendChild(cell);
+      });
+    }
+
+    function doRestart() {
+      current = 0;
+      revealed = false;
+      document.getElementById('summary-view').classList.remove('visible');
+      var sv = document.getElementById('step-view');
+      sv.style.display = '';
+      var ac = document.getElementById('answer-card');
+      ac.className = 'answer-card';
+      renderStep();
+    }
+
+    renderStep();
+  </script>
+</body>
+</html>

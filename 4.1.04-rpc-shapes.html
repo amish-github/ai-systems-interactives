@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Four RPC Shapes</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #ffffff;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* ── Hint header ── */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+}
+.hint svg {
+  flex-shrink: 0;
+  animation: wig 4s ease-in-out infinite;
+}
+@keyframes wig {
+  0%,100% { transform: rotate(0deg); }
+  10%     { transform: rotate(-10deg); }
+  20%     { transform: rotate(10deg); }
+  30%     { transform: rotate(-8deg); }
+  40%     { transform: rotate(6deg); }
+  50%     { transform: rotate(-3deg); }
+  60%     { transform: rotate(0deg); }
+}
+.hint-txt { font-size: 18px; color: #1A1A1A; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 20px 24px 0;
+}
+.tab {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #ffffff;
+  color: rgba(0,0,0,0.50);
+  cursor: pointer;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+.tab:hover:not(.on) {
+  color: #1A1A1A;
+  border-color: rgba(0,0,0,0.30);
+}
+.tab.on {
+  background: #1A1A1A;
+  color: #ffffff;
+  border-color: #1A1A1A;
+}
+
+/* ── Diagram card ── */
+.diag {
+  padding: 20px 24px;
+}
+.diag-inner {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 32px 20px 20px;
+  overflow: visible;
+}
+
+/* Nodes + channel row */
+.nrow {
+  display: flex;
+  align-items: center;
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 68px;
+  flex-shrink: 0;
+}
+.nbox {
+  width: 56px;
+  height: 56px;
+  background: #ffffff;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+}
+.nlbl {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+}
+
+/* Arrow channel */
+.chan {
+  flex: 1;
+  margin: 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 56px;
+}
+
+/* Single arrow row */
+.arr {
+  display: flex;
+  align-items: center;
+  position: relative;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.arr.vis {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Floating message label above arrow */
+.albl {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.40);
+  white-space: nowrap;
+  pointer-events: none;
+  background: #F2F1EE;
+  padding: 0 4px;
+}
+
+/* Shaft */
+.shaft {
+  flex: 1;
+  height: 2px;
+}
+
+/* Tip */
+.atip {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Right arrow (client → server) */
+.right .shaft { background: #1878DC; }
+.right .atip {
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent #1878DC;
+}
+
+/* Left arrow (server → client): reverse flex order */
+.left {
+  flex-direction: row-reverse;
+}
+.left .shaft { background: #328F51; }
+.left .atip {
+  border-width: 5px 8px 5px 0;
+  border-color: transparent #328F51 transparent transparent;
+}
+
+/* Status line */
+.status {
+  margin-top: 20px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+  text-align: center;
+  min-height: 18px;
+  transition: opacity 0.3s ease;
+}
+
+/* ── Info panel ── */
+.info {
+  margin: 0 24px;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+}
+.iname {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.ipat {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: #1878DC;
+  margin-bottom: 10px;
+}
+.idesc {
+  font-size: 16px;
+  color: rgba(0,0,0,0.65);
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
+.iex {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #F2F1EE;
+  border-radius: 8px;
+  align-items: flex-start;
+}
+.iex-tag {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.35);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.iex-val {
+  font-size: 14px;
+  color: rgba(0,0,0,0.65);
+  line-height: 1.45;
+}
+
+/* ── Legend ── */
+.legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 24px 0;
+}
+.leg-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+}
+.leg-swatch {
+  width: 20px;
+  height: 2px;
+}
+.leg-swatch.blue  { background: #1878DC; }
+.leg-swatch.green { background: #328F51; }
+
+/* ── Bottom row ── */
+.bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px 24px;
+}
+.replay {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1A1A1A;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+  transition: background 0.12s;
+}
+.replay:hover { background: #F2F1EE; }
+
+.dots {
+  display: flex;
+  gap: 8px;
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.dot.on { background: #1A1A1A; }
+
+/* ── Responsive ── */
+@media (max-width: 420px) {
+  .hint   { padding: 14px 16px; }
+  .tabs   { padding: 16px 16px 0; }
+  .diag   { padding: 16px; }
+  .info   { margin: 0 16px; }
+  .legend { padding: 10px 16px 0; }
+  .bottom { padding: 12px 16px 20px; }
+  .tab    { font-size: 13px; padding: 5px 10px; }
+  .hint-txt { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-txt">Select a shape to see how messages flow</span>
+  </div>
+
+  <!-- Shape tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- Diagram -->
+  <div class="diag">
+    <div class="diag-inner">
+      <div class="nrow">
+        <div class="node">
+          <div class="nbox">💻</div>
+          <span class="nlbl">client</span>
+        </div>
+        <div class="chan" id="chan"></div>
+        <div class="node">
+          <div class="nbox">🖥</div>
+          <span class="nlbl">server</span>
+        </div>
+      </div>
+      <div class="status" id="status">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="leg-item">
+      <div class="leg-swatch blue"></div>
+      client → server
+    </div>
+    <div class="leg-item">
+      <div class="leg-swatch green"></div>
+      server → client
+    </div>
+  </div>
+
+  <!-- Info panel -->
+  <div class="info" style="margin-top:16px">
+    <div class="iname"  id="iname"></div>
+    <div class="ipat"   id="ipat"></div>
+    <div class="idesc"  id="idesc"></div>
+    <div class="iex">
+      <span class="iex-tag">example</span>
+      <span class="iex-val" id="iex"></span>
+    </div>
+  </div>
+
+  <!-- Bottom: replay + dots -->
+  <div class="bottom">
+    <button class="replay" id="replay">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.5 7a5.5 5.5 0 1 1-1.17-3.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M9 3l2.5.59L12.07 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Replay
+    </button>
+    <div class="dots" id="dots"></div>
+  </div>
+
+</div>
+
+<script>
+var DATA = {
+  unary: {
+    name: 'Unary',
+    pat:  'one request → one response',
+    desc: 'The default shape. The client sends one message and waits for exactly one reply — just like calling a local function. Use this unless the interaction genuinely needs a stream.',
+    ex:   'GetOrder(order_id) — client sends an ID, server returns the matching order. One call, one result.',
+    arrows: [
+      { dir: 'right', lbl: 'request',  ms: 120 },
+      { dir: 'left',  lbl: 'response', ms: 620 }
+    ],
+    fin: 'One request, one response — call complete.'
+  },
+  server_streaming: {
+    name: 'Server streaming',
+    pat:  'one request → stream of responses',
+    desc: 'The client asks once and the server sends back many messages over time on the same open call, closing the stream when it is done.',
+    ex:   'Subscribe to a price feed — send one request, receive price updates one by one as they arrive.',
+    arrows: [
+      { dir: 'right', lbl: 'subscribe',    ms: 120  },
+      { dir: 'left',  lbl: 'price $4.20',  ms: 560  },
+      { dir: 'left',  lbl: 'price $4.18',  ms: 940  },
+      { dir: 'left',  lbl: 'price $4.25',  ms: 1320 },
+      { dir: 'left',  lbl: '⏹ stream end', ms: 1760 }
+    ],
+    fin: 'Server streamed 3 updates then closed.'
+  },
+  client_streaming: {
+    name: 'Client streaming',
+    pat:  'stream of requests → one response',
+    desc: 'The client sends many messages over time and the server waits until the stream is complete before replying once.',
+    ex:   'Upload a large video — client sends chunks one by one, server confirms with a file ID when all chunks arrive.',
+    arrows: [
+      { dir: 'right', lbl: 'chunk 1',   ms: 120  },
+      { dir: 'right', lbl: 'chunk 2',   ms: 500  },
+      { dir: 'right', lbl: 'chunk 3',   ms: 880  },
+      { dir: 'right', lbl: 'chunk 4',   ms: 1260 },
+      { dir: 'left',  lbl: '✓ file_id', ms: 1700 }
+    ],
+    fin: 'Client streamed 4 chunks → one confirmation.'
+  },
+  bidirectional: {
+    name: 'Bidirectional streaming',
+    pat:  'stream ⇄ stream',
+    desc: 'Both sides stream independently on a single open call. Either side can send whenever it has something to say, with no fixed turn order.',
+    ex:   'A live chat session — both users send and receive messages independently, at any time.',
+    arrows: [
+      { dir: 'right', lbl: 'msg A', ms: 80   },
+      { dir: 'left',  lbl: 'msg 1', ms: 340  },
+      { dir: 'right', lbl: 'msg B', ms: 600  },
+      { dir: 'left',  lbl: 'msg 2', ms: 860  },
+      { dir: 'right', lbl: 'msg C', ms: 1120 },
+      { dir: 'left',  lbl: 'msg 3', ms: 1380 }
+    ],
+    fin: 'Both sides streaming — call still open.'
+  }
+};
+
+var KEYS = ['unary', 'server_streaming', 'client_streaming', 'bidirectional'];
+var cur  = KEYS[0];
+var tids = [];
+
+function stopAll() { tids.forEach(clearTimeout); tids = []; }
+
+function go(key) {
+  stopAll();
+  cur = key;
+  var d = DATA[key];
+
+  // Update tabs
+  document.querySelectorAll('.tab').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.k === key);
+  });
+
+  // Update dots
+  document.querySelectorAll('.dot').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.k === key);
+  });
+
+  // Update info panel
+  document.getElementById('iname').textContent = d.name;
+  document.getElementById('ipat').textContent  = d.pat;
+  document.getElementById('idesc').textContent = d.desc;
+  document.getElementById('iex').textContent   = d.ex;
+  document.getElementById('status').innerHTML  = '&nbsp;';
+
+  // Build arrow rows (all invisible initially)
+  var chan = document.getElementById('chan');
+  chan.innerHTML = '';
+
+  d.arrows.forEach(function(a) {
+    var row   = document.createElement('div');
+    row.className = 'arr ' + a.dir;
+
+    var lbl   = document.createElement('span');
+    lbl.className   = 'albl';
+    lbl.textContent = a.lbl;
+
+    var shaft = document.createElement('div');
+    shaft.className = 'shaft';
+
+    var tip   = document.createElement('div');
+    tip.className = 'atip';
+
+    row.appendChild(lbl);
+    row.appendChild(shaft);
+    row.appendChild(tip);
+    chan.appendChild(row);
+  });
+
+  // Animate arrows in one by one
+  var rows = chan.querySelectorAll('.arr');
+  d.arrows.forEach(function(a, i) {
+    var t = setTimeout(function() {
+      rows[i].classList.add('vis');
+      if (i === d.arrows.length - 1) {
+        var t2 = setTimeout(function() {
+          document.getElementById('status').textContent = d.fin;
+        }, 350);
+        tids.push(t2);
+      }
+    }, a.ms);
+    tids.push(t);
+  });
+}
+
+// Build tabs
+var tabsEl = document.getElementById('tabs');
+var LABELS = { unary: 'Unary', server_streaming: 'Server streaming', client_streaming: 'Client streaming', bidirectional: 'Bidirectional' };
+KEYS.forEach(function(k) {
+  var b = document.createElement('button');
+  b.className   = 'tab';
+  b.dataset.k   = k;
+  b.textContent = LABELS[k];
+  b.onclick = function() { go(k); };
+  tabsEl.appendChild(b);
+});
+
+// Build dots
+var dotsEl = document.getElementById('dots');
+KEYS.forEach(function(k) {
+  var d = document.createElement('div');
+  d.className = 'dot';
+  d.dataset.k = k;
+  d.title     = LABELS[k];
+  d.onclick   = function() { go(k); };
+  dotsEl.appendChild(d);
+});
+
+document.getElementById('replay').onclick = function() { go(cur); };
+
+go(KEYS[0]);
+</script>
+</body>
+</html>

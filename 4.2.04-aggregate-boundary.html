@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aggregate Boundary Designer</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.hint-header .cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s ease-in-out infinite;
+}
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+.hint-header span {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+/* ── Scenario ── */
+.scenario {
+  padding: 20px 24px 16px;
+  font-size: 16px;
+  color: rgba(0,0,0,0.70);
+  line-height: 1.6;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.scenario strong { color: #1A1A1A; }
+
+/* ── Tray ── */
+.tray-section {
+  padding: 20px 24px 8px;
+}
+.tray-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 12px;
+  letter-spacing: 0.03em;
+}
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+}
+
+/* ── Item chips ── */
+.item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s, border-color 0.12s, transform 0.1s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.item-chip:hover { background: #E6E5E1; transform: translateY(-1px); }
+.item-chip:active { transform: translateY(0px); }
+
+.item-chip .badge {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.08);
+  color: rgba(0,0,0,0.45);
+  white-space: nowrap;
+}
+.item-chip.assigned-a {
+  background: #EBF3FD;
+  border-color: #1878DC;
+}
+.item-chip.assigned-a .badge {
+  background: #1878DC;
+  color: #FFFFFF;
+}
+.item-chip.assigned-b {
+  background: #EDF7F1;
+  border-color: #328F51;
+}
+.item-chip.assigned-b .badge {
+  background: #328F51;
+  color: #FFFFFF;
+}
+
+/* ── Aggregates ── */
+.aggregates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 24px;
+}
+@media (max-width: 480px) {
+  .aggregates { grid-template-columns: 1fr; }
+}
+
+.aggregate-box {
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 168px;
+  background: #FFFFFF;
+  transition: border-color 0.15s;
+}
+.aggregate-box.agg-a { border-color: rgba(24,120,220,0.40); }
+.aggregate-box.agg-b { border-color: rgba(50,143,81,0.40); }
+.aggregate-box.agg-a.has-items { border-color: #1878DC; }
+.aggregate-box.agg-b.has-items { border-color: #328F51; }
+
+.agg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.agg-pill {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: #FFFFFF;
+  letter-spacing: 0.04em;
+}
+.agg-a .agg-pill { background: #1878DC; }
+.agg-b .agg-pill { background: #328F51; }
+.agg-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+.agg-desc {
+  font-size: 13px;
+  color: rgba(0,0,0,0.45);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.agg-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 60px;
+}
+.agg-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #F2F1EE;
+}
+.empty-hint {
+  font-size: 13px;
+  color: rgba(0,0,0,0.28);
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* ── Check area ── */
+.check-area {
+  padding: 4px 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.check-btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: none;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl', sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.1s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.check-btn:hover:not(:disabled) { background: #333; transform: translateY(-1px); }
+.check-btn:active:not(:disabled) { transform: translateY(0); }
+.check-btn:disabled {
+  background: rgba(0,0,0,0.16);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.check-hint {
+  font-size: 14px;
+  color: rgba(0,0,0,0.38);
+}
+
+/* ── Feedback ── */
+.feedback-section {
+  padding: 0 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.feedback-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  align-items: flex-start;
+}
+.feedback-item.correct {
+  background: #EDF7F1;
+  border: 1px solid rgba(50,143,81,0.40);
+}
+.feedback-item.wrong {
+  background: #FDF0EF;
+  border: 1px solid rgba(222,76,69,0.40);
+}
+.feedback-icon {
+  flex-shrink: 0;
+  font-size: 15px;
+  margin-top: 1px;
+  width: 20px;
+  text-align: center;
+}
+.feedback-text strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 3px;
+  color: #1A1A1A;
+}
+.feedback-text p {
+  font-size: 14px;
+  color: rgba(0,0,0,0.65);
+}
+.score-line {
+  font-size: 16px;
+  color: #1A1A1A;
+  padding: 4px 0 0;
+}
+.reset-btn {
+  margin-top: 4px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  color: #1A1A1A;
+  font-family: 'Suisse Intl', sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.12s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.reset-btn:hover { background: #F2F1EE; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Click each data item to assign it to the right aggregate</span>
+  </div>
+
+  <!-- Scenario -->
+  <div class="scenario">
+    An order is placed in an online store. For each piece of data below, decide whether it needs <strong>immediate consistency</strong> (must be correct at the exact same instant) or <strong>eventual consistency</strong> (can catch up a moment later) — and assign it to the matching aggregate.
+    <br><br>
+    <span style="font-size:14px; color:rgba(0,0,0,0.50);">Each click cycles: unassigned → Aggregate A → Aggregate B → unassigned</span>
+  </div>
+
+  <!-- Item tray -->
+  <div class="tray-section">
+    <div class="tray-label">Data items</div>
+    <div class="tray" id="item-tray"></div>
+  </div>
+
+  <!-- Aggregate buckets -->
+  <div class="aggregates">
+    <div class="aggregate-box agg-a" id="box-a">
+      <div class="agg-header">
+        <span class="agg-pill">AGG A</span>
+        <span class="agg-name">Orders Service</span>
+      </div>
+      <div class="agg-desc">Immediate consistency — one transaction</div>
+      <div class="agg-items" id="agg-a-items">
+        <span class="empty-hint">Nothing assigned yet</span>
+      </div>
+    </div>
+    <div class="aggregate-box agg-b" id="box-b">
+      <div class="agg-header">
+        <span class="agg-pill">AGG B</span>
+        <span class="agg-name">Loyalty Service</span>
+      </div>
+      <div class="agg-desc">Eventual consistency — updated via event</div>
+      <div class="agg-items" id="agg-b-items">
+        <span class="empty-hint">Nothing assigned yet</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Check button -->
+  <div class="check-area">
+    <button class="check-btn" id="check-btn" disabled>Check my answer</button>
+    <span class="check-hint" id="check-hint">Assign all 4 items to check</span>
+  </div>
+
+  <!-- Feedback -->
+  <div class="feedback-section" id="feedback-section" style="display:none;"></div>
+
+</div>
+<script>
+const ITEMS = [
+  {
+    id: 'order-total',
+    label: 'Order Total',
+    icon: '&#x1F9EE;',
+    correctAgg: 'a',
+    correctLabel: 'Aggregate A',
+    explanation: 'The total must equal the sum of line items at every instant. It lives in the Orders aggregate and is updated in the same transaction as the line items — never out of sync, even for a moment.'
+  },
+  {
+    id: 'line-items',
+    label: 'Line Items',
+    icon: '&#x1F4CB;',
+    correctAgg: 'a',
+    correctLabel: 'Aggregate A',
+    explanation: 'Each line item drives the order total. Adding an item and recalculating the total must happen atomically in one transaction, so line items share the same aggregate as the total.'
+  },
+  {
+    id: 'loyalty-points',
+    label: 'Loyalty Points',
+    icon: '&#x2B50;',
+    correctAgg: 'b',
+    correctLabel: 'Aggregate B',
+    explanation: 'Points are awarded after the order is confirmed. A brief delay is acceptable, so the Loyalty Service can update itself when it receives a "order placed" event — no need for the same transaction.'
+  },
+  {
+    id: 'customer-profile',
+    label: 'Customer Profile',
+    icon: '&#x1F464;',
+    correctAgg: 'b',
+    correctLabel: 'Aggregate B',
+    explanation: 'Name, address, and preferences change independently of any individual order. There is no immediate consistency requirement linking them to order totals, so they belong in a separate aggregate.'
+  }
+];
+
+const assignments = {};
+ITEMS.forEach(i => assignments[i.id] = null);
+
+let checked = false;
+
+function cycleAssignment(id) {
+  if (checked) return;
+  const cur = assignments[id];
+  if (!cur) assignments[id] = 'a';
+  else if (cur === 'a') assignments[id] = 'b';
+  else assignments[id] = null;
+  render();
+}
+
+function render() {
+  renderTray();
+  renderBoxes();
+  updateCheck();
+}
+
+function renderTray() {
+  const tray = document.getElementById('item-tray');
+  tray.innerHTML = '';
+  ITEMS.forEach(item => {
+    const asg = assignments[item.id];
+    const chip = document.createElement('button');
+    chip.className = 'item-chip' + (asg === 'a' ? ' assigned-a' : asg === 'b' ? ' assigned-b' : '');
+    chip.style.border = 'none';
+    chip.innerHTML =
+      '<span>' + item.icon + ' ' + item.label + '</span>' +
+      '<span class="badge">' + (asg ? 'AGG ' + asg.toUpperCase() : 'unassigned') + '</span>';
+    chip.addEventListener('click', () => cycleAssignment(item.id));
+    if (checked) { chip.style.cursor = 'default'; chip.style.pointerEvents = 'none'; }
+    tray.appendChild(chip);
+  });
+}
+
+function renderBoxes() {
+  ['a', 'b'].forEach(agg => {
+    const container = document.getElementById('agg-' + agg + '-items');
+    const box = document.getElementById('box-' + agg);
+    const assigned = ITEMS.filter(i => assignments[i.id] === agg);
+    if (assigned.length === 0) {
+      container.innerHTML = '<span class="empty-hint">Nothing assigned yet</span>';
+      box.classList.remove('has-items');
+    } else {
+      container.innerHTML = assigned.map(i =>
+        '<div class="agg-item-row">' + i.icon + ' ' + i.label + '</div>'
+      ).join('');
+      box.classList.add('has-items');
+    }
+  });
+}
+
+function updateCheck() {
+  const allDone = ITEMS.every(i => assignments[i.id] !== null);
+  const btn = document.getElementById('check-btn');
+  const hint = document.getElementById('check-hint');
+  btn.disabled = !allDone;
+  const unassigned = ITEMS.filter(i => assignments[i.id] === null).length;
+  hint.textContent = allDone
+    ? 'All items assigned — ready to check'
+    : (unassigned + ' item' + (unassigned === 1 ? '' : 's') + ' still unassigned');
+}
+
+document.getElementById('check-btn').addEventListener('click', () => {
+  checked = true;
+  renderTray();
+
+  const section = document.getElementById('feedback-section');
+  section.style.display = 'flex';
+
+  let correct = 0;
+  let html = '';
+
+  ITEMS.forEach(item => {
+    const ok = assignments[item.id] === item.correctAgg;
+    if (ok) correct++;
+    const assigned = assignments[item.id] === 'a' ? 'Aggregate A' : 'Aggregate B';
+    html += '<div class="feedback-item ' + (ok ? 'correct' : 'wrong') + '">' +
+      '<span class="feedback-icon">' + (ok ? '&#x2713;' : '&#x2717;') + '</span>' +
+      '<div class="feedback-text">' +
+        '<strong>' + item.icon + ' ' + item.label + (ok ? ' &rarr; ' + item.correctLabel : ' &rarr; ' + assigned + ' &mdash; should be ' + item.correctLabel) + '</strong>' +
+        '<p>' + item.explanation + '</p>' +
+      '</div>' +
+    '</div>';
+  });
+
+  const allRight = correct === ITEMS.length;
+  html += '<div class="score-line">' +
+    (allRight ? '&#x2713; All correct. The boundary is well drawn.' : correct + ' of ' + ITEMS.length + ' correct. The highlighted items show where the line needs to move.') +
+  '</div>';
+  html += '<button class="reset-btn" id="reset-btn">Try again</button>';
+
+  section.innerHTML = html;
+  document.getElementById('check-btn').disabled = true;
+  document.getElementById('check-hint').textContent = '';
+
+  document.getElementById('reset-btn').addEventListener('click', () => {
+    checked = false;
+    ITEMS.forEach(i => assignments[i.id] = null);
+    section.style.display = 'none';
+    section.innerHTML = '';
+    render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>

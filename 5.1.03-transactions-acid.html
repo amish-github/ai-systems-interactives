@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Transactions and ACID — Interactive</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .hint-cursor {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%,100% { transform: rotate(0deg); }
+      15%     { transform: rotate(-10deg); }
+      30%     { transform: rotate(10deg); }
+      45%     { transform: rotate(-8deg); }
+      60%     { transform: rotate(6deg); }
+      75%     { transform: rotate(-3deg); }
+      90%     { transform: rotate(0deg); }
+    }
+
+    .hint-text { font-size: 18px; color: #1A1A1A; line-height: 1.3; }
+
+    /* ── Main layout ── */
+    .main-content {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Account cards ── */
+    .accounts-row {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .account-card {
+      background: #F2F1EE;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      border: 2px solid transparent;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.35s ease, border-color 0.35s ease;
+    }
+
+    .account-card.state-pending    { border-color: #F48E00; background: #FFF9EF; }
+    .account-card.state-committed  { border-color: #328F51; background: #EEF9F2; }
+    .account-card.state-rolledback { border-color: #DE4C45; background: #FFF0EF; }
+
+    .account-name {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(0,0,0,0.42);
+      margin-bottom: 8px;
+    }
+
+    .account-balance {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 28px;
+      color: #1A1A1A;
+    }
+
+    .account-tag {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      min-height: 20px;
+      margin-top: 6px;
+      transition: color 0.3s ease;
+    }
+
+    .tag-pending    { color: #F48E00; }
+    .tag-committed  { color: #328F51; }
+    .tag-restored   { color: #DE4C45; }
+
+    /* Transfer arrow */
+    .transfer-arrow {
+      text-align: center;
+      font-size: 22px;
+      color: rgba(0,0,0,0.18);
+      transition: color 0.35s ease, transform 0.35s ease;
+      user-select: none;
+    }
+    .transfer-arrow.active {
+      color: #1878DC;
+      transform: scale(1.2);
+    }
+
+    /* ── TX status bar ── */
+    .tx-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      padding: 10px 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .tx-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.18);
+      flex-shrink: 0;
+      transition: background 0.3s ease;
+    }
+    .tx-dot.state-open        { background: #F48E00; }
+    .tx-dot.state-committed   { background: #328F51; }
+    .tx-dot.state-rolledback  { background: #DE4C45; }
+
+    .tx-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      transition: color 0.3s ease;
+    }
+    .tx-label.state-open        { color: #F48E00; }
+    .tx-label.state-committed   { color: #328F51; }
+    .tx-label.state-rolledback  { color: #DE4C45; }
+
+    /* ── SQL log ── */
+    .sql-log {
+      background: #1A1A1A;
+      border-radius: 16px;
+      padding: 16px 20px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      min-height: 116px;
+      line-height: 1.7;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .sql-line {
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+      white-space: pre;
+    }
+    .sql-line.vis { opacity: 1; transform: none; }
+
+    .s-kw   { color: #8754FD; }
+    .s-def  { color: rgba(255,255,255,0.82); }
+    .s-cmt  { color: rgba(255,255,255,0.32); }
+    .s-ok   { color: #328F51; }
+    .s-fail { color: #DE4C45; }
+
+    /* ── Step description ── */
+    .step-desc {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 16px;
+      color: rgba(0,0,0,0.62);
+      line-height: 1.5;
+      min-height: 52px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    /* ── Outcome banner ── */
+    .outcome {
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 16px;
+      line-height: 1.5;
+      display: none;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .outcome.committed  {
+      display: block;
+      background: #EEF9F2;
+      border: 2px solid #328F51;
+      color: #1B5C33;
+    }
+    .outcome.rolledback {
+      display: block;
+      background: #FFF0EF;
+      border: 2px solid #DE4C45;
+      color: #892C27;
+    }
+
+    /* ── Buttons ── */
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 80px;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 15px;
+      cursor: pointer;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.2s ease;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 3px 8px 0 rgba(0,0,0,0.18);
+    }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.30; cursor: not-allowed; }
+
+    .btn-next     { background: #1A1A1A; color: #FFFFFF; }
+    .btn-commit   { background: #328F51; color: #FFFFFF; }
+    .btn-rollback { background: #DE4C45; color: #FFFFFF; }
+    .btn-reset    {
+      background: #F2F1EE;
+      color: #1A1A1A;
+      border: 1px solid rgba(0,0,0,0.14);
+    }
+
+    /* ── ACID section ── */
+    .acid-section {
+      padding-top: 20px;
+      border-top: 1px solid rgba(0,0,0,0.12);
+    }
+
+    .acid-heading {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 12px;
+    }
+
+    .acid-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .acid-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.2s ease, background 0.2s ease;
+      user-select: none;
+    }
+    .acid-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 3px 8px 0 rgba(0,0,0,0.18);
+    }
+    .acid-card.open { background: #FFFFFF; }
+
+    .acid-card[data-a="A"].open { border-color: #1878DC; }
+    .acid-card[data-a="C"].open { border-color: #328F51; }
+    .acid-card[data-a="I"].open { border-color: #8754FD; }
+    .acid-card[data-a="D"].open { border-color: #F48E00; }
+
+    .acid-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .acid-letter {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .acid-card[data-a="A"] .acid-letter { color: #1878DC; }
+    .acid-card[data-a="C"] .acid-letter { color: #328F51; }
+    .acid-card[data-a="I"] .acid-letter { color: #8754FD; }
+    .acid-card[data-a="D"] .acid-letter { color: #F48E00; }
+
+    .acid-word { font-size: 15px; color: #1A1A1A; }
+
+    .acid-chevron {
+      margin-left: auto;
+      font-size: 12px;
+      color: rgba(0,0,0,0.30);
+      transition: transform 0.25s ease;
+      flex-shrink: 0;
+    }
+    .acid-card.open .acid-chevron { transform: rotate(180deg); }
+
+    .acid-body {
+      font-size: 14px;
+      color: rgba(0,0,0,0.60);
+      line-height: 1.55;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding-top 0.3s ease;
+    }
+    .acid-card.open .acid-body {
+      max-height: 200px;
+      padding-top: 8px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hint-header  { padding: 16px 16px; }
+      .main-content { padding: 16px; gap: 16px; }
+      .account-balance { font-size: 24px; }
+      .btn { font-size: 14px; padding: 10px 12px; }
+      .accounts-row { grid-template-columns: 1fr 36px 1fr; }
+    }
+    @media (max-width: 360px) {
+      .acid-grid { grid-template-columns: 1fr; }
+      .account-balance { font-size: 20px; }
+    }
+    @media (max-width: 325px) {
+      .main-content { padding: 12px; gap: 12px; }
+      .sql-log { padding: 12px 14px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Step through a $100 transfer, then choose to commit or roll back</span>
+  </div>
+
+  <div class="main-content">
+
+    <!-- Account cards -->
+    <div class="accounts-row">
+      <div class="account-card" id="alice-card">
+        <div class="account-name">Alice</div>
+        <div class="account-balance" id="alice-bal">$500</div>
+        <div class="account-tag" id="alice-tag"></div>
+      </div>
+      <div class="transfer-arrow" id="arrow">&#8594;</div>
+      <div class="account-card" id="bob-card">
+        <div class="account-name">Bob</div>
+        <div class="account-balance" id="bob-bal">$300</div>
+        <div class="account-tag" id="bob-tag"></div>
+      </div>
+    </div>
+
+    <!-- TX status bar -->
+    <div class="tx-bar">
+      <div class="tx-dot" id="tx-dot"></div>
+      <span class="tx-label" id="tx-label">No active transaction</span>
+    </div>
+
+    <!-- SQL log -->
+    <div class="sql-log" id="sql-log">
+      <div class="sql-line s-cmt vis">-- Transfer $100: Alice &#x2192; Bob</div>
+      <div class="sql-line s-cmt vis">-- Click "Begin Transaction" to start</div>
+    </div>
+
+    <!-- Step description -->
+    <div class="step-desc" id="step-desc">Two writes are needed — debit Alice, then credit Bob. Without a transaction, one could succeed while the other fails, leaving money permanently lost.</div>
+
+    <!-- Outcome banner -->
+    <div class="outcome" id="outcome"></div>
+
+    <!-- Buttons -->
+    <div class="btn-row">
+      <button class="btn btn-next"     id="btn-next"     onclick="advance()">Begin Transaction</button>
+      <button class="btn btn-commit"   id="btn-commit"   onclick="doCommit()"   disabled>COMMIT</button>
+      <button class="btn btn-rollback" id="btn-rollback" onclick="doRollback()" disabled>ROLLBACK</button>
+      <button class="btn btn-reset"    onclick="doReset()">Reset</button>
+    </div>
+
+    <!-- ACID properties -->
+    <div class="acid-section">
+      <div class="acid-heading">ACID Guarantees &mdash; tap each to expand</div>
+      <div class="acid-grid">
+
+        <div class="acid-card" data-a="A" onclick="toggleAcid(this)">
+          <div class="acid-row">
+            <span class="acid-letter">A</span>
+            <span class="acid-word">Atomicity</span>
+            <span class="acid-chevron">&#9660;</span>
+          </div>
+          <div class="acid-body">All operations in the transaction succeed, or none take effect. The debit and credit are an indivisible pair — if either fails, the database undoes both automatically.</div>
+        </div>
+
+        <div class="acid-card" data-a="C" onclick="toggleAcid(this)">
+          <div class="acid-row">
+            <span class="acid-letter">C</span>
+            <span class="acid-word">Consistency</span>
+            <span class="acid-chevron">&#9660;</span>
+          </div>
+          <div class="acid-body">Every committed transaction leaves the database in a valid state. Constraints like "balance &ge; 0" or foreign-key rules are enforced — a violating transaction is rejected in full, never partially.</div>
+        </div>
+
+        <div class="acid-card" data-a="I" onclick="toggleAcid(this)">
+          <div class="acid-row">
+            <span class="acid-letter">I</span>
+            <span class="acid-word">Isolation</span>
+            <span class="acid-chevron">&#9660;</span>
+          </div>
+          <div class="acid-body">Concurrent transactions cannot see each other's uncommitted changes. Alice's pending debit is invisible to every other connection until COMMIT. (Explored in depth in the next lesson.)</div>
+        </div>
+
+        <div class="acid-card" data-a="D" onclick="toggleAcid(this)">
+          <div class="acid-row">
+            <span class="acid-letter">D</span>
+            <span class="acid-word">Durability</span>
+            <span class="acid-chevron">&#9660;</span>
+          </div>
+          <div class="acid-body">Once the database confirms COMMIT, the changes are written to durable storage. They will survive a crash or power loss — a committed transaction is permanent from that moment on.</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /.main-content -->
+</div><!-- /.container -->
+
+<script>
+  var step = 0;
+  // 0 = idle | 1 = begun | 2 = alice debited | 3 = bob credited (decision)
+  // 4 = committed | 5 = rolled back
+
+  function $(id) { return document.getElementById(id); }
+
+  /* ── SQL helpers ── */
+  function addLines(lines) {
+    var log = $('sql-log');
+    lines.forEach(function(l, i) {
+      var d = document.createElement('div');
+      d.className = 'sql-line ' + l.cls;
+      d.innerHTML = l.text;
+      log.appendChild(d);
+      setTimeout(function() { d.classList.add('vis'); }, i * 90 + 50);
+    });
+  }
+
+  function clearLog() {
+    $('sql-log').innerHTML = '';
+  }
+
+  /* ── Step through ── */
+  function advance() {
+    step++;
+
+    if (step === 1) {
+      clearLog();
+      addLines([
+        { text: 'BEGIN;', cls: 's-kw' }
+      ]);
+      setTx('open', 'Transaction OPEN');
+      setDesc('The transaction is now open. Any changes made inside are <em style="color:#F48E00;font-style:normal">pending</em> — not yet committed, and invisible to all other connections.');
+      $('btn-next').textContent = 'Debit Alice';
+    }
+
+    else if (step === 2) {
+      addLines([
+        { text: '', cls: 's-cmt' },
+        { text: 'UPDATE accounts', cls: 's-def' },
+        { text: '  SET balance = balance - 100', cls: 's-def' },
+        { text: "  WHERE id = 'alice';", cls: 's-def' },
+        { text: "  -- $500 → $400  (pending)", cls: 's-cmt' }
+      ]);
+      setAccount('alice', 'pending', '$400', '&#x25BA; $400 pending');
+      $('alice-tag').className = 'account-tag tag-pending';
+      setDesc('Alice\'s balance shows $400 inside the transaction — but this is a pending, uncommitted change. No other connection can see it yet. No money has moved for good.');
+      $('btn-next').textContent = 'Credit Bob';
+    }
+
+    else if (step === 3) {
+      addLines([
+        { text: '', cls: 's-cmt' },
+        { text: 'UPDATE accounts', cls: 's-def' },
+        { text: '  SET balance = balance + 100', cls: 's-def' },
+        { text: "  WHERE id = 'bob';", cls: 's-def' },
+        { text: "  -- $300 → $400  (pending)", cls: 's-cmt' }
+      ]);
+      setAccount('bob', 'pending', '$400', '&#x25BA; $400 pending');
+      $('bob-tag').className = 'account-tag tag-pending';
+      $('arrow').classList.add('active');
+      setDesc('Both operations are staged. Now choose: <strong style="color:#328F51">COMMIT</strong> makes both permanent and durable together. <strong style="color:#DE4C45">ROLLBACK</strong> undoes both — as if the transaction never ran.');
+      $('btn-next').disabled = true;
+      $('btn-commit').disabled = false;
+      $('btn-rollback').disabled = false;
+    }
+  }
+
+  /* ── Commit ── */
+  function doCommit() {
+    step = 4;
+    addLines([
+      { text: '', cls: 's-cmt' },
+      { text: 'COMMIT;', cls: 's-ok' },
+      { text: '-- Both changes are now durable', cls: 's-cmt' }
+    ]);
+    setTimeout(function() {
+      setTx('committed', 'Transaction COMMITTED');
+      setAccount('alice', 'committed', '$400', '&#x2713; committed');
+      $('alice-tag').className = 'account-tag tag-committed';
+      setAccount('bob', 'committed', '$400', '&#x2713; committed');
+      $('bob-tag').className = 'account-tag tag-committed';
+      $('arrow').classList.add('active');
+      showOutcome('committed', 'Atomicity held — both the debit and the credit took effect as one indivisible unit. The transfer is now durable: Alice has $400, Bob has $400. Total money in the system is unchanged.');
+      setDesc('The COMMIT was confirmed. Changes are on disk and will survive any crash from this moment on. That is Durability. The transfer is complete.');
+      $('btn-commit').disabled = true;
+      $('btn-rollback').disabled = true;
+    }, 340);
+  }
+
+  /* ── Rollback ── */
+  function doRollback() {
+    step = 5;
+    addLines([
+      { text: '', cls: 's-cmt' },
+      { text: 'ROLLBACK;', cls: 's-fail' },
+      { text: '-- State restored to before BEGIN', cls: 's-cmt' }
+    ]);
+    setTimeout(function() {
+      setTx('rolledback', 'Transaction ROLLED BACK');
+      setAccount('alice', 'rolledback', '$500', '&#x21A9; restored');
+      $('alice-tag').className = 'account-tag tag-restored';
+      setAccount('bob', 'rolledback', '$300', '&#x21A9; restored');
+      $('bob-tag').className = 'account-tag tag-restored';
+      $('arrow').classList.remove('active');
+      showOutcome('rolledback', 'Atomicity held — both changes were undone together. The database is exactly as it was before BEGIN. Without this transaction, a crash after the first write would have left Alice $100 short with nothing added to Bob.');
+      setDesc('ROLLBACK undid both writes atomically. Alice still has $500, Bob still has $300. This is the safety net that makes transactions valuable: all-or-nothing, never something-or-nothing.');
+      $('btn-commit').disabled = true;
+      $('btn-rollback').disabled = true;
+    }, 340);
+  }
+
+  /* ── Reset ── */
+  function doReset() {
+    step = 0;
+    setTx('', 'No active transaction');
+    ['alice', 'bob'].forEach(function(who) {
+      document.getElementById(who + '-card').className = 'account-card';
+      document.getElementById(who + '-tag').className = 'account-tag';
+      document.getElementById(who + '-tag').innerHTML = '';
+    });
+    $('alice-bal').textContent = '$500';
+    $('bob-bal').textContent = '$300';
+    $('arrow').className = 'transfer-arrow';
+    $('outcome').className = 'outcome';
+    $('outcome').textContent = '';
+    clearLog();
+    addLines([
+      { text: '-- Transfer $100: Alice → Bob', cls: 's-cmt' },
+      { text: '-- Click "Begin Transaction" to start', cls: 's-cmt' }
+    ]);
+    setDesc('Two writes are needed — debit Alice, then credit Bob. Without a transaction, one could succeed while the other fails, leaving money permanently lost.');
+    $('btn-next').disabled = false;
+    $('btn-next').textContent = 'Begin Transaction';
+    $('btn-commit').disabled = true;
+    $('btn-rollback').disabled = true;
+  }
+
+  /* ── Helpers ── */
+  function setTx(state, label) {
+    $('tx-dot').className = 'tx-dot' + (state ? ' state-' + state : '');
+    $('tx-label').className = 'tx-label' + (state ? ' state-' + state : '');
+    $('tx-label').textContent = label;
+  }
+
+  function setAccount(who, state, bal, tag) {
+    document.getElementById(who + '-card').className = 'account-card state-' + state;
+    document.getElementById(who + '-bal').textContent = bal;
+    document.getElementById(who + '-tag').innerHTML = tag;
+  }
+
+  function showOutcome(cls, text) {
+    var el = $('outcome');
+    el.className = 'outcome ' + cls;
+    el.textContent = text;
+  }
+
+  function setDesc(html) {
+    $('step-desc').innerHTML = html;
+  }
+
+  /* ── ACID toggle ── */
+  function toggleAcid(card) {
+    var wasOpen = card.classList.contains('open');
+    document.querySelectorAll('.acid-card').forEach(function(c) { c.classList.remove('open'); });
+    if (!wasOpen) card.classList.add('open');
+  }
+</script>
+</body>
+</html>

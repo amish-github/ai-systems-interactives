@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Synchronous vs Asynchronous Paths</title>
+<style>
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Suisse Intl', sans-serif;
+    font-size: 18px;
+    color: #1A1A1A;
+    background: #FFFFFF;
+  }
+
+  .container {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    background: #FFFFFF;
+  }
+
+  /* ── Hint header ── */
+  .hint-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+  }
+
+  .hint-cursor {
+    flex-shrink: 0;
+    animation: cursor-wiggle 4s ease-in-out infinite;
+  }
+
+  @keyframes cursor-wiggle {
+    0%   { transform: rotate(0deg); }
+    10%  { transform: rotate(-10deg); }
+    25%  { transform: rotate(10deg); }
+    40%  { transform: rotate(-8deg); }
+    55%  { transform: rotate(6deg); }
+    70%  { transform: rotate(-3deg); }
+    85%  { transform: rotate(0deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  .hint-text { font-size: 18px; color: #1A1A1A; }
+
+  /* ── Main ── */
+  .main { padding: 24px 20px; }
+
+  /* ── Step row ── */
+  .step-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+
+  .step-label {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+  }
+
+  .dots { display: flex; gap: 6px; }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.14);
+    transition: all 0.3s ease;
+  }
+  .dot.active {
+    width: 20px;
+    background: #1878DC;
+  }
+  .dot.done { background: #328F51; }
+
+  /* ── Two panels ── */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 480px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.14);
+    overflow: hidden;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .panel-head {
+    padding: 10px 16px;
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    border-bottom: 1px solid rgba(0,0,0,0.10);
+    font-weight: 500;
+  }
+
+  .panel-sync .panel-head {
+    background: #FFF0EA;
+    color: #D35722;
+    border-color: rgba(211,87,34,0.2);
+  }
+
+  .panel-async .panel-head {
+    background: #EEF5FF;
+    color: #1878DC;
+    border-color: rgba(24,120,220,0.2);
+  }
+
+  .panel-body {
+    padding: 12px 16px 16px;
+    background: #FFFFFF;
+  }
+
+  /* ── Actor rows ── */
+  .actor-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .actor-name {
+    font-family: 'Suisse Intl Mono', monospace;
+    font-size: 11px;
+    color: rgba(0,0,0,0.40);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    width: 44px;
+    flex-shrink: 0;
+  }
+
+  .chip {
+    flex: 1;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-family: 'Suisse Intl', sans-serif;
+    transition: background 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 8px;
+  }
+
+  .chip-idle {
+    background: #F2F1EE;
+    border-color: rgba(0,0,0,0.10);
+    color: rgba(0,0,0,0.35);
+  }
+
+  .chip-sending {
+    background: #1878DC;
+    border-color: rgba(24,120,220,0.50);
+    color: #FFFFFF;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .chip-blocked {
+    background: #FFF0EA;
+    border-color: rgba(211,87,34,0.40);
+    color: #D35722;
+    animation: blink 1.4s ease-in-out infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.60; }
+  }
+
+  .chip-free {
+    background: #EAF5EE;
+    border-color: rgba(50,143,81,0.35);
+    color: #328F51;
+  }
+
+  .chip-queued {
+    background: #F5F0FF;
+    border-color: rgba(135,84,253,0.30);
+    color: #8754FD;
+  }
+
+  .chip-working {
+    background: #8754FD;
+    border-color: rgba(135,84,253,0.50);
+    color: #FFFFFF;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .chip-done {
+    background: #EAF5EE;
+    border-color: rgba(50,143,81,0.35);
+    color: #328F51;
+  }
+
+  /* ── Connectors ── */
+  .conn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 20px;
+    padding-left: 52px;
+  }
+
+  .conn-track {
+    flex: 1;
+    height: 20px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .conn-track::before {
+    content: '';
+    width: 1.5px;
+    height: 100%;
+    background: rgba(0,0,0,0.12);
+    transition: background 0.35s;
+    display: block;
+  }
+
+  /* Down arrow (request direction) */
+  .conn-track.flow-down::before { background: #1878DC; }
+  .conn-track.flow-down::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #1878DC;
+  }
+
+  /* Up arrow (response going back) */
+  .conn-track.flow-up::before { background: #D35722; }
+  .conn-track.flow-up::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 6px solid #D35722;
+  }
+
+  /* ── Insight cards ── */
+  .insight {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    display: none;
+  }
+  .insight.show { display: block; }
+
+  .insight-orange {
+    background: #FFF0EA;
+    border: 1px solid rgba(211,87,34,0.20);
+    color: #7A2800;
+  }
+
+  .insight-blue {
+    background: #EEF5FF;
+    border: 1px solid rgba(24,120,220,0.20);
+    color: #0A3C7A;
+  }
+
+  /* ── Description ── */
+  .desc-box {
+    background: #F2F1EE;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(0,0,0,0.10);
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+  }
+
+  .desc-text {
+    font-size: 16px;
+    line-height: 1.55;
+    color: #1A1A1A;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .btn {
+    font-family: 'Suisse Intl', sans-serif;
+    font-size: 16px;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.14);
+    cursor: pointer;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    transition: background 0.15s, opacity 0.15s;
+    line-height: 1;
+  }
+
+  .btn-back {
+    background: #FFFFFF;
+    color: #1A1A1A;
+  }
+  .btn-back:hover:not(:disabled) { background: #F2F1EE; }
+
+  .btn-next {
+    background: #1878DC;
+    color: #FFFFFF;
+    border-color: rgba(24,120,220,0.4);
+  }
+  .btn-next:hover:not(:disabled) { background: #1366C2; }
+
+  .btn:disabled {
+    opacity: 0.32;
+    cursor: default;
+    box-shadow: none;
+  }
+
+  @media (max-width: 325px) {
+    .main { padding: 16px 12px; }
+    .btn { padding: 10px 16px; font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click Next to step through both communication patterns.</span>
+  </div>
+
+  <div class="main">
+
+    <!-- Step row -->
+    <div class="step-row">
+      <span class="step-label" id="js-step-label">Step 1 of 5</span>
+      <div class="dots">
+        <div class="dot" id="d0"></div>
+        <div class="dot" id="d1"></div>
+        <div class="dot" id="d2"></div>
+        <div class="dot" id="d3"></div>
+        <div class="dot" id="d4"></div>
+      </div>
+    </div>
+
+    <!-- Panels -->
+    <div class="panels">
+
+      <!-- Sync panel -->
+      <div class="panel panel-sync">
+        <div class="panel-head">Synchronous</div>
+        <div class="panel-body">
+          <div class="actor-row">
+            <span class="actor-name">Caller</span>
+            <div class="chip chip-idle" id="s-caller">Idle</div>
+          </div>
+          <div class="conn">
+            <div class="conn-track" id="s-c1"></div>
+          </div>
+          <div class="actor-row">
+            <span class="actor-name">Service</span>
+            <div class="chip chip-idle" id="s-service">Idle</div>
+          </div>
+          <div class="insight insight-orange" id="s-insight"></div>
+        </div>
+      </div>
+
+      <!-- Async panel -->
+      <div class="panel panel-async">
+        <div class="panel-head">Asynchronous</div>
+        <div class="panel-body">
+          <div class="actor-row">
+            <span class="actor-name">Caller</span>
+            <div class="chip chip-idle" id="a-caller">Idle</div>
+          </div>
+          <div class="conn">
+            <div class="conn-track" id="a-c1"></div>
+          </div>
+          <div class="actor-row">
+            <span class="actor-name">Queue</span>
+            <div class="chip chip-idle" id="a-queue">Idle</div>
+          </div>
+          <div class="conn">
+            <div class="conn-track" id="a-c2"></div>
+          </div>
+          <div class="actor-row">
+            <span class="actor-name">Worker</span>
+            <div class="chip chip-idle" id="a-worker">Idle</div>
+          </div>
+          <div class="insight insight-blue" id="a-insight"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Description -->
+    <div class="desc-box">
+      <p class="desc-text" id="js-desc">The caller is ready to make a request. In both patterns, the journey starts the same way — but what happens next is completely different.</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn btn-back" id="js-back" onclick="go(-1)" disabled>&#8592; Back</button>
+      <button class="btn btn-next" id="js-next" onclick="go(1)">Next &#8594;</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var STEPS = [
+    {
+      label: "Step 1 of 5",
+      desc: "The caller wants work done. In both patterns, it reaches out to another component — but the synchronous caller will wait, and the asynchronous caller will not.",
+      sync: {
+        caller:  ["chip-sending",  "Sends request →"],
+        c1:      "flow-down",
+        service: ["chip-idle",     "Receiving…"],
+        insight: null
+      },
+      async: {
+        caller:  ["chip-sending",  "Emits event →"],
+        c1:      "flow-down",
+        queue:   ["chip-queued",   "Event arrives"],
+        c2:      "",
+        worker:  ["chip-idle",     "Idle"],
+        insight: null
+      }
+    },
+    {
+      label: "Step 2 of 5",
+      desc: "Here the paths diverge. The synchronous caller stops dead — it is now blocked and can do nothing else. The asynchronous caller has already moved on to its next task.",
+      sync: {
+        caller:  ["chip-blocked",  "⏸ Blocked…"],
+        c1:      "flow-down",
+        service: ["chip-working",  "Working…"],
+        insight: null
+      },
+      async: {
+        caller:  ["chip-free",     "✓ Next task"],
+        c1:      "",
+        queue:   ["chip-queued",   "Event buffered"],
+        c2:      "",
+        worker:  ["chip-idle",     "Idle"],
+        insight: null
+      }
+    },
+    {
+      label: "Step 3 of 5",
+      desc: "The service is still working. The synchronous caller remains frozen. In the async path, the queue delivers the event to a worker, which starts processing independently.",
+      sync: {
+        caller:  ["chip-blocked",  "⏸ Still blocked"],
+        c1:      "flow-down",
+        service: ["chip-working",  "Still working…"],
+        insight: null
+      },
+      async: {
+        caller:  ["chip-free",     "✓ Still free"],
+        c1:      "",
+        queue:   ["chip-idle",     "Delivering"],
+        c2:      "flow-down",
+        worker:  ["chip-working",  "Working…"],
+        insight: null
+      }
+    },
+    {
+      label: "Step 4 of 5",
+      desc: "The service finishes and returns its response. The synchronous caller finally unblocks. In the async path, the worker finishes entirely on its own — the caller was never involved.",
+      sync: {
+        caller:  ["chip-sending",  "← Response!"],
+        c1:      "flow-up",
+        service: ["chip-done",     "✓ Done"],
+        insight: null
+      },
+      async: {
+        caller:  ["chip-free",     "✓ Already done"],
+        c1:      "",
+        queue:   ["chip-idle",     "Empty"],
+        c2:      "",
+        worker:  ["chip-done",     "✓ Done"],
+        insight: null
+      }
+    },
+    {
+      label: "Step 5 of 5",
+      desc: "The key trade-off: synchronous ties the caller’s speed to the service — if the service is slow, the caller is slow. Asynchronous decouples them, but the result arrives later: that’s the price.",
+      sync: {
+        caller:  ["chip-done",     "✓ Can continue"],
+        c1:      "",
+        service: ["chip-idle",     "Idle"],
+        insight: "The caller was blocked the entire time. A slow or unavailable service makes the caller slow too. That’s tight coupling."
+      },
+      async: {
+        caller:  ["chip-done",     "✓ Always free"],
+        c1:      "",
+        queue:   ["chip-idle",     "Idle"],
+        c2:      "",
+        worker:  ["chip-idle",     "Idle"],
+        insight: "The caller was never blocked. The trade: the result arrived later. That window — accepted but not yet done — is eventual consistency."
+      }
+    }
+  ];
+
+  var idx = 0;
+
+  function chip(id, arr) {
+    var el = document.getElementById(id);
+    el.className = "chip " + arr[0];
+    el.textContent = arr[1];
+  }
+
+  function conn(id, cls) {
+    var el = document.getElementById(id);
+    el.className = "conn-track" + (cls ? " " + cls : "");
+  }
+
+  function insight(id, text, variant) {
+    var el = document.getElementById(id);
+    if (text) {
+      el.textContent = text;
+      el.className = "insight " + variant + " show";
+    } else {
+      el.className = "insight " + variant;
+    }
+  }
+
+  function render(i) {
+    var s = STEPS[i];
+    document.getElementById("js-step-label").textContent = s.label;
+    document.getElementById("js-desc").textContent = s.desc;
+
+    for (var j = 0; j < 5; j++) {
+      var d = document.getElementById("d" + j);
+      d.className = "dot";
+      if (j < i) d.classList.add("done");
+      else if (j === i) d.classList.add("active");
+    }
+
+    chip("s-caller",  s.sync.caller);
+    conn("s-c1",      s.sync.c1);
+    chip("s-service", s.sync.service);
+    insight("s-insight", s.sync.insight, "insight-orange");
+
+    chip("a-caller",  s.async.caller);
+    conn("a-c1",      s.async.c1);
+    chip("a-queue",   s.async.queue);
+    conn("a-c2",      s.async.c2);
+    chip("a-worker",  s.async.worker);
+    insight("a-insight", s.async.insight, "insight-blue");
+
+    document.getElementById("js-back").disabled = (i === 0);
+    document.getElementById("js-next").disabled = (i === STEPS.length - 1);
+    document.getElementById("js-next").textContent = (i === STEPS.length - 2) ? "Finish →" : "Next →";
+  }
+
+  function go(dir) {
+    idx = Math.max(0, Math.min(STEPS.length - 1, idx + dir));
+    render(idx);
+  }
+
+  render(0);
+</script>
+</body>
+</html>

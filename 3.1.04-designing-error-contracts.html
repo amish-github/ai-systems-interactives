@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04. Designing Error Contracts</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* Scenario nav */
+    .scenario-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .dots {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.20);
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .dot:hover { background: rgba(0,0,0,0.40); }
+    .dot.active { background: #1878DC; }
+    .dot.done { background: #328F51; }
+
+    .nav-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    /* Scenario body */
+    .scenario-body {
+      padding: 24px 20px 20px;
+    }
+
+    .concept-tag {
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 4px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .scenario-heading {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-bottom: 12px;
+    }
+
+    .scenario-desc {
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 16px;
+      background: #F2F1EE;
+      border-radius: 8px;
+      padding: 4px;
+      width: fit-content;
+    }
+
+    .toggle-btn {
+      padding: 8px 20px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.18s;
+      color: rgba(0,0,0,0.50);
+    }
+    .toggle-btn:hover:not(.t-active-bad):not(.t-active-good) {
+      color: #1A1A1A;
+    }
+    .toggle-btn.t-active-bad {
+      background: #FFFFFF;
+      color: #DE4C45;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .toggle-btn.t-active-good {
+      background: #FFFFFF;
+      color: #328F51;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    /* Response card */
+    .response-card {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      margin-bottom: 16px;
+    }
+
+    .response-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .status-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .chip-4xx { background: rgba(211,87,34,0.12); color: #D35722; }
+    .chip-5xx { background: rgba(222,76,69,0.12); color: #DE4C45; }
+    .chip-200 { background: rgba(50,143,81,0.12); color: #328F51; }
+    .chip-200-bad { background: rgba(50,143,81,0.12); color: #1A1A1A; }
+
+    .response-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .code-block {
+      padding: 16px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      background: #FFFFFF;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .k { color: #8754FD; }
+    .v-good { color: #328F51; }
+    .v-bad { color: #DE4C45; }
+    .v-neutral { color: #1A1A1A; }
+    .dim { color: rgba(0,0,0,0.35); }
+
+    /* Explanation banner */
+    .explain {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 15px;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+    .explain.bad {
+      background: rgba(222,76,69,0.07);
+      border: 1px solid rgba(222,76,69,0.22);
+      color: #1A1A1A;
+    }
+    .explain.good {
+      background: rgba(50,143,81,0.07);
+      border: 1px solid rgba(50,143,81,0.22);
+      color: #1A1A1A;
+    }
+    .explain-icon {
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-next {
+      padding: 12px 28px;
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-next:hover { background: #1565C0; }
+
+    /* Complete */
+    .complete {
+      padding: 40px 20px;
+      text-align: center;
+    }
+    .complete-check {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: rgba(50,143,81,0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      font-size: 24px;
+    }
+    .complete-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-bottom: 8px;
+    }
+    .complete-sub {
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      line-height: 1.55;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Pill tags for rules */
+    .rules {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+      justify-content: center;
+    }
+    .rule-pill {
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      background: #F2F1EE;
+      color: rgba(0,0,0,0.60);
+      border: 1px solid rgba(0,0,0,0.10);
+    }
+    .rule-pill.lit {
+      background: rgba(50,143,81,0.10);
+      color: #328F51;
+      border-color: rgba(50,143,81,0.25);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Toggle between bad and good practice to see what changes.</span>
+  </div>
+
+  <div id="root"></div>
+
+</div>
+<script>
+const scenarios = [
+  {
+    concept: "Consistent error shape",
+    heading: "Validation failure",
+    desc: "A user submits a registration form with an invalid email and a quantity of zero. The server catches both field errors.",
+    bad: {
+      status: "400",
+      chipClass: "chip-4xx",
+      label: "Bad practice — plain string",
+      code: `"Invalid input: email is wrong, quantity too low"`,
+      codeHtml: `<span class="v-bad">"Invalid input: email is wrong, quantity too low"</span>`,
+      explain: "A plain string gives the client nothing stable to branch on. The message may be reworded or translated at any time, and code cannot extract which fields failed or why without parsing prose."
+    },
+    good: {
+      status: "400",
+      chipClass: "chip-4xx",
+      label: "Good practice — structured body",
+      codeHtml: `{
+  <span class="k">"code"</span>:    <span class="v-good">"INVALID_INPUT"</span>,
+  <span class="k">"message"</span>: <span class="v-good">"The request could not be processed."</span>,
+  <span class="k">"details"</span>: {
+    <span class="k">"fields"</span>: {
+      <span class="k">"email"</span>:    <span class="v-good">"must be a valid email address"</span>,
+      <span class="k">"quantity"</span>: <span class="v-good">"must be greater than zero"</span>
+    }
+  }
+}`,
+      explain: "The stable code INVALID_INPUT lets client code branch reliably. The message is readable in logs. The details field walks through every failing field so the UI can highlight them directly — without parsing a sentence."
+    }
+  },
+  {
+    concept: "Never leak internals",
+    heading: "Unexpected server error",
+    desc: "A database connection times out. The framework catches an unhandled exception that includes a full stack trace and an internal hostname.",
+    bad: {
+      status: "500",
+      chipClass: "chip-5xx",
+      label: "Bad practice — leaked stack trace",
+      codeHtml: `{
+  <span class="k">"error"</span>: <span class="v-bad">"Error: Connection timeout\\n  at db.query (/app/db/index.js:42:7)\\n  at OrderService.find (/app/services/orders.js:18)\\n  host: db-prod-07.internal:5432"</span>
+}`,
+      explain: "The stack trace reveals internal file paths, service names, and infrastructure hostnames. An attacker who can trigger the error now has a map of the system. Clients also cannot branch on text that may change with any refactor."
+    },
+    good: {
+      status: "500",
+      chipClass: "chip-5xx",
+      label: "Good practice — safe stable body",
+      codeHtml: `{
+  <span class="k">"code"</span>:    <span class="v-good">"INTERNAL_ERROR"</span>,
+  <span class="k">"message"</span>: <span class="v-good">"Something went wrong. Please try again."</span>
+}`,
+      explain: "The client gets a safe, stable code and a neutral message it can handle in code. The full stack trace is written to server logs where only your team can read it. The trust boundary is intact."
+    }
+  },
+  {
+    concept: "Deterministic mapping",
+    heading: "Two services, same failure",
+    desc: "Two services can both return a not-found error when an order does not exist. The client team writes one handler and expects it to work everywhere.",
+    bad: {
+      status: "400",
+      chipClass: "chip-4xx",
+      label: "Inconsistent — Service B",
+      codeHtml: `<span class="dim">// Service A returns this:</span>
+<span class="dim">// HTTP 404  code: "ORDER_NOT_FOUND"  ✓</span>
+
+<span class="dim">// Service B returns this instead:</span>
+{
+  <span class="k">"code"</span>:    <span class="v-bad">"BAD_ORDER"</span>,
+  <span class="k">"message"</span>: <span class="v-bad">"Order lookup failed."</span>
+}`,
+      explain: "The same domain failure — an order that does not exist — maps to a different status code and a different error code on Service B. The client's not-found handler works on A but silently fails on B."
+    },
+    good: {
+      status: "404",
+      chipClass: "chip-4xx",
+      label: "Consistent — both services",
+      codeHtml: `<span class="dim">// Service A returns:</span>
+{
+  <span class="k">"code"</span>:    <span class="v-good">"ORDER_NOT_FOUND"</span>,
+  <span class="k">"message"</span>: <span class="v-good">"No order found with the given ID."</span>
+}
+
+<span class="dim">// Service B returns the same shape:</span>
+{
+  <span class="k">"code"</span>:    <span class="v-good">"ORDER_NOT_FOUND"</span>,
+  <span class="k">"message"</span>: <span class="v-good">"No order found with the given ID."</span>
+}`,
+      explain: "Both services map the same domain failure to the same status code and error code. The client writes the handler once and trusts it everywhere. The mapping is deterministic."
+    }
+  },
+  {
+    concept: "Status codes as the primary signal",
+    heading: "Error hidden in a 200",
+    desc: "A developer returns HTTP 200 for every request and embeds a success flag in the body to report whether the operation actually worked.",
+    bad: {
+      status: "200",
+      chipClass: "chip-200-bad",
+      label: "Bad practice — error inside a 200",
+      codeHtml: `{
+  <span class="k">"success"</span>: <span class="v-bad">false</span>,
+  <span class="k">"error"</span>:   <span class="v-bad">"not found"</span>
+}`,
+      explain: "A 200 status means success to every HTTP client, proxy, and monitoring tool. Hiding a failure inside the body means retries, circuit breakers, alerting pipelines, and error-handling middleware all silently miss it."
+    },
+    good: {
+      status: "404",
+      chipClass: "chip-4xx",
+      label: "Good practice — correct status code",
+      codeHtml: `{
+  <span class="k">"code"</span>:    <span class="v-good">"ORDER_NOT_FOUND"</span>,
+  <span class="k">"message"</span>: <span class="v-good">"No order found with the given ID."</span>
+}`,
+      explain: "The HTTP status code is the first signal every layer of the stack reads. A 404 immediately tells proxies, monitoring, and client code that this is a failure. The body then adds the precise reason with a stable code."
+    }
+  }
+];
+
+const rules = [
+  "One consistent body shape",
+  "Never leak internals",
+  "Deterministic mapping",
+  "Use HTTP status codes"
+];
+
+let cur = 0;
+let good = false;
+let done = Array(scenarios.length).fill(false);
+
+function chipFor(s, isGood) {
+  const d = isGood ? s.good : s.bad;
+  return `<span class="status-chip ${d.chipClass}">HTTP ${d.status}</span>`;
+}
+
+function renderDots() {
+  return scenarios.map((_, i) => {
+    let cls = 'dot';
+    if (i === cur) cls += ' active';
+    else if (done[i]) cls += ' done';
+    return `<div class="${cls}" data-i="${i}"></div>`;
+  }).join('');
+}
+
+function renderScene() {
+  const s = scenarios[cur];
+  const d = good ? s.good : s.bad;
+  const isLast = cur === scenarios.length - 1;
+  return `
+    <div class="scenario-nav">
+      <div class="dots">${renderDots()}</div>
+      <span class="nav-label">Scenario ${cur+1} of ${scenarios.length}</span>
+    </div>
+    <div class="scenario-body">
+      <div class="concept-tag">${s.concept}</div>
+      <div class="scenario-heading">${s.heading}</div>
+      <div class="scenario-desc">${s.desc}</div>
+
+      <div class="toggle-row">
+        <button class="toggle-btn ${!good ? 't-active-bad' : ''}" id="tBad">Bad practice</button>
+        <button class="toggle-btn ${good ? 't-active-good' : ''}" id="tGood">Good practice</button>
+      </div>
+
+      <div class="response-card">
+        <div class="response-bar">
+          ${chipFor(s, good)}
+          <span class="response-label">${d.label}</span>
+        </div>
+        <div class="code-block">${d.codeHtml}</div>
+      </div>
+
+      <div class="explain ${good ? 'good' : 'bad'}">
+        <span class="explain-icon">${good ? '✓' : '✕'}</span>
+        <span>${d.explain}</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn-next" id="btnNext">${isLast ? 'Finish' : 'Next'}</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderComplete() {
+  return `
+    <div class="complete">
+      <div class="complete-check">✓</div>
+      <div class="complete-title">Error contract fundamentals complete</div>
+      <div class="complete-sub">
+        You have seen all four rules that define a well-designed error contract.
+        When every endpoint follows them, clients can handle failures in code
+        with confidence — and failures that would become support tickets are
+        resolved quietly and correctly instead.
+      </div>
+      <div class="rules">
+        ${rules.map(r => `<span class="rule-pill lit">${r}</span>`).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function mount() {
+  const root = document.getElementById('root');
+  if (cur >= scenarios.length) {
+    root.innerHTML = renderComplete();
+    return;
+  }
+  root.innerHTML = renderScene();
+
+  document.getElementById('tBad').addEventListener('click', () => { good = false; mount(); });
+  document.getElementById('tGood').addEventListener('click', () => { good = true; mount(); });
+  document.getElementById('btnNext').addEventListener('click', () => {
+    done[cur] = true;
+    cur++;
+    good = false;
+    mount();
+  });
+  document.querySelectorAll('.dot[data-i]').forEach(d => {
+    d.addEventListener('click', () => {
+      cur = parseInt(d.dataset.i);
+      good = false;
+      mount();
+    });
+  });
+}
+
+mount();
+</script>
+</body>
+</html>

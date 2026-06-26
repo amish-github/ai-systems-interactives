@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>03 — Repo Tour: Map the Three Views</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ─────────────────────────────────────────── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+@keyframes cursor-wiggle {
+  0%,100% { transform: rotate(0deg); }
+  10%     { transform: rotate(-10deg); }
+  20%     { transform: rotate(10deg); }
+  35%     { transform: rotate(-8deg); }
+  50%     { transform: rotate(6deg); }
+  65%     { transform: rotate(-3deg); }
+  80%     { transform: rotate(0deg); }
+}
+
+.cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+.hint-text   { font-size: 18px; }
+
+/* ── Main body ───────────────────────────────────────────── */
+.main { padding: 24px 20px 28px; }
+
+.section-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 10px;
+}
+
+/* ── Architecture chips ──────────────────────────────────── */
+.arch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.arch-chip {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.08s;
+  user-select: none;
+  position: relative;
+}
+
+.arch-chip:hover {
+  border-color: #1878DC;
+  color: #1878DC;
+  transform: translateY(-1px);
+}
+
+.arch-chip.active {
+  background: #1878DC;
+  border-color: #1878DC;
+  color: #FFFFFF;
+  transform: translateY(0);
+}
+
+.arch-chip .tick {
+  display: none;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  background: #328F51;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+}
+.arch-chip.explored .tick { display: block; }
+.arch-chip.explored.active .tick { border-color: #1878DC; }
+
+/* ── Two-panel row ───────────────────────────────────────── */
+.two-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 460px) {
+  .two-panel { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: #F2F1EE;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.14);
+  padding: 16px;
+  min-height: 148px;
+}
+
+.panel-head {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 10px;
+}
+
+/* Directory tree */
+.tree { list-style: none; }
+.tree-item {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+  line-height: 1.8;
+  padding-left: 4px;
+  border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+.tree-item.hl {
+  color: #1878DC;
+  background: rgba(24,120,220,0.07);
+  font-weight: 600;
+  padding-left: 4px;
+}
+.tree-item.hl::before { content: '▶ '; }
+.tree-item:not(.hl)::before { content: '  '; white-space: pre; }
+
+/* Contents panel */
+.contents-placeholder {
+  font-size: 16px;
+  color: rgba(0,0,0,0.30);
+  line-height: 1.5;
+}
+.contents-files { list-style: none; margin-bottom: 8px; }
+.contents-file {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.55);
+  line-height: 1.8;
+}
+.contents-file::before { content: '  '; white-space: pre; }
+.contents-note {
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+/* ── Responsibility strip ─────────────────────────────────── */
+.resp-strip {
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 68px;
+  margin-bottom: 24px;
+}
+
+.resp-bullet {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  margin-top: 7px;
+  transition: background 0.2s;
+}
+.resp-bullet.on { background: #1878DC; }
+
+.resp-body { flex: 1; }
+.resp-rule {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  margin-bottom: 2px;
+}
+.resp-text {
+  font-size: 16px;
+  color: rgba(0,0,0,0.30);
+  line-height: 1.55;
+  transition: color 0.2s;
+}
+.resp-text.on { color: #1A1A1A; }
+
+/* ── Progress ────────────────────────────────────────────── */
+.progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progress-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  white-space: nowrap;
+}
+.progress-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(0,0,0,0.10);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #328F51;
+  border-radius: 4px;
+  transition: width 0.35s ease;
+}
+.progress-done {
+  font-size: 14px;
+  color: #328F51;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.progress-done.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <span class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z"
+          stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span class="hint-text">Click an architecture box to find where it lives and what it owns.</span>
+  </div>
+
+  <!-- Body -->
+  <div class="main">
+
+    <div class="section-label">Architecture boxes</div>
+    <div class="arch-row" id="archRow"></div>
+
+    <div class="two-panel">
+      <!-- Directory tree -->
+      <div class="panel">
+        <div class="panel-head">Directory</div>
+        <ul class="tree" id="treePanel"></ul>
+      </div>
+      <!-- Contents -->
+      <div class="panel">
+        <div class="panel-head">What lives here</div>
+        <div id="contentsPanel">
+          <span class="contents-placeholder">Select a box above.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Responsibility -->
+    <div class="resp-strip">
+      <div class="resp-bullet" id="respBullet"></div>
+      <div class="resp-body">
+        <div class="resp-rule">Responsibility</div>
+        <div class="resp-text" id="respText">Why does this part exist? Select a box to find out.</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-row">
+      <span class="progress-label" id="progressLabel">0 of 5 explored</span>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      </div>
+      <span class="progress-done" id="progressDone">Full map built.</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  {
+    id: 'services',
+    label: 'Services',
+    dir: 'services/',
+    files: ['gateway/', 'app-service/', 'worker/'],
+    note: 'One folder per independently deployable service',
+    responsibility: 'Each service is a separate deployable unit with its own entry point. Keeping them in separate folders makes boundaries visible and prevents one service from reaching into another\'s internals.'
+  },
+  {
+    id: 'shared',
+    label: 'Shared Libs',
+    dir: 'shared/',
+    files: ['models/', 'logging/', 'db-client/'],
+    note: 'Code used by more than one service',
+    responsibility: 'Logic that multiple services need lives here once rather than being copied into each. Changes flow to all consumers together, so nothing drifts out of sync over time.'
+  },
+  {
+    id: 'infra',
+    label: 'Infra as Code',
+    dir: 'infra/',
+    files: ['docker-compose.yml', 'Dockerfile.*', 'config/'],
+    note: 'Environment definitions and configuration',
+    responsibility: 'Describes how every part of the system is assembled and started. Anyone can recreate the exact same environment from scratch by running one command against these files — that is what makes local setup repeatable.'
+  },
+  {
+    id: 'tests',
+    label: 'Tests',
+    dir: 'tests/',
+    files: ['unit/', 'integration/', 'e2e/'],
+    note: 'Automated test suites for services and shared code',
+    responsibility: 'Your safety net. Run the full suite before you touch anything to establish a known-good baseline. Any failure that appears after your change is yours to investigate — not a pre-existing problem.'
+  },
+  {
+    id: 'docs',
+    label: 'Docs',
+    dir: 'docs/',
+    files: ['README.md', 'setup.md', 'architecture.md'],
+    note: 'README, setup guide, architecture notes',
+    responsibility: 'The fastest way to orient yourself in any codebase. Always read these first — they tell you how to run the project and which folder owns which service, saving you an hour of guessing.'
+  }
+];
+
+const ALL_DIRS = ITEMS.map(i => i.dir);
+
+let activeId  = null;
+const explored = new Set();
+
+// ── Build chips ──────────────────────────────────────────────
+const archRow = document.getElementById('archRow');
+ITEMS.forEach(item => {
+  const chip = document.createElement('button');
+  chip.className = 'arch-chip';
+  chip.dataset.id = item.id;
+  chip.innerHTML = item.label + '<span class="tick"></span>';
+  chip.addEventListener('click', () => activate(item.id));
+  archRow.appendChild(chip);
+});
+
+// ── Initial tree (all greyed) ────────────────────────────────
+function renderTree(activeDir) {
+  const panel = document.getElementById('treePanel');
+  panel.innerHTML = '';
+  ALL_DIRS.forEach(dir => {
+    const li = document.createElement('li');
+    li.className = 'tree-item' + (dir === activeDir ? ' hl' : '');
+    li.textContent = dir;
+    panel.appendChild(li);
+  });
+}
+renderTree(null);
+
+// ── Activate ─────────────────────────────────────────────────
+function activate(id) {
+  activeId = id;
+  explored.add(id);
+  const item = ITEMS.find(i => i.id === id);
+
+  // Update chips
+  document.querySelectorAll('.arch-chip').forEach(chip => {
+    const cid = chip.dataset.id;
+    chip.classList.toggle('active',    cid === id);
+    chip.classList.toggle('explored',  explored.has(cid));
+  });
+
+  // Tree
+  renderTree(item.dir);
+
+  // Contents
+  const cp = document.getElementById('contentsPanel');
+  cp.innerHTML = '';
+  const ul = document.createElement('ul');
+  ul.className = 'contents-files';
+  item.files.forEach(f => {
+    const li = document.createElement('li');
+    li.className = 'contents-file';
+    li.textContent = f;
+    ul.appendChild(li);
+  });
+  const note = document.createElement('p');
+  note.className = 'contents-note';
+  note.textContent = item.note;
+  cp.appendChild(ul);
+  cp.appendChild(note);
+
+  // Responsibility
+  document.getElementById('respBullet').className = 'resp-bullet on';
+  const rt = document.getElementById('respText');
+  rt.className = 'resp-text on';
+  rt.textContent = item.responsibility;
+
+  // Progress
+  const n   = explored.size;
+  const pct = (n / ITEMS.length) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent =
+    n + ' of ' + ITEMS.length + ' explored';
+  const done = document.getElementById('progressDone');
+  done.classList.toggle('show', n === ITEMS.length);
+}
+</script>
+</body>
+</html>

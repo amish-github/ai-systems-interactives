@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Deciding Factors — Interactive Decision Walk</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  background: #FFFFFF;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 24px 16px;
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+.cursor-icon { flex-shrink: 0; }
+
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+.cursor-icon svg { animation: cursor-wiggle 4s infinite; display: block; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 16px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+  line-height: 1.4;
+}
+.tab-btn:hover { color: #1A1A1A; }
+.tab-btn.active {
+  color: #1A1A1A;
+  border-bottom-color: #1878DC;
+}
+
+/* ── Scenario area ── */
+.scenario-area { padding: 20px 24px 28px; }
+
+/* Scenario card */
+.scenario-card {
+  background: #F2F1EE;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+.scenario-eyebrow {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.50);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+.scenario-title {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+.scenario-facts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.scenario-facts li {
+  font-size: 14px;
+  color: rgba(0,0,0,0.70);
+  display: flex;
+  gap: 8px;
+  line-height: 1.45;
+  align-items: flex-start;
+}
+.fact-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.30);
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+/* ── Gate ── */
+.gate {
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+  animation: fadeSlideIn 0.25s ease-out;
+}
+.gate.active { display: flex; }
+
+/* Progress pips */
+.gate-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.progress-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.12);
+  transition: background 0.2s;
+}
+.progress-pip.done    { background: #328F51; }
+.progress-pip.current { background: #1878DC; }
+
+.gate-eyebrow {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.50);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.gate-question {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.5;
+}
+
+.gate-subtext {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  line-height: 1.5;
+  margin-top: -8px;
+}
+
+/* Choices */
+.gate-choices {
+  display: flex;
+  gap: 8px;
+}
+
+.choice-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  line-height: 1;
+}
+.choice-btn:hover:not(:disabled) {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.22);
+}
+.choice-btn:active:not(:disabled) { transform: scale(0.98); }
+.choice-btn:disabled { cursor: default; opacity: 0.6; }
+.choice-btn.correct-flash {
+  background: #EAF6EE;
+  border-color: #328F51;
+  color: #328F51;
+}
+.choice-btn.wrong-flash {
+  background: #FDECEA;
+  border-color: #DE4C45;
+  color: #DE4C45;
+}
+
+/* Feedback */
+.gate-feedback {
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  display: none;
+}
+.gate-feedback.visible { display: block; }
+.gate-feedback.feedback-wrong {
+  background: #FEF3F2;
+  border: 1px solid rgba(222,76,69,0.22);
+  color: #1A1A1A;
+}
+.gate-feedback.feedback-correct {
+  background: #F0FAF4;
+  border: 1px solid rgba(50,143,81,0.22);
+  color: #1A1A1A;
+}
+.feedback-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.feedback-wrong  .feedback-label { color: #DE4C45; }
+.feedback-correct .feedback-label { color: #328F51; }
+
+/* Continue button */
+.continue-btn {
+  align-self: flex-start;
+  padding: 10px 20px;
+  background: #1878DC;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #FFFFFF;
+  cursor: pointer;
+  display: none;
+  transition: background 0.15s, transform 0.1s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  line-height: 1;
+}
+.continue-btn:hover  { background: #1466BE; }
+.continue-btn:active { transform: scale(0.98); }
+.continue-btn.visible { display: inline-block; }
+
+/* ── Result card ── */
+.result-card {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 20px;
+  animation: fadeSlideIn 0.3s ease-out;
+}
+.result-card.visible { display: flex; }
+.result-card.monolith {
+  background: #F0FAF4;
+  border: 1px solid rgba(50,143,81,0.25);
+}
+.result-card.services {
+  background: #EFF5FE;
+  border: 1px solid rgba(24,120,220,0.25);
+}
+
+.result-eyebrow {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.monolith .result-eyebrow { color: #328F51; }
+.services .result-eyebrow { color: #1878DC; }
+
+.result-title {
+  font-size: 20px;
+  color: #1A1A1A;
+  line-height: 1.3;
+}
+
+.result-why {
+  font-size: 14px;
+  color: rgba(0,0,0,0.70);
+  line-height: 1.6;
+}
+
+.result-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.result-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  line-height: 1.4;
+}
+.monolith .result-tag.stop-tag {
+  background: rgba(211,87,34,0.10);
+  color: #D35722;
+}
+.monolith .result-tag.pass-tag {
+  background: rgba(50,143,81,0.10);
+  color: #328F51;
+}
+.services .result-tag.pass-tag {
+  background: rgba(24,120,220,0.10);
+  color: #1878DC;
+}
+
+.reset-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 8px 16px;
+  background: none;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  color: rgba(0,0,0,0.60);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.reset-btn:hover { background: #F2F1EE; color: #1A1A1A; }
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .hint-header   { padding: 16px 16px 12px; font-size: 16px; }
+  .tabs          { padding: 0 16px; }
+  .scenario-area { padding: 16px 16px 24px; }
+  .gate-choices  { flex-direction: column; }
+  .choice-btn    { flex: none; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <span class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    Pick a scenario, then answer each gate to reach the recommendation.
+  </div>
+
+  <!-- Scenario tabs -->
+  <div class="tabs" role="tablist" aria-label="Scenarios">
+    <button class="tab-btn active" role="tab" aria-selected="true"  data-scenario="0">Scenario A</button>
+    <button class="tab-btn"        role="tab" aria-selected="false" data-scenario="1">Scenario B</button>
+    <button class="tab-btn"        role="tab" aria-selected="false" data-scenario="2">Scenario C</button>
+  </div>
+
+  <!-- Scenario content (rendered by JS) -->
+  <div class="scenario-area" id="scenario-area"></div>
+
+</div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+
+const SCENARIOS = [
+  {
+    label: "Scenario A",
+    title: "Order & inventory at a 5-person startup",
+    facts: [
+      "Order management and inventory constantly share the same data",
+      "Both modules change together almost every sprint — a fix in one always touches the other",
+      "Five engineers, no dedicated ops or platform team",
+      "No automated deploys or observability tooling in place"
+    ],
+    gates: [
+      {
+        signal: "Domain Coupling",
+        question: "Are the domains tightly coupled — do they constantly share data and change together?",
+        subtext: "This is the strongest signal. A yes here often closes the path before you reach the others.",
+        correctAnswer: "yes",
+        wrongFeedback: "Look at the scenario again: orders and inventory share data on every request and change together almost every sprint. That is the definition of tight coupling.",
+        correctFeedback: "Tightly coupled domains belong in the same service. Splitting them would turn every in-process function call into a network hop — slower, independently fallible, and much harder to reason about.",
+        stopsPath: true,
+        result: {
+          type: "monolith",
+          title: "Stay with a monolith.",
+          why: "Domain coupling is the strongest signal, and here it is decisive. Order management and inventory share data constantly and change in lockstep. Forcing them apart turns fast, reliable in-process calls into a web of network calls that are slow, can fail independently, and are far harder to debug. The path closes at gate 1 — team shape and operational maturity never even enter the picture.",
+          stopTag: "Stopped at: Domain Coupling",
+          passTags: []
+        }
+      }
+    ]
+  },
+  {
+    label: "Scenario B",
+    title: "Fast-growing marketplace, small team",
+    facts: [
+      "Three product areas: catalog, payments, and messaging — each owns its own data",
+      "The domains rarely share data or change together",
+      "Founder expects 10x traffic growth next year and wants to \"be ready\"",
+      "No CI/CD automation, basic logging only, no on-call rotation"
+    ],
+    gates: [
+      {
+        signal: "Domain Coupling",
+        question: "Are the domains tightly coupled — do they constantly share data and change together?",
+        subtext: "This is the strongest signal. A yes here often closes the path before you reach the others.",
+        correctAnswer: "no",
+        wrongFeedback: "The scenario says the three product areas each own their own data and rarely share or change together. That is loosely coupled — coupling does not close the path here.",
+        correctFeedback: "Loosely coupled domains mean each area can own its data independently, which makes a split possible in principle. The path stays open — move to the next gate.",
+        stopsPath: false
+      },
+      {
+        signal: "Operational Maturity",
+        question: "Does the team have mature delivery automation, observability, and on-call practices already in place?",
+        subtext: "Microservices multiply every operational problem. Without these foundations the overhead is crushing.",
+        correctAnswer: "no",
+        wrongFeedback: "The scenario says there is no CI/CD automation, only basic logging, and no on-call rotation. That is immature operations — the team cannot afford the tax microservices charge.",
+        correctFeedback: "Without mature delivery, observability, and on-call, a distributed system buries the team in operational work. This gate closes the path — expected traffic growth alone is not a reason to split.",
+        stopsPath: true,
+        result: {
+          type: "monolith",
+          title: "Stay with a monolith.",
+          why: "Even though the domains are loosely coupled, the team lacks the operational foundations to run microservices safely. No automated deploys, no observability, no on-call. A monolith scales fine by running more copies in the meantime — and the team can build those foundations before considering a split. Notice that anticipated traffic was not the deciding factor.",
+          stopTag: "Stopped at: Operational Maturity",
+          passTags: ["Domain coupling: loosely coupled — gate open"]
+        }
+      }
+    ]
+  },
+  {
+    label: "Scenario C",
+    title: "Enterprise SaaS platform, eight teams",
+    facts: [
+      "Eight autonomous teams, each owning a distinct and loosely coupled product area",
+      "Strong CI/CD pipelines, comprehensive observability, healthy on-call rotation",
+      "Teams are blocked by a shared deploy — changes from all eight teams queue in one pipeline",
+      "One domain (video processing) runs at roughly 50x the CPU cost of everything else"
+    ],
+    gates: [
+      {
+        signal: "Domain Coupling",
+        question: "Are the domains tightly coupled — do they constantly share data and change together?",
+        subtext: "This is the strongest signal. A yes here often closes the path before you reach the others.",
+        correctAnswer: "no",
+        wrongFeedback: "The scenario says each team owns a distinct, loosely coupled product area. Independent ownership of data is the opposite of tight coupling — this gate stays open.",
+        correctFeedback: "Loosely coupled domains mean each area can own its data and rarely needs to call the others. The path stays open.",
+        stopsPath: false
+      },
+      {
+        signal: "Operational Maturity",
+        question: "Does the team have mature delivery automation, observability, and on-call practices already in place?",
+        subtext: "Microservices multiply every operational problem. Without these foundations the overhead is crushing.",
+        correctAnswer: "yes",
+        wrongFeedback: "The scenario explicitly lists strong CI/CD, comprehensive observability, and a healthy on-call rotation. Those are mature operations — this gate stays open.",
+        correctFeedback: "Mature operations mean the team can afford the operational tax that microservices charge. The path continues to the final gate.",
+        stopsPath: false
+      },
+      {
+        signal: "Team Shape and Scaling Needs",
+        question: "Are there many autonomous teams, or a real need to scale or deploy parts of the system independently?",
+        subtext: "If yes, microservices become a genuine option. If no, a monolith still serves better.",
+        correctAnswer: "yes",
+        wrongFeedback: "The scenario describes eight autonomous teams blocked by a shared deploy, plus one component with extreme resource needs. Both are strong positive signals for this gate.",
+        correctFeedback: "Multiple teams blocked by a shared pipeline and a component with exceptional resource needs — both point clearly toward services.",
+        stopsPath: false,
+        result: {
+          type: "services",
+          title: "Consider microservices.",
+          why: "All three gates stay open: domains are loosely coupled, operations are mature, and both team shape and scaling needs point toward a split. Each team can own its service and release on its own schedule. The heavy video-processing domain can scale independently without pulling the rest of the system along. Notice that the path reached this outcome only after passing three distinct gates — not because of any single factor alone.",
+          stopTag: null,
+          passTags: [
+            "Domain coupling: loosely coupled — gate open",
+            "Operational maturity: mature — gate open",
+            "Team shape + scaling: strong positive — recommendation reached"
+          ]
+        }
+      }
+    ]
+  }
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let activeScenario = 0;
+const scenarioState = SCENARIOS.map(() => null);
+
+function freshState() {
+  return { currentGate: 0, gateAnswered: [], done: false };
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────────────
+
+function renderScenario(idx) {
+  if (!scenarioState[idx]) scenarioState[idx] = freshState();
+  const state = scenarioState[idx];
+  const s = SCENARIOS[idx];
+  const area = document.getElementById('scenario-area');
+
+  let html = `
+    <div class="scenario-card">
+      <div class="scenario-eyebrow">${s.label}</div>
+      <div class="scenario-title">${s.title}</div>
+      <ul class="scenario-facts">
+        ${s.facts.map(f => `<li><span class="fact-dot"></span>${f}</li>`).join('')}
+      </ul>
+    </div>
+  `;
+
+  s.gates.forEach((g, gi) => {
+    const isCurrent = gi === state.currentGate && !state.done;
+    html += buildGateHTML(idx, gi, isCurrent, s.gates.length);
+  });
+
+  html += `<div class="result-card" id="result-${idx}"></div>`;
+
+  area.innerHTML = html;
+
+  area.querySelectorAll('.choice-btn').forEach(btn => btn.addEventListener('click', onChoice));
+  area.querySelectorAll('.continue-btn').forEach(btn => btn.addEventListener('click', onContinue));
+
+  if (state.done) showResult(idx);
+}
+
+function buildGateHTML(sIdx, gIdx, isActive, totalGates) {
+  const state = scenarioState[sIdx];
+  const g = SCENARIOS[sIdx].gates[gIdx];
+
+  const pips = Array.from({ length: totalGates }, (_, pi) => {
+    if (pi < state.currentGate) return 'done';
+    if (pi === state.currentGate) return 'current';
+    return '';
+  });
+
+  const pipHTML = pips.map(p => `<div class="progress-pip ${p}"></div>`).join('');
+  const gateLabel = `Gate ${gIdx + 1} of ${totalGates} — ${g.signal}`;
+
+  return `
+    <div class="gate${isActive ? ' active' : ''}" id="gate-${sIdx}-${gIdx}">
+      <div class="gate-progress">${pipHTML}</div>
+      <div class="gate-eyebrow">${gateLabel}</div>
+      <div class="gate-question">${g.question}</div>
+      ${g.subtext ? `<div class="gate-subtext">${g.subtext}</div>` : ''}
+      <div class="gate-choices">
+        <button class="choice-btn" id="btn-yes-${sIdx}-${gIdx}" data-scenario="${sIdx}" data-gate="${gIdx}" data-answer="yes">Yes</button>
+        <button class="choice-btn" id="btn-no-${sIdx}-${gIdx}"  data-scenario="${sIdx}" data-gate="${gIdx}" data-answer="no">No</button>
+      </div>
+      <div class="gate-feedback" id="feedback-${sIdx}-${gIdx}"></div>
+      <button class="continue-btn" id="continue-${sIdx}-${gIdx}" data-scenario="${sIdx}" data-gate="${gIdx}"></button>
+    </div>
+  `;
+}
+
+// ─── Interaction ─────────────────────────────────────────────────────────────
+
+function onChoice(e) {
+  const btn    = e.currentTarget;
+  const sIdx   = parseInt(btn.dataset.scenario, 10);
+  const gIdx   = parseInt(btn.dataset.gate,     10);
+  const answer = btn.dataset.answer;
+  const state  = scenarioState[sIdx];
+  const g      = SCENARIOS[sIdx].gates[gIdx];
+
+  if (state.gateAnswered[gIdx]) return;
+
+  const feedbackEl  = document.getElementById(`feedback-${sIdx}-${gIdx}`);
+  const continueBtn = document.getElementById(`continue-${sIdx}-${gIdx}`);
+  const yesBtn      = document.getElementById(`btn-yes-${sIdx}-${gIdx}`);
+  const noBtn       = document.getElementById(`btn-no-${sIdx}-${gIdx}`);
+
+  if (answer === g.correctAnswer) {
+    state.gateAnswered[gIdx] = true;
+    btn.classList.add('correct-flash');
+    yesBtn.disabled = true;
+    noBtn.disabled  = true;
+
+    feedbackEl.className = 'gate-feedback feedback-correct visible';
+    feedbackEl.innerHTML = `<div class="feedback-label">Correct</div>${g.correctFeedback}`;
+
+    const isLastGate = gIdx === SCENARIOS[sIdx].gates.length - 1;
+    continueBtn.textContent = (g.stopsPath || isLastGate) ? 'See recommendation →' : 'Next gate →';
+    continueBtn.classList.add('visible');
+
+  } else {
+    btn.classList.add('wrong-flash');
+    feedbackEl.className = 'gate-feedback feedback-wrong visible';
+    feedbackEl.innerHTML = `<div class="feedback-label">Not quite</div>${g.wrongFeedback}`;
+
+    setTimeout(() => { btn.classList.remove('wrong-flash'); }, 1000);
+    setTimeout(() => { feedbackEl.className = 'gate-feedback'; }, 3000);
+  }
+}
+
+function onContinue(e) {
+  const sIdx   = parseInt(e.currentTarget.dataset.scenario, 10);
+  const gIdx   = parseInt(e.currentTarget.dataset.gate,     10);
+  const g      = SCENARIOS[sIdx].gates[gIdx];
+  const state  = scenarioState[sIdx];
+  const isLast = gIdx === SCENARIOS[sIdx].gates.length - 1;
+
+  const gateEl = document.getElementById(`gate-${sIdx}-${gIdx}`);
+  if (gateEl) gateEl.style.display = 'none';
+
+  if (g.stopsPath || isLast) {
+    state.done = true;
+    showResult(sIdx);
+  } else {
+    state.currentGate = gIdx + 1;
+    const nextGate = document.getElementById(`gate-${sIdx}-${gIdx + 1}`);
+    if (nextGate) {
+      const pips = nextGate.querySelectorAll('.progress-pip');
+      pips.forEach((pip, pi) => {
+        pip.className = 'progress-pip';
+        if      (pi < gIdx + 1)  pip.classList.add('done');
+        else if (pi === gIdx + 1) pip.classList.add('current');
+      });
+      nextGate.classList.add('active');
+      nextGate.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+}
+
+function showResult(sIdx) {
+  const s        = SCENARIOS[sIdx];
+  const resultEl = document.getElementById(`result-${sIdx}`);
+  if (!resultEl) return;
+
+  let resultData = null;
+  for (const g of s.gates) {
+    if (g.result) { resultData = g.result; break; }
+  }
+  if (!resultData) return;
+
+  const stopTagHTML = resultData.stopTag
+    ? `<span class="result-tag stop-tag">${resultData.stopTag}</span>`
+    : '';
+
+  const passTagsHTML = resultData.passTags.length
+    ? resultData.passTags.map(t => `<span class="result-tag pass-tag">${t}</span>`).join('')
+    : '';
+
+  const tagsHTML = (stopTagHTML || passTagsHTML)
+    ? `<div class="result-tags">${stopTagHTML}${passTagsHTML}</div>`
+    : '';
+
+  resultEl.innerHTML = `
+    <div class="result-eyebrow">${resultData.type === 'monolith' ? 'Recommendation: Monolith' : 'Recommendation: Consider Microservices'}</div>
+    <div class="result-title">${resultData.title}</div>
+    <div class="result-why">${resultData.why}</div>
+    ${tagsHTML}
+    <button class="reset-btn" data-scenario="${sIdx}">Try this scenario again</button>
+  `;
+  resultEl.className = `result-card ${resultData.type} visible`;
+  resultEl.querySelector('.reset-btn').addEventListener('click', onReset);
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function onReset(e) {
+  const sIdx = parseInt(e.currentTarget.dataset.scenario, 10);
+  scenarioState[sIdx] = null;
+  renderScenario(sIdx);
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sIdx = parseInt(btn.dataset.scenario, 10);
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-selected', 'true');
+    activeScenario = sIdx;
+    renderScenario(sIdx);
+  });
+});
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+renderScenario(0);
+</script>
+</body>
+</html>

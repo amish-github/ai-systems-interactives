@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>gRPC Error Mapping — Lesson 4.3.05</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ───────────────────────────────────────── */
+    .hint-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 24px 24px 20px;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      margin-top: 1px;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      line-height: 1.4;
+    }
+
+    /* ── Scenario buttons ──────────────────────────────────── */
+    .scenarios {
+      display: flex;
+      gap: 8px;
+      padding: 0 24px 24px;
+      flex-wrap: wrap;
+    }
+
+    .scenario-btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      padding: 8px 16px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .scenario-btn:hover:not(.active) {
+      background: #F2F1EE;
+    }
+
+    .scenario-btn.active {
+      border-color: transparent;
+      color: #FFFFFF;
+    }
+
+    .scenario-btn[data-id="ok"].active          { background: #328F51; }
+    .scenario-btn[data-id="not_found"].active   { background: #1878DC; }
+    .scenario-btn[data-id="deadline"].active    { background: #D35722; }
+    .scenario-btn[data-id="unavailable"].active { background: #DE4C45; }
+
+    /* ── Main card ─────────────────────────────────────────── */
+    .main-card {
+      margin: 0 24px 24px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,0,0,0.14);
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    /* Path bar */
+    .path-bar {
+      background: #F2F1EE;
+      padding: 12px 20px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+      flex-wrap: wrap;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .path-node {
+      color: #1A1A1A;
+    }
+
+    .path-arrow {
+      color: rgba(0,0,0,0.28);
+    }
+
+    /* Two panels */
+    .panels {
+      display: flex;
+    }
+
+    .panel {
+      flex: 1;
+      padding: 20px;
+      min-width: 0;
+    }
+
+    .panel-grpc {
+      border-right: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .panel-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 12px;
+    }
+
+    /* Status chip */
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      max-width: 100%;
+      word-break: break-all;
+    }
+
+    /* Detail block */
+    .detail-block {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      background: #F2F1EE;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: rgba(0,0,0,0.70);
+      line-height: 1.6;
+      white-space: pre;
+      overflow-x: auto;
+      min-height: 88px;
+    }
+
+    /* Boundary label row */
+    .boundary-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-top: 1px solid rgba(0,0,0,0.14);
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+    }
+
+    .boundary-line {
+      flex: 1;
+      height: 1px;
+      background: rgba(0,0,0,0.14);
+    }
+
+    .boundary-tag {
+      font-size: 12px;
+      color: rgba(0,0,0,0.40);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .boundary-arrow {
+      color: rgba(0,0,0,0.30);
+      font-size: 14px;
+    }
+
+    /* Explanation */
+    .explanation {
+      padding: 16px 20px 20px;
+      font-size: 16px;
+      color: rgba(0,0,0,0.65);
+      line-height: 1.6;
+      min-height: 72px;
+    }
+
+    /* Chip color variants */
+    .chip-ok         { background: #E7F4EC; color: #328F51; }
+    .chip-not_found  { background: #E6F1FB; color: #1878DC; }
+    .chip-deadline   { background: #FAEEE7; color: #D35722; }
+    .chip-unavail    { background: #FAEAEA; color: #DE4C45; }
+    .chip-200        { background: #E7F4EC; color: #328F51; }
+    .chip-404        { background: #E6F1FB; color: #1878DC; }
+    .chip-504        { background: #FAEEE7; color: #D35722; }
+    .chip-503        { background: #FAEAEA; color: #DE4C45; }
+
+    /* Fade animation on scenario change */
+    .fade-in {
+      animation: fadeSlideIn 0.28s ease both;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ────────────────────────────────────────── */
+    @media (max-width: 500px) {
+      .hint-header  { padding: 20px 16px 16px; }
+      .scenarios    { padding: 0 16px 20px; }
+      .main-card    { margin: 0 16px 20px; }
+      .panel        { padding: 16px; }
+      .explanation  { padding: 12px 16px 16px; }
+      .hint-text    { font-size: 16px; }
+    }
+
+    @media (max-width: 360px) {
+      .panels {
+        flex-direction: column;
+      }
+      .panel-grpc {
+        border-right: none;
+        border-bottom: 1px solid rgba(0,0,0,0.14);
+      }
+    }
+
+    @media (max-width: 325px) {
+      .hint-header { padding: 16px 12px 12px; }
+      .scenarios   { padding: 0 12px 16px; gap: 6px; }
+      .main-card   { margin: 0 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click a scenario to trace how the boundary maps each outcome.</span>
+  </div>
+
+  <!-- Scenario buttons -->
+  <div class="scenarios">
+    <button class="scenario-btn active" data-id="ok">Success</button>
+    <button class="scenario-btn" data-id="not_found">NOT_FOUND</button>
+    <button class="scenario-btn" data-id="deadline">DEADLINE_EXCEEDED</button>
+    <button class="scenario-btn" data-id="unavailable">UNAVAILABLE</button>
+  </div>
+
+  <!-- Main card -->
+  <div class="main-card">
+
+    <!-- Path bar -->
+    <div class="path-bar">
+      <span class="path-node">Consumer</span>
+      <span class="path-arrow">→</span>
+      <span class="path-node">REST API</span>
+      <span class="path-arrow">→</span>
+      <span class="path-node">gRPC Service</span>
+    </div>
+
+    <!-- Two panels -->
+    <div class="panels">
+      <!-- gRPC / internal side -->
+      <div class="panel panel-grpc">
+        <div class="panel-label">Internal · gRPC</div>
+        <div id="grpc-chip" class="status-chip chip-ok">OK</div>
+        <div id="grpc-detail" class="detail-block">GetItemResponse {
+  item_id: "item-42"
+  name:    "Widget Pro"
+  price:   49.99
+}</div>
+      </div>
+
+      <!-- REST / public side -->
+      <div class="panel panel-rest">
+        <div class="panel-label">Public · REST</div>
+        <div id="rest-chip" class="status-chip chip-200">200 OK</div>
+        <div id="rest-detail" class="detail-block">{
+  "item_id": "item-42",
+  "name": "Widget Pro",
+  "price": 49.99
+}</div>
+      </div>
+    </div>
+
+    <!-- Boundary row -->
+    <div class="boundary-row">
+      <div class="boundary-line"></div>
+      <div class="boundary-tag">
+        <span>error mapping</span>
+        <span class="boundary-arrow">⟵</span>
+        <span>gRPC status</span>
+        <span class="boundary-arrow">⟶</span>
+        <span>REST response</span>
+      </div>
+      <div class="boundary-line"></div>
+    </div>
+
+    <!-- Explanation -->
+    <div id="explanation" class="explanation">
+      The gRPC call succeeded. The REST API passed the data straight through as JSON. The consumer never needed to know gRPC was involved.
+    </div>
+
+  </div><!-- /main-card -->
+
+</div><!-- /container -->
+
+<script>
+  const scenarios = {
+    ok: {
+      grpcChip:  { text: 'OK',               cls: 'chip-ok' },
+      grpcDetail:`GetItemResponse {\n  item_id: "item-42"\n  name:    "Widget Pro"\n  price:   49.99\n}`,
+      restChip:  { text: '200 OK',            cls: 'chip-200' },
+      restDetail:`{\n  "item_id": "item-42",\n  "name": "Widget Pro",\n  "price": 49.99\n}`,
+      explanation: 'The gRPC call succeeded. The REST API passed the data straight through as JSON. The consumer never needed to know gRPC was involved.'
+    },
+    not_found: {
+      grpcChip:  { text: 'NOT_FOUND',         cls: 'chip-not_found' },
+      grpcDetail:`RpcError {\n  code:    StatusCode.NOT_FOUND\n  details: "item-42 not in catalog"\n}`,
+      restChip:  { text: '404 Not Found',     cls: 'chip-404' },
+      restDetail:`{\n  "error": {\n    "message": "Item not found."\n  }\n}`,
+      explanation: 'The item does not exist — a caller problem, not a system failure. A 4xx status tells the consumer their request was the issue. The raw gRPC detail is hidden behind the clean error body.'
+    },
+    deadline: {
+      grpcChip:  { text: 'DEADLINE_EXCEEDED', cls: 'chip-deadline' },
+      grpcDetail:`RpcError {\n  code:    StatusCode.DEADLINE_EXCEEDED\n  details: "timeout after 3.0s"\n}`,
+      restChip:  { text: '504 Gateway Timeout', cls: 'chip-504' },
+      restDetail:`{\n  "error": {\n    "message": "The request timed out."\n  }\n}`,
+      explanation: 'The internal service was too slow — a system problem, not the caller\'s fault. The 3-second timeout prevented the public API from hanging forever. A 5xx signals an upstream failure.'
+    },
+    unavailable: {
+      grpcChip:  { text: 'UNAVAILABLE',       cls: 'chip-unavail' },
+      grpcDetail:`RpcError {\n  code:    StatusCode.UNAVAILABLE\n  details: "dial tcp catalog-service:50051:\n           connection refused"\n}`,
+      restChip:  { text: '503 Service Unavailable', cls: 'chip-503' },
+      restDetail:`{\n  "error": {\n    "message": "The service is\n    unavailable."\n  }\n}`,
+      explanation: 'The internal service cannot be reached at all — a system problem. A 503 tells the consumer to try again later. The internal address and port are never exposed in the response.'
+    }
+  };
+
+  const grpcChipEl   = document.getElementById('grpc-chip');
+  const grpcDetailEl = document.getElementById('grpc-detail');
+  const restChipEl   = document.getElementById('rest-chip');
+  const restDetailEl = document.getElementById('rest-detail');
+  const explanationEl= document.getElementById('explanation');
+  const buttons      = document.querySelectorAll('.scenario-btn');
+
+  function applyScenario(id) {
+    const s = scenarios[id];
+    if (!s) return;
+
+    const targets = [grpcChipEl, grpcDetailEl, restChipEl, restDetailEl, explanationEl];
+
+    // Remove animation class, force reflow, re-add
+    targets.forEach(el => el.classList.remove('fade-in'));
+    void grpcChipEl.offsetWidth; // single reflow
+
+    grpcChipEl.textContent   = s.grpcChip.text;
+    grpcChipEl.className     = 'status-chip ' + s.grpcChip.cls;
+    grpcDetailEl.textContent = s.grpcDetail;
+
+    restChipEl.textContent   = s.restChip.text;
+    restChipEl.className     = 'status-chip ' + s.restChip.cls;
+    restDetailEl.textContent = s.restDetail;
+
+    explanationEl.textContent = s.explanation;
+
+    targets.forEach(el => el.classList.add('fade-in'));
+
+    buttons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.id === id);
+    });
+  }
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => applyScenario(btn.dataset.id));
+  });
+</script>
+</body>
+</html>

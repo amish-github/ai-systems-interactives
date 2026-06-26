@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NoSQL Families — Match the Access Pattern</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .cursor-icon {
+      animation: cursor-wiggle 4s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      25%  { transform: rotate(10deg); }
+      40%  { transform: rotate(-8deg); }
+      55%  { transform: rotate(6deg); }
+      70%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .hint-header span {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* Progress bar */
+    .progress-wrap {
+      height: 4px;
+      background: rgba(0,0,0,0.08);
+    }
+    .progress-fill {
+      height: 4px;
+      background: #1878DC;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    /* Main */
+    .main {
+      padding: 24px;
+    }
+
+    .step-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 16px;
+    }
+
+    /* Scenario card */
+    .scenario-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .scenario-eyebrow {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .scenario-body {
+      font-size: 18px;
+      line-height: 1.55;
+      color: #1A1A1A;
+    }
+
+    .pick-prompt {
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 16px;
+    }
+
+    /* Family buttons */
+    .families-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .family-btn {
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, opacity 0.2s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .family-btn:hover:not(:disabled) {
+      border-color: #1878DC;
+      box-shadow: 0 0 0 2.5px rgba(24,120,220,0.18), 0 1px 3px 0 rgba(0,0,0,0.12);
+    }
+    .family-btn:disabled { cursor: default; }
+
+    .family-name {
+      font-size: 16px;
+      font-weight: 500;
+      color: #1A1A1A;
+      margin-bottom: 4px;
+    }
+    .family-eg {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .family-btn.state-correct {
+      background: #EDF8F1;
+      border-color: #328F51;
+      box-shadow: 0 0 0 2.5px rgba(50,143,81,0.18), 0 1px 3px 0 rgba(0,0,0,0.08);
+    }
+    .family-btn.state-correct .family-name { color: #328F51; }
+
+    .family-btn.state-wrong {
+      background: #FEF0F0;
+      border-color: #DE4C45;
+      box-shadow: 0 0 0 2.5px rgba(222,76,69,0.18), 0 1px 3px 0 rgba(0,0,0,0.08);
+    }
+    .family-btn.state-wrong .family-name { color: #DE4C45; }
+
+    .family-btn.state-dim { opacity: 0.38; }
+
+    /* Feedback */
+    .feedback {
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 16px;
+      line-height: 1.55;
+      display: none;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .feedback.visible { display: block; }
+
+    .feedback.fb-correct {
+      background: #EDF8F1;
+      border: 1.5px solid #328F51;
+    }
+    .feedback.fb-wrong {
+      background: #FEF0F0;
+      border: 1.5px solid #DE4C45;
+    }
+
+    .fb-label {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .fb-correct .fb-label { color: #328F51; }
+    .fb-wrong .fb-label { color: #DE4C45; }
+
+    /* Next button */
+    .btn-next {
+      display: none;
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .btn-next.visible { display: inline-block; }
+    .btn-next:hover { background: #1060B8; }
+    .btn-next:active { transform: scale(0.98); }
+
+    /* Results */
+    .results {
+      display: none;
+      padding: 32px 24px 24px;
+      text-align: center;
+    }
+    .results.visible { display: block; }
+
+    .results-score {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 56px;
+      color: #1878DC;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .results-of {
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 20px;
+    }
+    .results-title {
+      font-size: 20px;
+      color: #1A1A1A;
+      margin-bottom: 24px;
+      line-height: 1.4;
+    }
+
+    .breakdown {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+    .breakdown-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #F2F1EE;
+      font-size: 15px;
+      color: #1A1A1A;
+      line-height: 1.45;
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    .dot-hit { background: #328F51; }
+    .dot-miss { background: #DE4C45; }
+    .breakdown-family {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-top: 2px;
+    }
+
+    .btn-restart {
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .btn-restart:hover { background: #1060B8; }
+
+    @media (max-width: 480px) {
+      .families-grid { grid-template-columns: 1fr; }
+      .main { padding: 16px; }
+      .results { padding: 24px 16px 16px; }
+      .hint-header { padding: 12px 16px; }
+    }
+    @media (max-width: 325px) {
+      .hint-header span { font-size: 15px; }
+      .scenario-body { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Read the access pattern, then pick the right NoSQL family.</span>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+
+  <!-- Quiz -->
+  <div class="main" id="quizArea">
+    <div class="step-label" id="stepLabel">Scenario 1 of 5</div>
+
+    <div class="scenario-card">
+      <div class="scenario-eyebrow">Access Pattern</div>
+      <div class="scenario-body" id="scenarioBody"></div>
+    </div>
+
+    <div class="pick-prompt">Which NoSQL family fits this pattern best?</div>
+
+    <div class="families-grid" id="familiesGrid">
+      <button class="family-btn" id="btn-document" onclick="pick('document')">
+        <div class="family-name">Document</div>
+        <div class="family-eg">e.g. MongoDB</div>
+      </button>
+      <button class="family-btn" id="btn-keyvalue" onclick="pick('keyvalue')">
+        <div class="family-name">Key-Value</div>
+        <div class="family-eg">e.g. Redis, DynamoDB</div>
+      </button>
+      <button class="family-btn" id="btn-widecolumn" onclick="pick('widecolumn')">
+        <div class="family-name">Wide-Column</div>
+        <div class="family-eg">e.g. Cassandra</div>
+      </button>
+      <button class="family-btn" id="btn-graph" onclick="pick('graph')">
+        <div class="family-name">Graph</div>
+        <div class="family-eg">e.g. Neo4j</div>
+      </button>
+    </div>
+
+    <div class="feedback" id="feedbackBox">
+      <div class="fb-label" id="fbLabel"></div>
+      <div id="fbText"></div>
+    </div>
+
+    <button class="btn-next" id="btnNext" onclick="advance()">Next scenario →</button>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="resultsArea">
+    <div class="results-score" id="scoreNum"></div>
+    <div class="results-of">out of 5 correct</div>
+    <div class="results-title" id="resultsTitle"></div>
+    <div class="breakdown" id="breakdown"></div>
+    <button class="btn-restart" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+<script>
+  const SCENARIOS = [
+    {
+      text: "Your app stores user sessions. Each one is fetched by a single session ID. The values are small, and the system must handle tens of thousands of reads and writes every second.",
+      answer: "keyvalue",
+      correctText: "Correct. Every access is a direct lookup by a known key at very high throughput — the one thing a key-value store is built for. You give up rich querying you do not need here.",
+      wrongText: {
+        document:   "A document store can hold session data, but it is designed for varied, nested records that you query flexibly. For a high-volume lookup-by-key pattern, a key-value store is lighter and faster.",
+        widecolumn: "A wide-column store handles massive write volume, but it is not designed for simple lookups by a single key. It asks you to plan queries in advance — more weight than sessions need.",
+        graph:      "A graph database traverses relationships and paths between records. Sessions are individual values fetched by a single ID — there are no connections to traverse here."
+      }
+    },
+    {
+      text: "A product catalog stores items with nested, varying attributes. Trail shoes carry sizes and colors. Industrial pumps carry pressure ratings and certifications. The schema keeps changing as new product types are added.",
+      answer: "document",
+      correctText: "Correct. Nested, varied records that you read whole are the document store's strength. Each product can carry different fields without a schema migration, which is exactly the flexibility this catalog needs.",
+      wrongText: {
+        keyvalue:   "A key-value store can hold any value but gives you no structure inside it. You would lose the ability to query or index product fields — for example, finding all outdoor products under a price threshold.",
+        widecolumn: "A wide-column store requires you to know your queries in advance and design tables around them. Frequently changing, varied product shapes fight against that model.",
+        graph:      "A graph database is designed to query relationships and paths between records — not to store varied, nested product data that you read whole."
+      }
+    },
+    {
+      text: "A fleet of IoT sensors sends readings every second from millions of devices. Data arrives at enormous volume. The engineering team knows exactly which queries analysts will run: device history by time window, per region. No ad-hoc queries are expected.",
+      answer: "widecolumn",
+      correctText: "Correct. Massive write volume with queries known up front is the wide-column store's sweet spot. The team designs tables around those queries and gets horizontal write scale in return.",
+      wrongText: {
+        document:   "A document store handles varied, nested records well, but it is not designed to absorb the write throughput that millions of sensors produce each second.",
+        keyvalue:   "A key-value store is fast at individual lookups. It is not built for the time-windowed analytical queries — device history per region — that the team needs to run.",
+        graph:      "A graph database traverses relationships between nodes. Time-series sensor data at massive volume is not a relationship problem — it is a write-throughput and query-design problem."
+      }
+    },
+    {
+      text: "A social network needs to answer 'who are this person's friends-of-friends?' and 'what is the shortest path between two users?' The connections between people are the most important data.",
+      answer: "graph",
+      correctText: "Correct. When the connections between records are the main thing being queried, a graph database answers relationship and path questions far more naturally than any other family — and far faster than repeated joins would.",
+      wrongText: {
+        document:   "Storing a user profile as a document works for the profile itself. But it gives you no efficient way to traverse chains of connections between users — following hops across millions of relationships.",
+        keyvalue:   "A key-value store fetches one record by key instantly. It has no mechanism to follow, count, or measure chains of connections between records.",
+        widecolumn: "A wide-column store scales for write volume with pre-designed queries. It cannot efficiently answer 'shortest path between two nodes' or 'who is within three hops of this user.'"
+      }
+    },
+    {
+      text: "An e-commerce recommendation engine computes 'customers who bought X also bought Y' by traversing chains of shared purchases. The core question is always about connections and paths between items and buyers.",
+      answer: "graph",
+      correctText: "Correct. Recommendation engines follow chains of relationships — items connected through shared buyers. A graph database traverses those paths far more naturally than repeated joins, which is exactly what this pattern needs.",
+      wrongText: {
+        document:   "Documents store product data well, but they cannot efficiently traverse chains of connections between items and buyers at query time.",
+        keyvalue:   "A key-value store can look up items instantly but has no way to follow and query the web of relationships connecting items through purchasers.",
+        widecolumn: "A wide-column store handles high write volume with pre-planned queries. It is not designed to traverse relationship paths between items in real time."
+      }
+    }
+  ];
+
+  const FAMILY_LABELS = {
+    document:   "Document (e.g. MongoDB)",
+    keyvalue:   "Key-Value (e.g. Redis)",
+    widecolumn: "Wide-Column (e.g. Cassandra)",
+    graph:      "Graph (e.g. Neo4j)"
+  };
+
+  let idx = 0;
+  let score = 0;
+  let history = [];
+
+  function render() {
+    const s = SCENARIOS[idx];
+    document.getElementById('stepLabel').textContent = `Scenario ${idx + 1} of ${SCENARIOS.length}`;
+    document.getElementById('scenarioBody').textContent = s.text;
+
+    ['document','keyvalue','widecolumn','graph'].forEach(f => {
+      const btn = document.getElementById('btn-' + f);
+      btn.className = 'family-btn';
+      btn.disabled = false;
+    });
+
+    const fb = document.getElementById('feedbackBox');
+    fb.className = 'feedback';
+    document.getElementById('fbLabel').textContent = '';
+    document.getElementById('fbText').textContent = '';
+    document.getElementById('btnNext').className = 'btn-next';
+
+    document.getElementById('progressFill').style.width = (idx / SCENARIOS.length * 100) + '%';
+  }
+
+  function pick(family) {
+    const s = SCENARIOS[idx];
+    const correct = family === s.answer;
+
+    ['document','keyvalue','widecolumn','graph'].forEach(f => {
+      const btn = document.getElementById('btn-' + f);
+      btn.disabled = true;
+      if (f === family && correct) btn.classList.add('state-correct');
+      else if (f === family && !correct) btn.classList.add('state-wrong');
+      else if (f === s.answer && !correct) btn.classList.add('state-correct');
+      else btn.classList.add('state-dim');
+    });
+
+    const fb = document.getElementById('feedbackBox');
+    if (correct) {
+      fb.className = 'feedback fb-correct visible';
+      document.getElementById('fbLabel').textContent = 'Correct';
+      document.getElementById('fbText').textContent = s.correctText;
+      score++;
+    } else {
+      fb.className = 'feedback fb-wrong visible';
+      document.getElementById('fbLabel').textContent = 'Not quite';
+      document.getElementById('fbText').textContent = s.wrongText[family];
+    }
+
+    history.push({ correct, snippet: s.text.slice(0, 72) + '…', answer: s.answer });
+
+    const btn = document.getElementById('btnNext');
+    btn.className = 'btn-next visible';
+    btn.textContent = idx === SCENARIOS.length - 1 ? 'See results' : 'Next scenario →';
+  }
+
+  function advance() {
+    if (idx === SCENARIOS.length - 1) {
+      showResults();
+    } else {
+      idx++;
+      render();
+    }
+  }
+
+  function showResults() {
+    document.getElementById('quizArea').style.display = 'none';
+    document.getElementById('resultsArea').className = 'results visible';
+    document.getElementById('progressFill').style.width = '100%';
+
+    document.getElementById('scoreNum').textContent = score;
+
+    const titles = [
+      "The tradeoffs take practice — review each family and try again.",
+      "Solid start. A couple of access patterns to revisit.",
+      "Good pattern recognition — three nailed, two to review.",
+      "Strong. One scenario to look back at.",
+      "Every access pattern matched correctly."
+    ];
+    document.getElementById('resultsTitle').textContent = titles[score] || '';
+
+    const bd = document.getElementById('breakdown');
+    bd.innerHTML = '';
+    history.forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'breakdown-row';
+      row.innerHTML =
+        `<div class="dot ${h.correct ? 'dot-hit' : 'dot-miss'}"></div>` +
+        `<div><div>${h.snippet}</div><div class="breakdown-family">${h.correct ? 'Correct — ' : 'Answer: '}${FAMILY_LABELS[h.answer]}</div></div>`;
+      bd.appendChild(row);
+    });
+  }
+
+  function restart() {
+    idx = 0; score = 0; history = [];
+    document.getElementById('quizArea').style.display = '';
+    document.getElementById('resultsArea').className = 'results';
+    render();
+  }
+
+  render();
+</script>
+</body>
+</html>

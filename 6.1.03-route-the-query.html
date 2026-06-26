@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Route the Query — Routing Reads and Writes</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+.outer {
+  width: 100%;
+  max-width: 700px;
+}
+
+/* Hint header */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.cursor-icon {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+}
+@keyframes wiggle {
+  0%,  100% { transform: rotate(0deg);   }
+  15%        { transform: rotate(-10deg); }
+  30%        { transform: rotate(10deg);  }
+  45%        { transform: rotate(-8deg);  }
+  60%        { transform: rotate(6deg);   }
+  75%        { transform: rotate(-3deg);  }
+  90%        { transform: rotate(0deg);   }
+}
+
+/* Diagram */
+.diagram-section {
+  background: #F2F1EE;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.diagram-svg {
+  width: 100%;
+  display: block;
+}
+.diagram-caption {
+  font-size: 13px;
+  color: rgba(0,0,0,0.4);
+  text-align: center;
+  margin-top: 6px;
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* SVG styles */
+.route-line {
+  stroke: rgba(0,0,0,0.18);
+  stroke-width: 2;
+  fill: none;
+  transition: stroke 0.3s ease, stroke-width 0.3s ease;
+}
+.route-line.hi-primary { stroke: #1878DC; stroke-width: 2.5; }
+.route-line.hi-replica { stroke: #328F51; stroke-width: 2.5; }
+.repl-line {
+  stroke: rgba(0,0,0,0.15);
+  stroke-width: 1.5;
+  fill: none;
+  stroke-dasharray: 4 3;
+}
+.db-box {
+  fill: #FFFFFF;
+  stroke: rgba(0,0,0,0.14);
+  stroke-width: 1.5;
+  transition: stroke 0.3s ease, fill 0.3s ease;
+}
+.db-box.hi-primary { stroke: #1878DC; stroke-width: 2.5; fill: rgba(24,120,220,0.05); }
+.db-box.hi-replica { stroke: #328F51; stroke-width: 2.5; fill: rgba(50,143,81,0.05); }
+.db-text {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  fill: rgba(0,0,0,0.6);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  transition: fill 0.3s ease;
+}
+.db-text.hi-primary { fill: #1878DC; }
+.db-text.hi-replica { fill: #328F51; }
+.db-sub {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 9.5px;
+  fill: rgba(0,0,0,0.35);
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+
+/* Main content */
+.main {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.progress-meta {
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+.progress-track {
+  height: 4px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #1878DC;
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.4s ease;
+}
+
+/* Query card */
+.query-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.query-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: 'Suisse Intl Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.badge-write { background: rgba(211,87,34,0.10); color: #D35722; }
+.badge-fresh { background: rgba(24,120,220,0.10); color: #1878DC; }
+.badge-stale { background: rgba(50,143,81,0.10); color: #328F51; }
+.query-text { font-size: 18px; line-height: 1.55; }
+
+/* Routing buttons */
+.btn-row { display: flex; gap: 12px; }
+.route-btn {
+  flex: 1;
+  min-height: 52px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1.5px solid transparent;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.route-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.route-btn:disabled { cursor: default; opacity: 0.42; }
+
+.btn-primary-choice { background: #1878DC; color: #FFFFFF; }
+.btn-primary-choice:not(:disabled):hover { background: #1266C4; }
+.btn-replica-choice { background: #F2F1EE; color: #1A1A1A; border-color: rgba(0,0,0,0.14); }
+.btn-replica-choice:not(:disabled):hover { background: #e8e7e3; }
+
+/* Feedback */
+.feedback {
+  border-radius: 10px;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.6;
+  display: none;
+}
+.feedback.show { display: block; }
+.feedback.correct { background: rgba(50,143,81,0.07); border: 1px solid rgba(50,143,81,0.28); }
+.feedback.wrong   { background: rgba(222,76,69,0.07);  border: 1px solid rgba(222,76,69,0.28); }
+.feedback-head { font-size: 16px; margin-bottom: 6px; }
+.feedback-body { font-size: 15px; color: rgba(0,0,0,0.72); }
+
+/* Next button */
+.next-btn {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 24px;
+  border-radius: 10px;
+  background: #1A1A1A;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  display: none;
+  transition: background 0.15s ease;
+}
+.next-btn.show { display: block; }
+.next-btn:hover { background: #333; }
+
+/* Score screen */
+.score-screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 52px 24px 36px;
+  text-align: center;
+}
+.score-screen.show { display: flex; }
+.score-big {
+  font-size: 52px;
+  font-family: 'Suisse Intl Mono', monospace;
+  line-height: 1;
+}
+.score-of { font-size: 18px; color: rgba(0,0,0,0.45); margin-top: 4px; }
+.score-msg { font-size: 18px; line-height: 1.65; max-width: 460px; }
+.restart-btn {
+  padding: 14px 32px;
+  min-height: 52px;
+  border-radius: 10px;
+  background: #1878DC;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s ease;
+}
+.restart-btn:hover { background: #1266C4; }
+
+@media (max-width: 420px) {
+  .hint-header { padding: 12px 16px; }
+  .diagram-section { padding: 16px 16px 10px; }
+  .main { padding: 16px; }
+  .query-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="outer">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Click a destination to route each query.</span>
+  </div>
+
+  <!-- Architecture diagram -->
+  <div class="diagram-section">
+    <svg class="diagram-svg" id="routing-diagram" viewBox="0 0 652 215" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr-default" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+          <path d="M0,1 L0,6 L7,3.5 z" fill="rgba(0,0,0,0.18)"/>
+        </marker>
+        <marker id="arr-primary" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+          <path d="M0,1 L0,6 L7,3.5 z" fill="#1878DC"/>
+        </marker>
+        <marker id="arr-replica" markerWidth="7" markerHeight="7" refX="5.5" refY="3.5" orient="auto">
+          <path d="M0,1 L0,6 L7,3.5 z" fill="#328F51"/>
+        </marker>
+        <marker id="arr-repl" markerWidth="6" markerHeight="6" refX="4.5" refY="3" orient="auto">
+          <path d="M0,0.5 L0,5.5 L6,3 z" fill="rgba(0,0,0,0.15)"/>
+        </marker>
+      </defs>
+
+      <!-- Replication lines (dashed) -->
+      <line class="repl-line" x1="183" y1="183" x2="253" y2="183" marker-end="url(#arr-repl)"/>
+      <line class="repl-line" x1="396" y1="183" x2="460" y2="183" marker-end="url(#arr-repl)"/>
+
+      <!-- Route lines -->
+      <line id="rline-app"      class="route-line" x1="326" y1="53"  x2="326" y2="87"  marker-end="url(#arr-default)"/>
+      <line id="rline-primary"  class="route-line" x1="285" y1="131" x2="118" y2="158" marker-end="url(#arr-default)"/>
+      <line id="rline-replica1" class="route-line" x1="326" y1="131" x2="326" y2="158" marker-end="url(#arr-default)"/>
+      <line id="rline-replica2" class="route-line" x1="367" y1="131" x2="526" y2="158" marker-end="url(#arr-default)"/>
+
+      <!-- App box: center (326,32) -->
+      <rect class="db-box" x="246" y="12" width="160" height="40" rx="8"/>
+      <text class="db-text" x="326" y="32">Application Service</text>
+
+      <!-- Router box: center (326,110) -->
+      <rect class="db-box" x="246" y="90" width="160" height="40" rx="8"/>
+      <text class="db-text" x="326" y="106">Routing Layer</text>
+      <text class="db-sub"  x="326" y="120">app · proxy · driver</text>
+
+      <!-- Primary: x=39 y=159 w=144 h=44, center x=111 -->
+      <rect class="db-box" id="box-primary" x="39"  y="159" width="144" height="44" rx="8"/>
+      <text class="db-text" id="lbl-primary" x="111" y="177">Primary</text>
+      <text class="db-sub"               x="111" y="192">source of truth</text>
+
+      <!-- Replica 1: x=256 y=159 w=140 h=44, center x=326 -->
+      <rect class="db-box" id="box-r1" x="256" y="159" width="140" height="44" rx="8"/>
+      <text class="db-text" id="lbl-r1" x="326" y="177">Replica 1</text>
+      <text class="db-sub"              x="326" y="192">read-only</text>
+
+      <!-- Replica 2: x=462 y=159 w=140 h=44, center x=532 -->
+      <rect class="db-box" id="box-r2" x="462" y="159" width="140" height="44" rx="8"/>
+      <text class="db-text" id="lbl-r2" x="532" y="177">Replica 2</text>
+      <text class="db-sub"              x="532" y="192">read-only</text>
+    </svg>
+    <p class="diagram-caption">─ ─ ─ replication stream &nbsp;|&nbsp; —— query traffic</p>
+  </div>
+
+  <!-- Quiz area -->
+  <div class="main" id="quiz-area">
+
+    <div>
+      <div class="progress-row">
+        <span class="progress-meta" id="prog-label">Scenario 1 of 6</span>
+        <span class="progress-meta" id="score-label">Score: 0 / 6</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="prog-fill"></div>
+      </div>
+    </div>
+
+    <div class="query-card">
+      <div id="query-badge" class="query-badge badge-write">WRITE</div>
+      <div id="query-text"  class="query-text"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="route-btn btn-primary-choice" id="btn-primary" onclick="choose('primary')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="5" fill="currentColor"/>
+        </svg>
+        Primary
+      </button>
+      <button class="route-btn btn-replica-choice" id="btn-replica" onclick="choose('replica')">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        Replica
+      </button>
+    </div>
+
+    <div class="feedback" id="feedback">
+      <div class="feedback-head" id="fb-head"></div>
+      <div class="feedback-body" id="fb-body"></div>
+    </div>
+
+    <button class="next-btn" id="next-btn" onclick="advance()">Next</button>
+
+  </div>
+
+  <!-- Score screen -->
+  <div class="score-screen" id="score-screen">
+    <div>
+      <div class="score-big" id="final-score">—</div>
+      <div class="score-of">queries routed correctly</div>
+    </div>
+    <p class="score-msg" id="final-msg"></p>
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+
+<script>
+var SCENARIOS = [
+  {
+    badgeClass: 'badge-write',
+    badgeText: 'WRITE',
+    text: 'A user clicks "Place Order." The application runs an INSERT statement to record the new order in the database.',
+    answer: 'primary',
+    reason: 'Writes — INSERT, UPDATE, DELETE — always go to the primary. Replicas are kept in read-only mode and will reject write statements outright.'
+  },
+  {
+    badgeClass: 'badge-fresh',
+    badgeText: 'READ · post-write',
+    text: 'Right after placing the order, the app loads an order confirmation page. It reads from the database to show the user what they just submitted.',
+    answer: 'primary',
+    reason: 'This read immediately follows a write by the same user. A replica may not have received that change yet. Routing it to a replica risks showing the user that their order does not exist — a classic read-your-writes failure.'
+  },
+  {
+    badgeClass: 'badge-stale',
+    badgeText: 'READ · stale-ok',
+    text: 'The homepage loads a public product listing — titles, prices, and descriptions. Showing data that is a fraction of a second old is perfectly acceptable.',
+    answer: 'replica',
+    reason: 'No preceding write by this user, and a small lag is acceptable. This is the ideal workload for a replica. Moving stale-tolerant reads like this off the primary is exactly where the capacity benefit of replication comes from.'
+  },
+  {
+    badgeClass: 'badge-write',
+    badgeText: 'WRITE',
+    text: 'A user edits their display name and clicks Save. The application runs an UPDATE statement on their user record.',
+    answer: 'primary',
+    reason: 'Any statement that modifies data must go to the primary, without exception. Replicas cannot accept writes.'
+  },
+  {
+    badgeClass: 'badge-fresh',
+    badgeText: 'READ · post-write',
+    text: 'A user just posted a comment. The app immediately reloads the comment thread so the new comment appears on screen.',
+    answer: 'primary',
+    reason: 'The comment was just written and may not have propagated to the replicas yet. Routing this read to a replica could make the user\'s own comment invisible — exactly the read-your-writes problem this lesson warns about.'
+  },
+  {
+    badgeClass: 'badge-stale',
+    badgeText: 'READ · stale-ok',
+    text: 'A sales dashboard loads 30-day summary statistics aggregated across many rows. Showing numbers that are a few seconds old is acceptable.',
+    answer: 'replica',
+    reason: 'High-volume aggregate reads with no freshness requirement are perfect for a replica. Offloading this workload frees the primary for writes and time-sensitive reads.'
+  }
+];
+
+var current = 0;
+var score = 0;
+var answered = false;
+
+function sc(id, cls) {
+  var el = document.getElementById(id);
+  if (el) el.setAttribute('class', cls);
+}
+function sm(id, marker) {
+  var el = document.getElementById(id);
+  if (el) el.setAttribute('marker-end', 'url(#' + marker + ')');
+}
+
+function resetDiagram() {
+  ['rline-app','rline-primary','rline-replica1','rline-replica2'].forEach(function(id) {
+    sc(id, 'route-line');
+    sm(id, 'arr-default');
+  });
+  sc('box-primary', 'db-box');
+  sc('box-r1', 'db-box');
+  sc('box-r2', 'db-box');
+  sc('lbl-primary', 'db-text');
+  sc('lbl-r1', 'db-text');
+  sc('lbl-r2', 'db-text');
+}
+
+function highlightDiagram(dest) {
+  if (dest === 'primary') {
+    sc('rline-app',     'route-line hi-primary'); sm('rline-app',     'arr-primary');
+    sc('rline-primary', 'route-line hi-primary'); sm('rline-primary', 'arr-primary');
+    sc('box-primary', 'db-box hi-primary');
+    sc('lbl-primary', 'db-text hi-primary');
+  } else {
+    sc('rline-app',      'route-line hi-replica'); sm('rline-app',      'arr-replica');
+    sc('rline-replica1', 'route-line hi-replica'); sm('rline-replica1', 'arr-replica');
+    sc('rline-replica2', 'route-line hi-replica'); sm('rline-replica2', 'arr-replica');
+    sc('box-r1', 'db-box hi-replica');
+    sc('box-r2', 'db-box hi-replica');
+    sc('lbl-r1', 'db-text hi-replica');
+    sc('lbl-r2', 'db-text hi-replica');
+  }
+}
+
+function loadScenario(idx) {
+  answered = false;
+  var s = SCENARIOS[idx];
+  var badge = document.getElementById('query-badge');
+  badge.textContent = s.badgeText;
+  badge.setAttribute('class', 'query-badge ' + s.badgeClass);
+  document.getElementById('query-text').textContent = s.text;
+  document.getElementById('btn-primary').disabled = false;
+  document.getElementById('btn-replica').disabled = false;
+  document.getElementById('feedback').setAttribute('class', 'feedback');
+  document.getElementById('next-btn').setAttribute('class', 'next-btn');
+  resetDiagram();
+  var total = SCENARIOS.length;
+  document.getElementById('prog-label').textContent = 'Scenario ' + (idx + 1) + ' of ' + total;
+  document.getElementById('score-label').textContent = 'Score: ' + score + ' / ' + total;
+  document.getElementById('prog-fill').style.width = (idx / total * 100) + '%';
+}
+
+function choose(choice) {
+  if (answered) return;
+  answered = true;
+  var s = SCENARIOS[current];
+  var correct = (choice === s.answer);
+  if (correct) score++;
+  document.getElementById('btn-primary').disabled = true;
+  document.getElementById('btn-replica').disabled = true;
+  highlightDiagram(s.answer);
+  var fb     = document.getElementById('feedback');
+  var fbHead = document.getElementById('fb-head');
+  var fbBody = document.getElementById('fb-body');
+  if (correct) {
+    fb.setAttribute('class', 'feedback show correct');
+    fbHead.innerHTML = '<strong style="color:#328F51">Correct</strong>';
+  } else {
+    var dest = s.answer === 'primary' ? 'the Primary' : 'a Replica';
+    fb.setAttribute('class', 'feedback show wrong');
+    fbHead.innerHTML = '<strong style="color:#DE4C45">Not quite</strong> — this one goes to ' + dest;
+  }
+  fbBody.textContent = s.reason;
+  document.getElementById('score-label').textContent = 'Score: ' + score + ' / ' + SCENARIOS.length;
+  var nb = document.getElementById('next-btn');
+  nb.setAttribute('class', 'next-btn show');
+  nb.textContent = (current < SCENARIOS.length - 1) ? 'Next →' : 'See results';
+}
+
+function advance() {
+  current++;
+  if (current >= SCENARIOS.length) {
+    showScore();
+  } else {
+    loadScenario(current);
+  }
+}
+
+function showScore() {
+  document.getElementById('quiz-area').style.display = 'none';
+  var ss = document.getElementById('score-screen');
+  ss.setAttribute('class', 'score-screen show');
+  document.getElementById('final-score').textContent = score + ' / ' + SCENARIOS.length;
+  var msg;
+  var pct = score / SCENARIOS.length;
+  if (pct === 1) {
+    msg = 'Perfect score. You classified every query correctly — writes and freshness-sensitive reads to the primary, stale-tolerant reads to replicas.';
+  } else if (pct >= 5/6) {
+    msg = 'Nearly perfect. The usual slip is a read that follows a write in the same user flow. Those look like ordinary reads, but they must still go to the primary to preserve read-your-writes.';
+  } else if (pct >= 0.5) {
+    msg = 'Good progress. The rule to remember: writes always go to the primary, reads that immediately follow a related write also go to the primary, and only stale-tolerant reads belong on replicas.';
+  } else {
+    msg = 'Keep at it. Writes always go to the primary. Reads that chase a recent write also go to the primary (read-your-writes). Only stale-tolerant reads with no preceding write go to replicas.';
+  }
+  document.getElementById('final-msg').textContent = msg;
+}
+
+function restart() {
+  current = 0;
+  score = 0;
+  document.getElementById('score-screen').setAttribute('class', 'score-screen');
+  document.getElementById('quiz-area').style.display = '';
+  loadScenario(0);
+}
+
+loadScenario(0);
+</script>
+</body>
+</html>

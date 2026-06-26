@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Should I Cache This?</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+  padding: 32px 24px 48px;
+}
+
+/* Hint header */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+  color: rgba(0,0,0,0.50);
+  font-size: 16px;
+  line-height: 1.4;
+}
+.cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s ease-in-out infinite; }
+@keyframes cursor-wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Progress */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.progress-dots { display: flex; gap: 6px; }
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.14);
+  transition: background 0.25s;
+}
+.dot.active  { background: #1878DC; }
+.dot.correct { background: #328F51; }
+.dot.wrong   { background: #DE4C45; }
+.progress-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.50);
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* Scenario card */
+.scenario-card {
+  background: #F2F1EE;
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.scenario-chip {
+  display: inline-block;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(0,0,0,0.50);
+  background: rgba(0,0,0,0.07);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 12px;
+}
+.scenario-title {
+  font-size: 18px;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.scenario-detail {
+  font-size: 14px;
+  color: rgba(0,0,0,0.55);
+  line-height: 1.55;
+}
+
+/* Gates */
+.gates { display: flex; flex-direction: column; margin-bottom: 20px; }
+
+.gate {
+  border-radius: 12px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  overflow: hidden;
+  transition: border-color 0.2s, background 0.2s, opacity 0.2s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.gate.inactive { opacity: 0.35; pointer-events: none; }
+.gate.passed  { border-color: rgba(50,143,81,0.55);  background: #f0faf3; }
+.gate.blocked { border-color: rgba(222,76,69,0.45);  background: #fdf2f2; }
+
+.gate-header {
+  padding: 16px 20px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.gate-num {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+  background: rgba(0,0,0,0.07);
+  border-radius: 4px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.gate-question {
+  font-size: 16px;
+  line-height: 1.5;
+  flex: 1;
+}
+.gate-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.gate-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px 16px;
+}
+
+.gate-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  color: #1A1A1A;
+  text-align: center;
+}
+.gate-btn:hover:not(:disabled) {
+  background: #F2F1EE;
+  border-color: rgba(0,0,0,0.28);
+  transform: translateY(-1px);
+}
+.gate-btn.yes:hover:not(:disabled) { background: #e6f4ec; border-color: #328F51; color: #1d5c33; }
+.gate-btn.no:hover:not(:disabled)  { background: #fdeaea; border-color: #DE4C45; color: #9c2d29; }
+.gate-btn:disabled { opacity: 0.5; cursor: default; transform: none; }
+.gate-btn.chosen-yes { background: #e6f4ec; border-color: #328F51; color: #1d5c33; }
+.gate-btn.chosen-no  { background: #fdeaea; border-color: #DE4C45; color: #9c2d29; }
+
+/* Connector */
+.connector {
+  display: flex;
+  justify-content: center;
+  height: 16px;
+  position: relative;
+}
+.connector::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 1.5px;
+  height: 100%;
+  background: rgba(0,0,0,0.12);
+}
+
+/* Verdict */
+.verdict {
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  display: none;
+}
+.verdict.show { display: block; }
+.verdict.v-yes { background: #e6f4ec; border: 1.5px solid rgba(50,143,81,0.45); }
+.verdict.v-no  { background: #fdf2f2; border: 1.5px solid rgba(222,76,69,0.40); }
+
+.verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  border-radius: 6px;
+  padding: 4px 10px;
+  margin-bottom: 12px;
+}
+.v-yes .verdict-badge { background: rgba(50,143,81,0.15); color: #1d5c33; }
+.v-no  .verdict-badge { background: rgba(222,76,69,0.14); color: #9c2d29; }
+
+.verdict-heading {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+.v-yes .verdict-heading { color: #1d5c33; }
+.v-no  .verdict-heading { color: #9c2d29; }
+
+.verdict-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(0,0,0,0.65);
+}
+
+.verdict-code {
+  margin-top: 12px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: #1A1A1A;
+  line-height: 1.6;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Next button */
+.next-btn {
+  width: 100%;
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: none;
+  background: #1878DC;
+  color: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  display: none;
+}
+.next-btn:hover { background: #1260b8; transform: translateY(-1px); }
+.next-btn.show  { display: block; }
+
+/* All-done */
+.all-done {
+  display: none;
+  text-align: center;
+  padding: 48px 24px;
+}
+.all-done.show { display: block; }
+.all-done-mark {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #e6f4ec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  font-size: 28px;
+}
+.all-done-title { font-size: 22px; margin-bottom: 12px; }
+.all-done-text  { font-size: 16px; color: rgba(0,0,0,0.55); line-height: 1.6; max-width: 520px; margin: 0 auto; }
+
+.score-row {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  margin: 24px 0;
+}
+.score-chip {
+  background: #F2F1EE;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 14px;
+  color: rgba(0,0,0,0.60);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.score-chip strong {
+  display: block;
+  font-size: 24px;
+  font-family: 'Suisse Intl Mono', monospace;
+  color: #1A1A1A;
+  margin-bottom: 2px;
+}
+.score-chip.green strong { color: #328F51; }
+.score-chip.red   strong { color: #DE4C45; }
+
+.restart-btn {
+  margin-top: 8px;
+  padding: 12px 28px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.restart-btn:hover { background: #e4e3df; }
+
+@media (max-width: 480px) {
+  .container  { padding: 24px 16px 40px; }
+  .gate-header { padding: 14px 16px 0; }
+  .gate-actions { padding: 10px 16px 14px; }
+  .verdict    { padding: 20px; }
+  .score-row  { gap: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Answer each gate to decide whether to cache this read
+  </div>
+
+  <!-- Progress -->
+  <div class="progress">
+    <div class="progress-dots" id="progressDots"></div>
+    <span class="progress-label" id="progressLabel">1 / 6</span>
+  </div>
+
+  <!-- Main area -->
+  <div id="mainArea">
+    <div class="scenario-card">
+      <div class="scenario-chip">Read to classify</div>
+      <div class="scenario-title" id="scenarioTitle"></div>
+      <div class="scenario-detail" id="scenarioDetail"></div>
+    </div>
+
+    <div class="gates">
+      <!-- Gate 1 -->
+      <div class="gate" id="gate1">
+        <div class="gate-header">
+          <span class="gate-num">01</span>
+          <span class="gate-question">Must this read always return a perfectly fresh value — where a stale answer is a <em>correctness failure</em>?</span>
+          <span class="gate-icon" id="g1icon"></span>
+        </div>
+        <div class="gate-actions" id="g1actions">
+          <button class="gate-btn yes" onclick="answer(1,true)">Yes — must stay fresh</button>
+          <button class="gate-btn no"  onclick="answer(1,false)">No — some staleness is OK</button>
+        </div>
+      </div>
+
+      <div class="connector"></div>
+
+      <!-- Gate 2 -->
+      <div class="gate inactive" id="gate2">
+        <div class="gate-header">
+          <span class="gate-num">02</span>
+          <span class="gate-question">Is this read actually <em>frequent</em> — requested many times between updates?</span>
+          <span class="gate-icon" id="g2icon"></span>
+        </div>
+        <div class="gate-actions" id="g2actions">
+          <button class="gate-btn yes" onclick="answer(2,true)">Yes — read often</button>
+          <button class="gate-btn no"  onclick="answer(2,false)">No — rarely requested</button>
+        </div>
+      </div>
+
+      <div class="connector"></div>
+
+      <!-- Gate 3 -->
+      <div class="gate inactive" id="gate3">
+        <div class="gate-header">
+          <span class="gate-num">03</span>
+          <span class="gate-question">Is this read <em>expensive</em> to fetch — not just a fast indexed lookup?</span>
+          <span class="gate-icon" id="g3icon"></span>
+        </div>
+        <div class="gate-actions" id="g3actions">
+          <button class="gate-btn yes" onclick="answer(3,true)">Yes — expensive to fetch</button>
+          <button class="gate-btn no"  onclick="answer(3,false)">No — already cheap</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict" id="verdict">
+      <div class="verdict-badge" id="verdictBadge"></div>
+      <div class="verdict-heading" id="verdictHeading"></div>
+      <div class="verdict-text" id="verdictText"></div>
+      <div class="verdict-code" id="verdictCode" style="display:none"></div>
+    </div>
+
+    <button class="next-btn" id="nextBtn" onclick="nextScenario()"></button>
+  </div>
+
+  <!-- All-done screen -->
+  <div class="all-done" id="allDone">
+    <div class="all-done-mark">✓</div>
+    <div class="all-done-title">All reads classified</div>
+    <div class="score-row">
+      <div class="score-chip green"><strong id="scoreCorrect">0</strong>cached correctly</div>
+      <div class="score-chip red"><strong id="scoreWrong">0</strong>would have been stale</div>
+    </div>
+    <div class="all-done-text">The rule is the same for every read: must it stay fresh? Is it read often? Is it expensive to fetch? Only when all three gates pass does caching earn its place — and the TTL you set should match the staleness your system can tolerate.</div>
+    <button class="restart-btn" onclick="restart()">Start over</button>
+  </div>
+
+</div>
+<script>
+const SCENARIOS = [
+  {
+    title: "Product price on a busy catalog page",
+    detail: "Read thousands of times per minute. The price changes a few times a day. Checkout always confirms the real price against the database before charging.",
+    mustBeFresh: false,
+    readOften:   true,
+    expensive:   true,
+    verdict: "cache",
+    heading: "Cache it — with a TTL",
+    text: "The read is frequent, tolerates a small window of staleness (corrected at checkout), and hits shared price tables that can be shared across many concurrent requests. Set a short TTL that matches the staleness your team agreed on.",
+    code: 'SET product:1234:price "19.99" EX 10'
+  },
+  {
+    title: "Authorization check: is this user allowed to delete this record?",
+    detail: "Runs on every API request. An administrator can revoke a user's permission at any moment.",
+    mustBeFresh: true,
+    readOften:   true,
+    expensive:   false,
+    verdict: "no-cache",
+    heading: "Do not cache",
+    text: "A permission check must always reflect the current state. A stale \"allowed\" answer would let a user keep acting for minutes after their access was revoked — that is a correctness failure, not a minor delay. The read frequency does not override this.",
+    code: null
+  },
+  {
+    title: "A customer's current account balance",
+    detail: "Used to decide whether a transaction is permitted. Balances change with every debit and credit.",
+    mustBeFresh: true,
+    readOften:   false,
+    expensive:   false,
+    verdict: "no-cache",
+    heading: "Do not cache",
+    text: "A stale balance can let money be spent twice or block valid spending. Like permissions, this must always read from the source of truth. Caching it is a correctness bug, not a performance trade-off.",
+    code: null
+  },
+  {
+    title: "A popular article's rendered HTML",
+    detail: "Viewed by thousands of readers per hour. Rebuilding the HTML from Markdown and database fields takes about 80 ms on every request.",
+    mustBeFresh: false,
+    readOften:   true,
+    expensive:   true,
+    verdict: "cache",
+    heading: "Cache it — with a TTL",
+    text: "The rendered HTML is expensive to produce, read very often, and a slightly old version causes no harm to readers. This is exactly what caches are for. A TTL in the minutes-to-hours range is reasonable here.",
+    code: 'SET article:5678:html "<html>...</html>" EX 300'
+  },
+  {
+    title: "User profile fetched by primary-key lookup",
+    detail: "A single indexed query returning in about 1 ms. Each profile is viewed only a handful of times per day.",
+    mustBeFresh: false,
+    readOften:   false,
+    expensive:   false,
+    verdict: "no-cache",
+    heading: "Do not cache",
+    text: "The read is already cheap (a fast indexed lookup) and is rarely repeated between updates, so the cache almost never holds a useful copy. You pay for a new failure mode and gain almost nothing.",
+    code: null
+  },
+  {
+    title: "An analytics report one analyst runs once a day",
+    detail: "Aggregates data from several tables — takes about 400 ms to run — but is requested by a single person, once per day.",
+    mustBeFresh: false,
+    readOften:   false,
+    expensive:   true,
+    verdict: "no-cache",
+    heading: "Do not cache",
+    text: "Although the query is expensive, it is requested far too rarely for the cache to hold a useful hit. By the time the analyst opens it tomorrow the entry has long since expired. The cache would almost never save any work.",
+    code: null
+  }
+];
+
+let idx = 0;
+let correctCount = 0;
+let wrongCount = 0;
+let dotState = [];
+
+function init() {
+  dotState = SCENARIOS.map(() => 'pending');
+  renderDots();
+  loadScenario();
+}
+
+function renderDots() {
+  const c = document.getElementById('progressDots');
+  c.innerHTML = '';
+  dotState.forEach((state, i) => {
+    const d = document.createElement('div');
+    d.className = 'dot' + (state === 'pending' && i === idx ? ' active' : state === 'correct' ? ' correct' : state === 'wrong' ? ' wrong' : '');
+    c.appendChild(d);
+  });
+  document.getElementById('progressLabel').textContent = (idx + 1) + ' / ' + SCENARIOS.length;
+}
+
+function loadScenario() {
+  const s = SCENARIOS[idx];
+  document.getElementById('scenarioTitle').textContent = s.title;
+  document.getElementById('scenarioDetail').textContent = s.detail;
+
+  [1,2,3].forEach(n => {
+    const g = document.getElementById('gate' + n);
+    g.className = 'gate' + (n === 1 ? '' : ' inactive');
+    document.getElementById('g' + n + 'icon').textContent = '';
+    const acts = document.getElementById('g' + n + 'actions');
+    acts.style.display = 'flex';
+    acts.querySelectorAll('button').forEach(b => {
+      b.disabled = false;
+      b.className = b.className.replace(/ chosen-yes| chosen-no/g, '');
+    });
+  });
+
+  const v = document.getElementById('verdict');
+  v.className = 'verdict';
+  v.style.display = 'none';
+
+  const nb = document.getElementById('nextBtn');
+  nb.className = 'next-btn';
+
+  document.getElementById('mainArea').style.display = 'block';
+  document.getElementById('allDone').className = 'all-done';
+}
+
+function answer(gateNum, isYes) {
+  const s = SCENARIOS[idx];
+  const gate = document.getElementById('gate' + gateNum);
+  const acts = document.getElementById('g' + gateNum + 'actions');
+  const icon = document.getElementById('g' + gateNum + 'icon');
+
+  const btns = acts.querySelectorAll('button');
+  btns.forEach(b => b.disabled = true);
+  btns[0].className += isYes ? ' chosen-yes' : '';
+  btns[1].className += !isYes ? ' chosen-no' : '';
+
+  let eliminated = false;
+
+  if (gateNum === 1) {
+    if (isYes) {
+      gate.className = 'gate blocked';
+      icon.textContent = '✗';
+      eliminated = true;
+    } else {
+      gate.className = 'gate passed';
+      icon.textContent = '✓';
+      document.getElementById('gate2').className = 'gate';
+    }
+  } else if (gateNum === 2) {
+    if (!isYes) {
+      gate.className = 'gate blocked';
+      icon.textContent = '✗';
+      eliminated = true;
+    } else {
+      gate.className = 'gate passed';
+      icon.textContent = '✓';
+      document.getElementById('gate3').className = 'gate';
+    }
+  } else if (gateNum === 3) {
+    if (!isYes) {
+      gate.className = 'gate blocked';
+      icon.textContent = '✗';
+      eliminated = true;
+    } else {
+      gate.className = 'gate passed';
+      icon.textContent = '✓';
+    }
+  }
+
+  if (eliminated || gateNum === 3) {
+    const outcome = (!eliminated) ? 'cache' : 'no-cache';
+    const isRight = (outcome === s.verdict);
+    dotState[idx] = isRight ? 'correct' : 'wrong';
+    if (isRight) correctCount++; else wrongCount++;
+    renderDots();
+    showVerdict(s, outcome);
+  }
+}
+
+function showVerdict(s, outcome) {
+  const v = document.getElementById('verdict');
+  const isCaching = (outcome === 'cache');
+
+  v.className = 'verdict show ' + (isCaching ? 'v-yes' : 'v-no');
+  v.style.display = 'block';
+
+  document.getElementById('verdictBadge').textContent = isCaching ? '✓  Cache it' : '✗  Do not cache';
+  document.getElementById('verdictHeading').textContent = s.heading;
+  document.getElementById('verdictText').textContent = s.text;
+
+  const codeEl = document.getElementById('verdictCode');
+  if (s.code) {
+    codeEl.textContent = s.code;
+    codeEl.style.display = 'block';
+  } else {
+    codeEl.style.display = 'none';
+  }
+
+  const nb = document.getElementById('nextBtn');
+  nb.className = 'next-btn show';
+  nb.textContent = idx < SCENARIOS.length - 1 ? 'Next scenario →' : 'See results →';
+}
+
+function nextScenario() {
+  idx++;
+  if (idx >= SCENARIOS.length) {
+    document.getElementById('mainArea').style.display = 'none';
+    document.getElementById('scoreCorrect').textContent = correctCount;
+    document.getElementById('scoreWrong').textContent  = wrongCount;
+    document.getElementById('allDone').className = 'all-done show';
+  } else {
+    renderDots();
+    loadScenario();
+  }
+}
+
+function restart() {
+  idx = 0; correctCount = 0; wrongCount = 0;
+  dotState = SCENARIOS.map(() => 'pending');
+  renderDots();
+  loadScenario();
+}
+
+init();
+</script>
+</body>
+</html>

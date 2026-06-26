@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Repository Pattern: Tracing a Request</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* Hint header */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 24px 16px;
+      font-size: 18px;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* Layers diagram */
+    .layers {
+      padding: 0 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .layer {
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 12px 16px;
+      transition: background 0.25s, border-color 0.25s, box-shadow 0.25s;
+      background: #FFFFFF;
+    }
+
+    .layer + .layer { margin-top: 4px; }
+
+    .layer.active {
+      background: #EBF4FF;
+      border-color: #1878DC;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .layer.passed {
+      background: #F2F1EE;
+      border-color: rgba(0,0,0,0.08);
+    }
+
+    .layer.db { background: #F2F1EE; }
+    .layer.db.active { background: #EBF4FF; border-color: #1878DC; }
+
+    .layer-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1A1A1A;
+      transition: color 0.25s;
+    }
+
+    .layer.active .layer-name { color: #1878DC; }
+
+    .layer-desc {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-top: 2px;
+    }
+
+    .arrow-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 20px;
+      color: rgba(0,0,0,0.22);
+      transition: color 0.25s;
+    }
+
+    .arrow-wrap.active { color: #1878DC; }
+
+    /* Step panel */
+    .step-panel {
+      margin: 16px 24px 0;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .step-header {
+      padding: 12px 16px;
+      background: #F2F1EE;
+      border-bottom: 1.5px solid rgba(0,0,0,0.14);
+    }
+
+    .step-label {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .step-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-top: 4px;
+    }
+
+    .step-body {
+      padding: 16px;
+      background: #FFFFFF;
+    }
+
+    .step-explanation {
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.55;
+    }
+
+    .code-block {
+      margin-top: 12px;
+      background: #1D1D1D;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: #E0E0E0;
+      line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* chips */
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .chip {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chip-yes {
+      background: #E8F5EE;
+      color: #328F51;
+      border: 1px solid rgba(50,143,81,0.20);
+    }
+
+    .chip-no {
+      background: #FDF0EE;
+      color: #D35722;
+      border: 1px solid rgba(211,87,34,0.20);
+    }
+
+    /* Navigation */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px 28px;
+    }
+
+    .dots {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .dot {
+      height: 8px;
+      width: 8px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.2s, width 0.2s;
+    }
+
+    .dot.active { background: #1878DC; width: 20px; }
+    .dot.passed { background: rgba(0,0,0,0.32); }
+
+    .btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary {
+      background: #1878DC;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+    .btn-primary:hover { background: #1060BE; }
+    .btn-primary:active { transform: scale(0.97); }
+
+    .btn-ghost {
+      background: transparent;
+      color: rgba(0,0,0,0.45);
+    }
+    .btn-ghost:hover { background: rgba(0,0,0,0.05); color: #1A1A1A; }
+    .btn-ghost:active { transform: scale(0.97); }
+
+    .btn:disabled {
+      opacity: 0.30;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    @media (max-width: 480px) {
+      .hint-header { padding: 16px 16px 12px; font-size: 16px; }
+      .layers { padding: 0 16px; }
+      .step-panel { margin: 12px 16px 0; }
+      .nav { padding: 12px 16px 24px; }
+      .code-block { font-size: 12px; }
+    }
+
+    @media (max-width: 325px) {
+      .hint-header { padding: 12px 12px 10px; font-size: 15px; }
+      .layers { padding: 0 12px; }
+      .step-panel { margin: 10px 12px 0; }
+      .nav { padding: 10px 12px 20px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    Step through a <code style="font-family:'Suisse Intl Mono',monospace;font-size:15px;background:#F2F1EE;padding:2px 6px;border-radius:4px;">register_user</code> call, layer by layer
+  </div>
+
+  <div class="layers" id="layers-diagram">
+    <div class="layer" id="layer-api">
+      <div class="layer-name">API layer</div>
+      <div class="layer-desc">Translates HTTP in and out</div>
+    </div>
+    <div class="arrow-wrap" id="arrow-1">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="layer" id="layer-svc">
+      <div class="layer-name">Service layer</div>
+      <div class="layer-desc">Runs business logic</div>
+    </div>
+    <div class="arrow-wrap" id="arrow-2">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="layer" id="layer-repo">
+      <div class="layer-name">Repository</div>
+      <div class="layer-desc">Reads and writes data, returns domain objects</div>
+    </div>
+    <div class="arrow-wrap" id="arrow-3">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M7 1v10M2 7l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="layer db" id="layer-db">
+      <div class="layer-name">Postgres</div>
+      <div class="layer-desc">Source of truth</div>
+    </div>
+  </div>
+
+  <div class="step-panel">
+    <div class="step-header">
+      <div class="step-label" id="step-label">Step 1 of 6</div>
+      <div class="step-title" id="step-title"></div>
+    </div>
+    <div class="step-body">
+      <div class="step-explanation" id="step-explanation"></div>
+      <div class="code-block" id="step-code"></div>
+      <div class="chips-row" id="step-chips"></div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button class="btn btn-ghost" id="btn-back" onclick="go(-1)">&#8592; Back</button>
+    <div class="dots" id="dots"></div>
+    <button class="btn btn-primary" id="btn-next" onclick="go(1)">Next &#8594;</button>
+  </div>
+
+</div>
+<script>
+var STEPS = [
+  {
+    layer: 'api',
+    arrows: [],
+    title: 'HTTP POST /users arrives at the API layer',
+    explanation: 'A client sends an HTTP POST. The API layer is the only part of the system that sees raw HTTP — the path, the body, the headers. Its single job is to parse the request and hand clean arguments to the service. It writes no queries and applies no business rules.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)"># API layer — knows HTTP, nothing else</span>',
+      '@app.post(<span style="color:#7EC699">"/users"</span>)',
+      'def create_user(body: CreateUserBody):',
+      '    user = <span style="color:#F48E00">registration_service.register_user</span>(',
+      '        repo=repo,',
+      '        email=body.email,',
+      '        full_name=body.full_name,',
+      '    )',
+      '    <span style="color:rgba(224,224,224,0.4)"># turns the result into JSON — that is all</span>',
+      '    return {<span style="color:#7EC699">"id"</span>: user.id, <span style="color:#7EC699">"email"</span>: user.email}'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'HTTP paths & verbs'},
+      {yes: true,  text: 'request / response shape'},
+      {yes: false, text: 'business rules'},
+      {yes: false, text: 'SQL or ORM'}
+    ]
+  },
+  {
+    layer: 'svc',
+    arrows: [1],
+    title: 'Service layer checks the business rule',
+    explanation: 'The service receives plain strings, not an HTTP object. It applies the one rule it owns: no duplicate emails. It calls the repository by name to check and save, but it has no idea whether the repository talks to Postgres, SQLite, or an in-memory dict. That ignorance is intentional.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)"># Service layer — knows business rules, not storage</span>',
+      'def register_user(repo, email, full_name):',
+      '    existing = <span style="color:#F48E00">repo.get_by_email</span>(email)',
+      '    <span style="color:rgba(224,224,224,0.4)"># business rule: no duplicates</span>',
+      '    if existing <span style="color:#79B8FF">is not</span> None:',
+      '        raise EmailAlreadyTakenError(email)',
+      '',
+      '    new_user = User(id=<span style="color:#79B8FF">None</span>, email=email,',
+      '                    full_name=full_name)',
+      '    return <span style="color:#F48E00">repo.save</span>(new_user)'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'business rules'},
+      {yes: true,  text: 'repository interface'},
+      {yes: false, text: 'SQL / ORM'},
+      {yes: false, text: 'HTTP requests'}
+    ]
+  },
+  {
+    layer: 'repo',
+    arrows: [1, 2],
+    title: 'The repository interface is the stable seam',
+    explanation: 'The service depends only on this interface — a set of method names and return types. The concrete implementation behind it can be swapped (SQLAlchemy today, raw SQL tomorrow, an in-memory fake in tests) without the service ever noticing. This is the whole point of the pattern.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)"># The interface the service is allowed to depend on</span>',
+      '<span style="color:rgba(224,224,224,0.4)"># (a Protocol — structural typing, no inheritance)</span>',
+      'class UserRepositoryInterface(<span style="color:#79B8FF">Protocol</span>):',
+      '    def get_by_email(self, email: <span style="color:#79B8FF">str</span>)',
+      '        -> <span style="color:#7EC699">User</span> | <span style="color:#79B8FF">None</span>: ...',
+      '',
+      '    def save(self, user: <span style="color:#7EC699">User</span>)',
+      '        -> <span style="color:#7EC699">User</span>: ...',
+      '',
+      '<span style="color:rgba(224,224,224,0.4)"># Returns plain User objects — never ORM rows</span>'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'method names & return types'},
+      {yes: false, text: 'SQLAlchemy internals'},
+      {yes: false, text: 'which database is used'}
+    ]
+  },
+  {
+    layer: 'repo',
+    arrows: [1, 2, 3],
+    title: 'Repository runs the query and converts the row',
+    explanation: 'Inside the concrete repository, SQLAlchemy runs the query and returns a UserRow (an ORM object). The repository immediately converts it to a plain User dataclass. That ORM row never leaves the repository. Callers above receive data, not a database handle.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)"># Concrete repository — SQLAlchemy is hidden here</span>',
+      'def get_by_email(self, email: str) -> User | None:',
+      '    row = self._session.execute(',
+      '        select(UserRow)',
+      '        .where(UserRow.email == email)',
+      '    ).scalar_one_or_none()',
+      '    if row is None:',
+      '        return None',
+      '    return <span style="color:#7EC699">self._to_domain(row)</span>  <span style="color:rgba(224,224,224,0.4)"># ORM row -> User</span>',
+      '',
+      'def _to_domain(self, row: UserRow) -> <span style="color:#7EC699">User</span>:',
+      '    return User(id=row.id, email=row.email,',
+      '                full_name=row.full_name)'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'SQL / ORM'},
+      {yes: true,  text: 'database session'},
+      {yes: false, text: 'business rules'},
+      {yes: false, text: 'HTTP layer'}
+    ]
+  },
+  {
+    layer: 'db',
+    arrows: [1, 2, 3],
+    title: 'Postgres stores the row and assigns an id',
+    explanation: 'Postgres runs the actual query, enforces schema constraints, and assigns the auto-increment id. The repository handles everything needed to talk to it. No layer above ever thinks about connection strings, transaction scope, or SQL syntax.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)">-- What Postgres actually executes on save</span>',
+      '<span style="color:#79B8FF">INSERT INTO</span> users (email, full_name)',
+      '<span style="color:#79B8FF">VALUES</span> (<span style="color:#7EC699">\'grace@example.com\'</span>, <span style="color:#7EC699">\'Grace Hopper\'</span>)',
+      '<span style="color:#79B8FF">RETURNING</span> id;',
+      '',
+      '<span style="color:rgba(224,224,224,0.4)">-- Returns: id = 42</span>',
+      '<span style="color:rgba(224,224,224,0.4)">-- The repository catches this and sets User.id = 42</span>',
+      '<span style="color:rgba(224,224,224,0.4)">-- before returning to the service.</span>'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'rows & columns'},
+      {yes: true,  text: 'constraints & ids'},
+      {yes: false, text: 'Python objects'},
+      {yes: false, text: 'business logic'}
+    ]
+  },
+  {
+    layer: 'api',
+    arrows: [],
+    title: 'A plain User travels back up — no leaks',
+    explanation: 'The repository returns a plain User dataclass. The service returns the same plain User. The API turns it into JSON. At no point did an ORM row, a database session, or a SQL query appear above the repository. That clean seam is what the pattern creates and protects.',
+    codeHtml: [
+      '<span style="color:rgba(224,224,224,0.4)"># What crosses each boundary on the way back up:</span>',
+      '',
+      '<span style="color:rgba(224,224,224,0.4)">#  Postgres   ->  repository :  UserRow  (ORM object)</span>',
+      '<span style="color:rgba(224,224,224,0.4)">#  repository ->  service    :  </span><span style="color:#7EC699">User</span><span style="color:rgba(224,224,224,0.4)">     (plain dataclass)</span>',
+      '<span style="color:rgba(224,224,224,0.4)">#  service    ->  API        :  </span><span style="color:#7EC699">User</span><span style="color:rgba(224,224,224,0.4)">     (plain dataclass)</span>',
+      '<span style="color:rgba(224,224,224,0.4)">#  API        ->  client     :  JSON     ({"id": 42, ...})</span>',
+      '',
+      '<span style="color:rgba(224,224,224,0.4)"># The ORM row is contained inside the repository.</span>',
+      '<span style="color:rgba(224,224,224,0.4)"># Nothing above depends on SQLAlchemy.</span>',
+      '<span style="color:#7EC699"># Seam is intact.</span>'
+    ].join('\n'),
+    chips: [
+      {yes: true,  text: 'clean layer boundaries'},
+      {yes: true,  text: 'ORM row stays in repository'},
+      {yes: false, text: 'leaking ORM objects up'}
+    ]
+  }
+];
+
+var current = 0;
+
+function render() {
+  var step = STEPS[current];
+  var total = STEPS.length;
+
+  var layerIds = ['api', 'svc', 'repo', 'db'];
+  layerIds.forEach(function(id) {
+    var el = document.getElementById('layer-' + id);
+    var isDb = id === 'db';
+    el.className = 'layer' + (isDb ? ' db' : '') + (id === step.layer ? ' active' : '');
+  });
+
+  [1, 2, 3].forEach(function(i) {
+    var el = document.getElementById('arrow-' + i);
+    var isActive = step.arrows && step.arrows.indexOf(i) !== -1;
+    el.className = 'arrow-wrap' + (isActive ? ' active' : '');
+  });
+
+  document.getElementById('step-label').textContent = 'Step ' + (current + 1) + ' of ' + total;
+  document.getElementById('step-title').textContent = step.title;
+  document.getElementById('step-explanation').textContent = step.explanation;
+  document.getElementById('step-code').innerHTML = step.codeHtml;
+
+  var chipsEl = document.getElementById('step-chips');
+  chipsEl.innerHTML = step.chips.map(function(c) {
+    return '<span class="chip ' + (c.yes ? 'chip-yes' : 'chip-no') + '">' +
+      (c.yes ? '&#10003;' : '&#10007;') + ' ' + c.text + '</span>';
+  }).join('');
+
+  var dotsEl = document.getElementById('dots');
+  var dotsHtml = '';
+  for (var i = 0; i < total; i++) {
+    var cls = 'dot';
+    if (i === current) cls += ' active';
+    else if (i < current) cls += ' passed';
+    dotsHtml += '<div class="' + cls + '"></div>';
+  }
+  dotsEl.innerHTML = dotsHtml;
+
+  var back = document.getElementById('btn-back');
+  var next = document.getElementById('btn-next');
+  back.disabled = current === 0;
+  next.textContent = current === total - 1 ? 'Restart' : 'Next →';
+}
+
+function go(dir) {
+  var total = STEPS.length;
+  if (dir === 1 && current === total - 1) {
+    current = 0;
+  } else {
+    current = Math.max(0, Math.min(total - 1, current + dir));
+  }
+  render();
+}
+
+render();
+</script>
+</body>
+</html>

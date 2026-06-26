@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Mapping Patterns</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ─────────────────────────────────────────────────── */
+
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 0 20px;
+    }
+
+    .hint-header span {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* ── Pattern tabs ────────────────────────────────────────────────── */
+
+    .pattern-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .pattern-tab {
+      padding: 12px 16px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      background: #F2F1EE;
+      cursor: pointer;
+      text-align: left;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      color: #1A1A1A;
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+
+    .pattern-tab:hover {
+      background: #ECEAE6;
+      border-color: rgba(0,0,0,0.25);
+    }
+
+    .pattern-tab.active {
+      background: #FFFFFF;
+      border-color: #1878DC;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .tab-label {
+      font-size: 13px;
+      color: rgba(0,0,0,0.45);
+      margin-bottom: 2px;
+    }
+
+    .tab-name {
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    /* ── Diagram area ────────────────────────────────────────────────── */
+
+    .diagram-area {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 14px;
+      padding: 24px 20px;
+      margin-bottom: 16px;
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    .diagram-area svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Description ─────────────────────────────────────────────────── */
+
+    .description {
+      padding: 16px 20px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .tradeoff {
+      margin-top: 8px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    /* ── ACL stepper ─────────────────────────────────────────────────── */
+
+    .acl-stepper {
+      margin-top: 16px;
+    }
+
+    .acl-stepper-title {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 8px;
+    }
+
+    .acl-step-display {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 20px;
+      background: #F2F1EE;
+      margin-bottom: 12px;
+      min-height: 148px;
+    }
+
+    .acl-step-header {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .acl-step-content {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      line-height: 1.75;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .f-old { color: #DE4C45; }
+    .f-new  { color: #328F51; }
+    .f-dim  { color: rgba(0,0,0,0.50); }
+
+    .acl-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .step-btn {
+      padding: 10px 20px;
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+
+    .step-btn:hover:not(:disabled) {
+      background: #1465BB;
+    }
+
+    .step-btn:disabled {
+      background: rgba(0,0,0,0.10);
+      color: rgba(0,0,0,0.35);
+      cursor: default;
+    }
+
+    .step-dots {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+
+    .step-dot {
+      height: 8px;
+      width: 8px;
+      border-radius: 4px;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.2s, width 0.2s;
+    }
+
+    .step-dot.active {
+      background: #1878DC;
+      width: 16px;
+    }
+
+    @media (max-width: 400px) {
+      .acl-step-content { font-size: 11px; }
+      .step-btn { padding: 8px 14px; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Click a pattern to see how contexts connect — then step through the ACL.</span>
+  </div>
+
+  <div class="pattern-tabs" id="patternTabs">
+    <button class="pattern-tab active" data-pattern="partnership">
+      <div class="tab-label">Pattern 1</div>
+      <div class="tab-name">Partnership</div>
+    </button>
+    <button class="pattern-tab" data-pattern="customer-supplier">
+      <div class="tab-label">Pattern 2</div>
+      <div class="tab-name">Customer &amp; Supplier</div>
+    </button>
+    <button class="pattern-tab" data-pattern="shared-kernel">
+      <div class="tab-label">Pattern 3</div>
+      <div class="tab-name">Shared Kernel</div>
+    </button>
+    <button class="pattern-tab" data-pattern="acl">
+      <div class="tab-label">Pattern 4</div>
+      <div class="tab-name">Anti-Corruption Layer</div>
+    </button>
+  </div>
+
+  <div class="diagram-area" id="diagramArea"></div>
+  <div class="description"  id="descArea"></div>
+
+  <div class="acl-stepper" id="aclStepper" style="display:none">
+    <div class="acl-stepper-title">Trace the translation — step through the ACL in action</div>
+    <div class="acl-step-display" id="aclStepDisplay"></div>
+    <div class="acl-controls">
+      <button class="step-btn" id="prevBtn" disabled>&larr; Back</button>
+      <button class="step-btn" id="nextBtn">Next &rarr;</button>
+      <div class="step-dots" id="stepDots"></div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ─── Pattern data ────────────────────────────────────────────────────────────
+
+var PATTERNS = {
+  partnership: {
+    description: '<strong>Both teams coordinate closely and succeed or fail together.</strong> Neither side can make a breaking change without talking to the other first.',
+    tradeoff: 'A legitimate choice when two contexts are genuinely evolving together — but it is tight coupling, so use it deliberately.',
+    svg: function() { return (
+'<svg viewBox="0 0 600 136" xmlns="http://www.w3.org/2000/svg">' +
+'<defs>' +
+'<marker id="pf" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#8754FD"/></marker>' +
+'<marker id="pb" markerWidth="8" markerHeight="8" refX="2" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 Z" fill="#8754FD"/></marker>' +
+'</defs>' +
+'<text x="145" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Context A</text>' +
+'<rect x="20" y="26" width="250" height="68" rx="10" fill="#F4F0FF" stroke="#8754FD" stroke-width="1.5"/>' +
+'<text x="145" y="68" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Orders</text>' +
+'<text x="455" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Context B</text>' +
+'<rect x="330" y="26" width="250" height="68" rx="10" fill="#F4F0FF" stroke="#8754FD" stroke-width="1.5"/>' +
+'<text x="455" y="68" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Inventory</text>' +
+'<path d="M 274 50 L 326 50" stroke="#8754FD" stroke-width="2" marker-end="url(#pf)"/>' +
+'<path d="M 326 76 L 274 76" stroke="#8754FD" stroke-width="2" marker-end="url(#pb)"/>' +
+'<text x="300" y="44" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="#8754FD">coordinate plans</text>' +
+'<text x="300" y="124" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="#8754FD">&#8596; mutual, tightly coordinated</text>' +
+'</svg>'
+); }
+  },
+
+  'customer-supplier': {
+    description: '<strong>Dependency runs in one clear direction.</strong> The downstream customer relies on what the upstream supplier provides — and the supplier accommodates the customer\'s needs in its roadmap.',
+    tradeoff: 'Works well when the upstream team is willing to plan around the downstream team. The customer has a real voice in the supplier\'s roadmap.',
+    svg: function() { return (
+'<svg viewBox="0 0 600 136" xmlns="http://www.w3.org/2000/svg">' +
+'<defs>' +
+'<marker id="bf" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#1878DC"/></marker>' +
+'<marker id="bb" markerWidth="8" markerHeight="8" refX="2" refY="4" orient="auto"><path d="M8,0 L0,4 L8,8 Z" fill="#1878DC"/></marker>' +
+'</defs>' +
+'<text x="145" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Upstream (Supplier)</text>' +
+'<rect x="20" y="26" width="250" height="68" rx="10" fill="#EBF4FF" stroke="#1878DC" stroke-width="1.5"/>' +
+'<text x="145" y="58" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Billing</text>' +
+'<text x="145" y="79" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.50)">provides data</text>' +
+'<text x="455" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Downstream (Customer)</text>' +
+'<rect x="330" y="26" width="250" height="68" rx="10" fill="#EBF4FF" stroke="#1878DC" stroke-width="1.5"/>' +
+'<text x="455" y="58" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Orders</text>' +
+'<text x="455" y="79" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.50)">depends on data</text>' +
+'<path d="M 274 52 L 326 52" stroke="#1878DC" stroke-width="2.5" marker-end="url(#bf)"/>' +
+'<path d="M 326 74 L 274 74" stroke="#1878DC" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#bb)"/>' +
+'<text x="300" y="46" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="#1878DC">data &#8594;</text>' +
+'<text x="300" y="86" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="#1878DC">needs (dashed) &#8592;</text>' +
+'<text x="300" y="124" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="#1878DC">&#8594; one-directional dependency</text>' +
+'</svg>'
+); }
+  },
+
+  'shared-kernel': {
+    description: '<strong>Two contexts share a small, agreed piece of the model.</strong> Neither side changes the shared piece alone — both teams must agree on any modification to it.',
+    tradeoff: 'Can save real duplication, but every change requires cross-team agreement. Keep the kernel tiny, and use it sparingly. Never share a large model.',
+    svg: function() { return (
+'<svg viewBox="0 0 600 136" xmlns="http://www.w3.org/2000/svg">' +
+'<text x="120" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Context A</text>' +
+'<rect x="20" y="26" width="200" height="68" rx="10" fill="#FFF3DC" stroke="#F48E00" stroke-width="1.5"/>' +
+'<text x="120" y="67" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Catalog</text>' +
+'<text x="480" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Context B</text>' +
+'<rect x="380" y="26" width="200" height="68" rx="10" fill="#FFF3DC" stroke="#F48E00" stroke-width="1.5"/>' +
+'<text x="480" y="67" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="17" fill="#1A1A1A">Pricing</text>' +
+'<rect x="228" y="30" width="144" height="60" rx="10" fill="#FFFFFF" stroke="#F48E00" stroke-width="2"/>' +
+'<text x="300" y="52" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="#F48E00">Shared Kernel</text>' +
+'<text x="300" y="68" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="12" fill="#1A1A1A">ProductId</text>' +
+'<text x="300" y="84" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="12" fill="#1A1A1A">Currency</text>' +
+'<line x1="220" y1="60" x2="228" y2="60" stroke="#F48E00" stroke-width="1.5" stroke-dasharray="3,2"/>' +
+'<line x1="372" y1="60" x2="380" y2="60" stroke="#F48E00" stroke-width="1.5" stroke-dasharray="3,2"/>' +
+'<text x="300" y="124" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="#F48E00">&#8596; tiny shared piece — both sides own it</text>' +
+'</svg>'
+); }
+  },
+
+  acl: {
+    description: '<strong>A translation layer converts the external model into yours.</strong> The messy outside model stops at the boundary — only the ACL knows both shapes.',
+    tradeoff: 'Worth building when you depend on a model you do not control. Without it, the external field names and conventions leak in and corrupt your clean design.',
+    svg: function() { return (
+'<svg viewBox="0 0 600 148" xmlns="http://www.w3.org/2000/svg">' +
+'<defs>' +
+'<marker id="gf" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#328F51"/></marker>' +
+'<marker id="gb" markerWidth="7" markerHeight="7" refX="2" refY="3.5" orient="auto"><path d="M7,0 L0,3.5 L7,7 Z" fill="#328F51"/></marker>' +
+'</defs>' +
+'<text x="110" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Legacy Context</text>' +
+'<rect x="20" y="26" width="180" height="92" rx="10" fill="#FDECEA" stroke="#DE4C45" stroke-width="1.5"/>' +
+'<text x="110" y="52" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="15" fill="#1A1A1A">Billing</text>' +
+'<text x="110" y="70" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#DE4C45">cust_nm</text>' +
+'<text x="110" y="87" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#DE4C45">acct_bal_cents</text>' +
+'<text x="110" y="104" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#DE4C45">vip_flg</text>' +
+'<rect x="228" y="30" width="144" height="84" rx="12" fill="#EAF4EE" stroke="#328F51" stroke-width="2"/>' +
+'<text x="300" y="56" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#328F51">ACL</text>' +
+'<text x="300" y="74" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.50)">translates</text>' +
+'<text x="300" y="92" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="22" fill="#328F51">&#8644;</text>' +
+'<text x="490" y="18" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="rgba(0,0,0,0.45)">Your Context</text>' +
+'<rect x="400" y="26" width="180" height="92" rx="10" fill="#EAF4EE" stroke="#328F51" stroke-width="1.5"/>' +
+'<text x="490" y="52" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="15" fill="#1A1A1A">Orders</text>' +
+'<text x="490" y="70" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#328F51">Customer.name</text>' +
+'<text x="490" y="87" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#328F51">balance_dollars</text>' +
+'<text x="490" y="104" text-anchor="middle" font-family="Suisse Intl Mono,monospace" font-size="11" fill="#328F51">is_priority</text>' +
+'<path d="M 204 58 L 224 58" stroke="#328F51" stroke-width="1.5" marker-end="url(#gf)"/>' +
+'<path d="M 224 84 L 204 84" stroke="#328F51" stroke-width="1.5" marker-end="url(#gb)"/>' +
+'<path d="M 376 58 L 396 58" stroke="#328F51" stroke-width="1.5" marker-end="url(#gf)"/>' +
+'<path d="M 396 84 L 376 84" stroke="#328F51" stroke-width="1.5" marker-end="url(#gb)"/>' +
+'<text x="300" y="136" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="13" fill="#328F51">outside model never enters your context</text>' +
+'</svg>'
+); }
+  }
+};
+
+// ─── ACL step-through ────────────────────────────────────────────────────────
+
+var ACL_STEPS = [
+  {
+    label: 'Step 1 of 4 — Legacy model arrives at the boundary',
+    html: '<span class="f-dim">// Orders context requests customer data from Legacy Billing\n// The legacy system returns its own model:\n</span>\nlegacy_record = {\n    <span class="f-old">"cust_nm"</span><span class="f-dim">: "Ada Lovelace",</span>\n    <span class="f-old">"acct_bal_cents"</span><span class="f-dim">: 4200,</span>\n    <span class="f-old">"vip_flg"</span><span class="f-dim">: "Y",</span>\n}'
+  },
+  {
+    label: 'Step 2 of 4 — ACL intercepts and maps the fields',
+    html: '<span class="f-dim">// The ACL is the ONLY place that knows both shapes.\n// It translates before anything crosses the boundary:\n</span>\ndef <span class="f-new">to_customer</span>(record: dict) -> Customer:\n    return Customer(\n        <span class="f-new">name</span>            = record[<span class="f-old">"cust_nm"</span>],\n        <span class="f-new">balance_dollars</span> = record[<span class="f-old">"acct_bal_cents"</span>] / 100,\n        <span class="f-new">is_priority</span>     = record[<span class="f-old">"vip_flg"</span>] == "Y",\n    )'
+  },
+  {
+    label: 'Step 3 of 4 — Clean model enters your context',
+    html: '<span class="f-dim">// What the rest of Orders sees:\n// No cust_nm. No cents. No "Y"/"N" flags.\n</span>\ncustomer = Customer(\n    <span class="f-new">name</span>            = "Ada Lovelace",\n    <span class="f-new">balance_dollars</span> = 42.00,\n    <span class="f-new">is_priority</span>     = True,\n)\n\n<span class="f-dim">// Legacy field names: gone. Legacy conventions: gone.</span>'
+  },
+  {
+    label: 'Step 4 of 4 — Legacy changes: only the ACL changes',
+    html: '<span class="f-dim">// Legacy system renames a field tomorrow:\n</span><span class="f-old">- "vip_flg": "Y"</span>\n<span class="f-new">+ "priority_flag": 1</span>\n\n<span class="f-dim">// You update exactly ONE line in the ACL:\n</span>    <span class="f-new">is_priority</span> = record[<span class="f-new">"priority_flag"</span>] == 1\n\n<span class="f-dim">// The rest of Orders context: untouched.\n// That is the entire point of the ACL.</span>'
+  }
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+var currentPattern = 'partnership';
+var currentStep    = 0;
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+
+function render(id) {
+  currentPattern = id;
+  var p = PATTERNS[id];
+
+  // Tabs
+  document.querySelectorAll('.pattern-tab').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.pattern === id);
+  });
+
+  // Diagram
+  document.getElementById('diagramArea').innerHTML = p.svg();
+
+  // Description
+  document.getElementById('descArea').innerHTML =
+    '<div>' + p.description + '</div>' +
+    '<div class="tradeoff">' + p.tradeoff + '</div>';
+
+  // ACL stepper
+  var stepper = document.getElementById('aclStepper');
+  if (id === 'acl') {
+    stepper.style.display = 'block';
+    currentStep = 0;
+    renderStep();
+  } else {
+    stepper.style.display = 'none';
+  }
+}
+
+function renderStep() {
+  var step = ACL_STEPS[currentStep];
+  document.getElementById('aclStepDisplay').innerHTML =
+    '<div class="acl-step-header">' + step.label + '</div>' +
+    '<div class="acl-step-content">' + step.html + '</div>';
+
+  var prevBtn = document.getElementById('prevBtn');
+  var nextBtn = document.getElementById('nextBtn');
+  prevBtn.disabled = currentStep === 0;
+  nextBtn.disabled = currentStep === ACL_STEPS.length - 1;
+  nextBtn.innerHTML = currentStep === ACL_STEPS.length - 1 ? 'Done' : 'Next &rarr;';
+
+  var dotsEl = document.getElementById('stepDots');
+  dotsEl.innerHTML = ACL_STEPS.map(function(_, i) {
+    return '<div class="step-dot' + (i === currentStep ? ' active' : '') + '"></div>';
+  }).join('');
+}
+
+// ─── Events ──────────────────────────────────────────────────────────────────
+
+document.getElementById('patternTabs').addEventListener('click', function(e) {
+  var btn = e.target.closest('.pattern-tab');
+  if (btn) render(btn.dataset.pattern);
+});
+
+document.getElementById('prevBtn').addEventListener('click', function() {
+  if (currentStep > 0) { currentStep--; renderStep(); }
+});
+
+document.getElementById('nextBtn').addEventListener('click', function() {
+  if (currentStep < ACL_STEPS.length - 1) { currentStep++; renderStep(); }
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+render('partnership');
+</script>
+</body>
+</html>

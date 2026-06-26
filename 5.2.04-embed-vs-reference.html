@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embed vs Reference — Document Modeling</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+}
+
+/* ── Hint header ── */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: cursor-wiggle 4s infinite;
+}
+
+@keyframes cursor-wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+  90%     { transform: rotate(0deg); }
+}
+
+.hint-text {
+  font-size: 18px;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+/* ── Main wrapper ── */
+.main {
+  padding: 24px 20px 32px;
+}
+
+/* ── Section label ── */
+.section-label {
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  margin-bottom: 12px;
+  letter-spacing: 0.03em;
+}
+
+/* ── Scenario grid ── */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 480px) {
+  .scenario-grid { grid-template-columns: 1fr; }
+}
+
+.scenario-card {
+  padding: 16px;
+  background: #F2F1EE;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+}
+
+.scenario-card:hover {
+  background: #e7e6e2;
+  border-color: rgba(0,0,0,0.14);
+}
+
+.scenario-card.selected {
+  background: #FFFFFF;
+  border-color: #1878DC;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.scenario-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.scenario-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 4px;
+}
+
+.scenario-desc {
+  font-size: 14px;
+  color: rgba(0,0,0,0.5);
+  line-height: 1.4;
+}
+
+/* ── Questions panel ── */
+.questions-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.questions-panel.visible {
+  display: flex;
+}
+
+.question-row {
+  background: #F2F1EE;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  padding: 16px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.question-row.answered-yes {
+  background: #f0f7f2;
+  border-color: rgba(50,143,81,0.5);
+}
+
+.question-row.answered-no {
+  background: #fff7f2;
+  border-color: rgba(211,87,34,0.4);
+}
+
+.question-text {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  color: #1A1A1A;
+}
+
+.question-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.q-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.18);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.q-btn:hover {
+  border-color: rgba(0,0,0,0.35);
+  background: #f5f5f5;
+}
+
+.q-btn.sel-yes {
+  background: #328F51;
+  border-color: #328F51;
+  color: #FFFFFF;
+}
+
+.q-btn.sel-no {
+  background: #D35722;
+  border-color: #D35722;
+  color: #FFFFFF;
+}
+
+/* ── Result panel ── */
+.result-panel {
+  display: none;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  margin-bottom: 24px;
+}
+
+.result-panel.visible { display: block; }
+
+.result-panel.embed {
+  background: #f0f7f2;
+  border: 2px solid #328F51;
+}
+
+.result-panel.reference {
+  background: #eef4fd;
+  border: 2px solid #1878DC;
+}
+
+.result-label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+
+.result-panel.embed   .result-label    { color: #328F51; }
+.result-panel.reference .result-label  { color: #1878DC; }
+
+.result-strategy {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.result-panel.embed   .result-strategy   { color: #328F51; }
+.result-panel.reference .result-strategy { color: #1878DC; }
+
+.result-explanation {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1A1A1A;
+  margin-bottom: 16px;
+}
+
+.result-code {
+  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  background: rgba(0,0,0,0.06);
+  border-radius: 8px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  white-space: pre;
+  color: #1A1A1A;
+}
+
+/* ── Reset button ── */
+.reset-btn {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1.5px solid rgba(0,0,0,0.18);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  color: rgba(0,0,0,0.5);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  display: block;
+}
+
+.reset-btn:hover {
+  color: #1A1A1A;
+  border-color: rgba(0,0,0,0.3);
+}
+
+/* ── Rule chips ── */
+.rules-row {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .rules-row { flex-direction: column; }
+}
+
+.rule-chip {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.rule-chip.embed-chip {
+  background: #f0f7f2;
+  color: #2a7a44;
+  border: 1px solid rgba(50,143,81,0.3);
+}
+
+.rule-chip.ref-chip {
+  background: #eef4fd;
+  color: #1464bb;
+  border: 1px solid rgba(24,120,220,0.3);
+}
+
+.rule-chip strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Pick a relationship, answer three questions, see the modeling decision.</span>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <div class="section-label">Blogging platform — pick a relationship to model</div>
+
+    <!-- Scenario cards -->
+    <div class="scenario-grid">
+      <button class="scenario-card" data-scenario="tags" onclick="selectScenario('tags')">
+        <span class="scenario-icon">🏷️</span>
+        <div class="scenario-name">Tags</div>
+        <div class="scenario-desc">A short list of topic labels on each post</div>
+      </button>
+      <button class="scenario-card" data-scenario="author" onclick="selectScenario('author')">
+        <span class="scenario-icon">👤</span>
+        <div class="scenario-name">Author</div>
+        <div class="scenario-desc">The user profile of whoever wrote the post</div>
+      </button>
+      <button class="scenario-card" data-scenario="comments" onclick="selectScenario('comments')">
+        <span class="scenario-icon">💬</span>
+        <div class="scenario-name">Comments</div>
+        <div class="scenario-desc">Reader responses that accumulate over time</div>
+      </button>
+    </div>
+
+    <!-- Questions -->
+    <div class="questions-panel" id="questionsPanel">
+      <div class="section-label">Answer three questions about this data</div>
+
+      <div class="question-row" id="q1row">
+        <div class="question-text" id="q1text"></div>
+        <div class="question-btns">
+          <button class="q-btn" id="q1yes" onclick="answer(1, true)">Yes</button>
+          <button class="q-btn" id="q1no"  onclick="answer(1, false)">No</button>
+        </div>
+      </div>
+
+      <div class="question-row" id="q2row">
+        <div class="question-text" id="q2text"></div>
+        <div class="question-btns">
+          <button class="q-btn" id="q2yes" onclick="answer(2, true)">Yes</button>
+          <button class="q-btn" id="q2no"  onclick="answer(2, false)">No</button>
+        </div>
+      </div>
+
+      <div class="question-row" id="q3row">
+        <div class="question-text" id="q3text"></div>
+        <div class="question-btns">
+          <button class="q-btn" id="q3yes" onclick="answer(3, true)">Yes</button>
+          <button class="q-btn" id="q3no"  onclick="answer(3, false)">No</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-panel" id="resultPanel">
+      <div class="result-label">Strategy</div>
+      <div class="result-strategy" id="resultStrategy"></div>
+      <div class="result-explanation" id="resultExplanation"></div>
+      <pre class="result-code" id="resultCode"></pre>
+      <button class="reset-btn" onclick="resetAll()">← Try another relationship</button>
+    </div>
+
+    <!-- Rule chips -->
+    <div class="rules-row">
+      <div class="rule-chip embed-chip">
+        <strong>Embed when…</strong>
+        bounded size · read together · not shared
+      </div>
+      <div class="rule-chip ref-chip">
+        <strong>Reference when…</strong>
+        unbounded growth · shared across many docs
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const SCENARIOS = {
+  tags: {
+    questions: [
+      'Are the tags almost always shown together with the post?',
+      'Can the tag list grow without a clear limit?',
+      'Are the same tag objects shared and updated independently?'
+    ],
+    strategy: 'embed',
+    explanation: 'Tags are small, bounded, always shown with the post, and belong to this post alone. Embedding puts them right inside the post document — a single read returns everything the page needs, with no second lookup.',
+    code:
+`// posts collection
+{
+  "_id": "post_8821",
+  "title": "Modeling Documents in Practice",
+  "tags": ["nosql", "data-modeling", "documents"]
+  //       ↑ embedded — bounded & always read together
+}`
+  },
+
+  author: {
+    questions: [
+      'Is the full author profile always needed when reading a post?',
+      'Can author data grow without a clear limit?',
+      'Is the same author shared across many posts?'
+    ],
+    strategy: 'reference',
+    explanation: 'One author writes hundreds of posts. Copying the full profile into every post means a single bio update must touch all of them. Storing the author once in its own document and referencing the id keeps updates to a single write.',
+    code:
+`// posts collection — just the reference
+{
+  "_id": "post_8821",
+  "authorId": "user_42"
+  //          ↑ reference — author is shared by many posts
+}
+
+// users collection — the author lives here once
+{
+  "_id": "user_42",
+  "name": "Dana Okoro",
+  "bio": "Writes about data systems."
+}`
+  },
+
+  comments: {
+    questions: [
+      'Are comments loaded every time the post page displays?',
+      'Can the number of comments grow without a clear limit?',
+      'Are comments shared or reused across multiple posts?'
+    ],
+    strategy: 'reference',
+    explanation: 'A popular post can collect tens of thousands of comments. An embedded array that grows forever makes every post read drag the entire list along, and updates get slower over time. Comments live in their own collection, each one pointing back to its post.',
+    code:
+`// posts collection — just a cheap count, not the full list
+{
+  "_id": "post_8821",
+  "commentCount": 1384
+  //              ↑ summary only — the array would grow forever
+}
+
+// comments collection — unbounded, so its own home
+{
+  "_id": "comment_99001",
+  "postId": "post_8821",     // ← reference back to the post
+  "authorId": "user_77",
+  "text": "This finally made embed vs reference click for me."
+}`
+  }
+};
+
+let current = null;
+let ans = { 1: null, 2: null, 3: null };
+
+function selectScenario(name) {
+  current = name;
+  ans = { 1: null, 2: null, 3: null };
+
+  document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector('[data-scenario="' + name + '"]').classList.add('selected');
+
+  const qs = SCENARIOS[name].questions;
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById('q' + i + 'text').textContent = qs[i - 1];
+    const row = document.getElementById('q' + i + 'row');
+    row.classList.remove('answered-yes', 'answered-no');
+    ['yes','no'].forEach(k => {
+      document.getElementById('q' + i + k).classList.remove('sel-yes','sel-no');
+    });
+  }
+
+  document.getElementById('questionsPanel').classList.add('visible');
+
+  const rp = document.getElementById('resultPanel');
+  rp.classList.remove('visible','embed','reference');
+}
+
+function answer(n, val) {
+  if (!current) return;
+  ans[n] = val;
+
+  const row = document.getElementById('q' + n + 'row');
+  row.classList.remove('answered-yes','answered-no');
+  row.classList.add(val ? 'answered-yes' : 'answered-no');
+
+  const yb = document.getElementById('q' + n + 'yes');
+  const nb = document.getElementById('q' + n + 'no');
+  yb.classList.remove('sel-yes','sel-no');
+  nb.classList.remove('sel-yes','sel-no');
+  if (val) { yb.classList.add('sel-yes'); }
+  else      { nb.classList.add('sel-no'); }
+
+  if (ans[1] !== null && ans[2] !== null && ans[3] !== null) {
+    showResult();
+  }
+}
+
+function showResult() {
+  const s = SCENARIOS[current];
+  const rp = document.getElementById('resultPanel');
+
+  rp.className = 'result-panel visible ' + s.strategy;
+  document.getElementById('resultStrategy').textContent =
+    s.strategy === 'embed' ? 'Embed' : 'Reference';
+  document.getElementById('resultExplanation').textContent = s.explanation;
+  document.getElementById('resultCode').textContent = s.code;
+
+  rp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetAll() {
+  current = null;
+  ans = { 1: null, 2: null, 3: null };
+  document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('questionsPanel').classList.remove('visible');
+  const rp = document.getElementById('resultPanel');
+  rp.classList.remove('visible','embed','reference');
+}
+</script>
+</body>
+</html>

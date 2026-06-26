@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Which Test Level Catches the Bug?</title>
+<style>
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+
+  :root {
+    --ink: #1A1A1A;
+    --ink-50: rgba(0,0,0,0.50);
+    --ink-70: rgba(0,0,0,0.70);
+    --paper: #FFFFFF;
+    --beige: #F2F1EE;
+    --border: rgba(0,0,0,0.14);
+    --blue: #1878DC;
+    --green: #328F51;
+    --orange: #D35722;
+    --red: #DE4C45;
+    --yellow: #F48E00;
+    --shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--paper); }
+  body {
+    font-family: 'Suisse Intl', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 18px;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    justify-content: center;
+  }
+
+  .viz { width: 100%; max-width: 700px; }
+
+  /* ── Hint header ── */
+  .hint {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hint svg { flex-shrink: 0; transform-origin: center center; animation: cursor-wiggle 4s ease-in-out infinite; }
+  .hint p { font-size: 18px; line-height: 1.5; color: var(--ink); }
+  @keyframes cursor-wiggle {
+    0%   { transform: rotate(0deg); }
+    2%   { transform: rotate(-10deg); }
+    6%   { transform: rotate(10deg); }
+    10%  { transform: rotate(-8deg); }
+    14%  { transform: rotate(6deg); }
+    18%  { transform: rotate(-3deg); }
+    22%, 100% { transform: rotate(0deg); }
+  }
+
+  /* ── Scenario tabs ── */
+  .tabs {
+    display: flex;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab {
+    flex-shrink: 0;
+    padding: 12px 16px 10px;
+    font-family: inherit; font-size: 14px;
+    color: var(--ink-50); background: none; border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer; white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* ── Main panel ── */
+  .panel { padding: 20px 24px; }
+
+  /* Change description */
+  .change-box {
+    background: var(--beige); border-radius: 12px;
+    padding: 16px 20px; margin-bottom: 12px;
+  }
+  .change-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-50); margin-bottom: 4px;
+  }
+  .change-text { font-size: 16px; line-height: 1.55; }
+  .change-text code {
+    font-family: 'Suisse Intl Mono', ui-monospace, monospace;
+    font-size: 14px; background: rgba(0,0,0,0.07);
+    padding: 1px 5px; border-radius: 4px;
+  }
+
+  /* Code snippet */
+  .code-block {
+    background: #1A1A1A; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  .code-block pre {
+    font-family: 'Suisse Intl Mono', ui-monospace, monospace;
+    font-size: 13px; color: rgba(255,255,255,0.88);
+    line-height: 1.65; white-space: pre;
+  }
+  .code-block .comment { color: rgba(255,255,255,0.38); }
+
+  /* Section label */
+  .section-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-50); margin-bottom: 12px;
+  }
+
+  /* Level cards */
+  .levels { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .level-card {
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.25s ease, background 0.25s ease;
+    background: var(--paper);
+  }
+  .level-card.pass  { border-color: var(--green);  background: rgba(50,143,81,0.04); }
+  .level-card.fail  { border-color: var(--red);    background: rgba(222,76,69,0.04); }
+  .level-card.running { border-color: var(--blue); background: rgba(24,120,220,0.03); }
+
+  .level-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .level-meta { flex: 1; min-width: 0; }
+  .level-name  { font-size: 16px; color: var(--ink); margin-bottom: 2px; }
+  .level-scope { font-size: 14px; color: var(--ink-50); }
+
+  /* Badge */
+  .badge {
+    flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 6px;
+    font-family: 'Suisse Intl Mono', ui-monospace, monospace;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    background: var(--beige); color: var(--ink-50);
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+    min-width: 84px; justify-content: center;
+  }
+  .badge.pass    { background: rgba(50,143,81,0.10);  color: var(--green); border-color: rgba(50,143,81,0.28); }
+  .badge.fail    { background: rgba(222,76,69,0.10);  color: var(--red);   border-color: rgba(222,76,69,0.28); }
+  .badge.running { background: rgba(24,120,220,0.10); color: var(--blue);  border-color: rgba(24,120,220,0.28); }
+
+  /* Reason (hidden until revealed) */
+  .level-reason {
+    font-size: 14px; color: var(--ink-70); line-height: 1.55;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    padding-top: 10px; margin-top: 10px;
+    display: none;
+  }
+  .level-reason.visible { display: block; }
+
+  /* Controls */
+  .controls { display: flex; gap: 8px; margin-bottom: 20px; }
+  .btn {
+    font-family: inherit; font-size: 16px; cursor: pointer;
+    border-radius: 10px; padding: 10px 24px;
+    border: 1px solid var(--border); background: var(--paper); color: var(--ink);
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { box-shadow: var(--shadow); }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn.primary:hover { background: #1568c0; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* Insight box */
+  .insight {
+    border-radius: 12px; padding: 16px 20px;
+    opacity: 0; transform: translateY(6px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    display: none;
+  }
+  .insight.visible { display: block; }
+  .insight.shown   { opacity: 1; transform: translateY(0); }
+  .insight.good    { background: rgba(50,143,81,0.07);  border: 1px solid rgba(50,143,81,0.25); }
+  .insight.warning { background: rgba(212,87,34,0.06);  border: 1px solid rgba(212,87,34,0.25); }
+  .insight-label {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--ink-50); margin-bottom: 4px;
+  }
+  .insight-text { font-size: 15px; line-height: 1.55; }
+  .insight-text code {
+    font-family: 'Suisse Intl Mono', ui-monospace, monospace;
+    font-size: 13px; background: rgba(0,0,0,0.06);
+    padding: 1px 4px; border-radius: 4px;
+  }
+
+  @media (max-width: 380px) {
+    .hint p, .change-text { font-size: 16px; }
+    .panel { padding: 16px; }
+    .hint  { padding: 16px 16px 12px; }
+    .tabs  { padding: 0 16px; }
+    .tab   { padding: 10px 12px 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="viz">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p>Pick a scenario, then run the suite to see which test level catches the bug.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-idx="0">Rename a field</button>
+    <button class="tab"        data-idx="1">Wrong route</button>
+    <button class="tab"        data-idx="2">Logic bug</button>
+    <button class="tab"        data-idx="3">All correct</button>
+  </div>
+
+  <!-- Panel -->
+  <div class="panel">
+
+    <div class="change-box">
+      <div class="change-label">The change you made</div>
+      <div class="change-text" id="changeText"></div>
+    </div>
+
+    <div class="code-block"><pre id="codeSnippet"></pre></div>
+
+    <div class="section-label">Test suite</div>
+    <div class="levels" id="levels">
+      <!-- rendered by JS -->
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" id="runBtn">Run tests</button>
+      <button class="btn"         id="resetBtn">Reset</button>
+    </div>
+
+    <div class="insight" id="insight">
+      <div class="insight-label">Key takeaway</div>
+      <div class="insight-text" id="insightText"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Data ── */
+const SCENARIOS = [
+  {
+    change: 'You rename the <code>price</code> field to <code>cost</code> in the <code>Item</code> response model to match your internal naming convention.',
+    code: [
+      'class Item(BaseModel):',
+      '    id: int',
+      '    name: str',
+      '    cost: float   # was: price',
+    ].join('\n'),
+    commentLine: 3,
+    levels: [
+      {
+        name: 'Unit tests',
+        scope: 'Business logic in isolation',
+        result: 'pass',
+        reason: 'Unit tests call handler functions directly with no HTTP layer. They never inspect response field names, so the rename is invisible to them.'
+      },
+      {
+        name: 'Your API tests',
+        scope: 'Routes, status codes, response shape',
+        result: 'pass',
+        reason: 'Your test only asserts status_code == 200. You never checked the field names in the body, so the rename slips through cleanly.'
+      },
+      {
+        name: 'Consumer contract tests',
+        scope: 'Fields and types the consumer depends on',
+        result: 'fail',
+        reason: 'The contract test reads response["price"]. That key no longer exists. The consumer’s code is broken — even though every test you wrote is green.'
+      }
+    ],
+    insight: 'Your own tests were all green — yet the consumer is broken. This is exactly why the contract suite is irreplaceable. Do not edit the test to pass; restore the field name instead.',
+    insightType: 'warning'
+  },
+  {
+    change: 'You accidentally register the endpoint at <code>GET /product/{id}</code> instead of <code>GET /items/{item_id}</code>.',
+    code: [
+      '@app.get("/product/{id}")   # was: /items/{item_id}',
+      'def get_item(id: int) -> Item:',
+      '    ...',
+    ].join('\n'),
+    commentLine: 0,
+    levels: [
+      {
+        name: 'Unit tests',
+        scope: 'Business logic in isolation',
+        result: 'pass',
+        reason: 'Unit tests call handler functions directly, bypassing the router entirely. A misregistered route is completely invisible to them.'
+      },
+      {
+        name: 'Your API tests',
+        scope: 'Routes, status codes, response shape',
+        result: 'fail',
+        reason: 'client.get("/items/1") returns 404 — the route no longer exists at that path. This is exactly what API tests are built to catch.'
+      },
+      {
+        name: 'Consumer contract tests',
+        scope: 'Fields and types the consumer depends on',
+        result: 'fail',
+        reason: 'The contract test calls GET /items/{id}. It hits 404 before it can inspect a single field. The first assertion fails.'
+      }
+    ],
+    insight: 'Unit tests can never catch a misregistered route. You need at least the API level to confirm that routes exist and respond correctly.',
+    insightType: 'warning'
+  },
+  {
+    change: 'A discount function subtracts 10 instead of 10%. The endpoint still responds normally — just with the wrong number.',
+    code: [
+      'def apply_discount(price: float) -> float:',
+      '    return price - 10   # bug: should be price * 0.90',
+    ].join('\n'),
+    commentLine: 1,
+    levels: [
+      {
+        name: 'Unit tests',
+        scope: 'Business logic in isolation',
+        result: 'fail',
+        reason: 'assert apply_discount(100) == 90.0 fails immediately. Unit tests catch logic bugs directly, faster than any other level.'
+      },
+      {
+        name: 'Your API tests',
+        scope: 'Routes, status codes, response shape',
+        result: 'pass',
+        reason: 'Your test only asserts status_code == 200. The endpoint responds normally — the wrong computed value is never checked.'
+      },
+      {
+        name: 'Consumer contract tests',
+        scope: 'Fields and types the consumer depends on',
+        result: 'pass',
+        reason: 'The contract checks that discounted_price is a float and is present. The wrong number still satisfies the type contract.'
+      }
+    ],
+    insight: 'Only unit tests reliably catch logic bugs by asserting on values. API and contract tests can miss them entirely when they don’t check the computed result.',
+    insightType: 'warning'
+  },
+  {
+    change: 'You wired the handler to the data-access interface, covered all three test levels, and nothing in the public contract changed.',
+    code: [
+      '# No breaking changes.',
+      '# All interfaces, routes, and field names intact.',
+    ].join('\n'),
+    commentLine: -1,
+    levels: [
+      {
+        name: 'Unit tests',
+        scope: 'Business logic in isolation',
+        result: 'pass',
+        reason: 'All logic functions return the expected values. Every assertion is green.'
+      },
+      {
+        name: 'Your API tests',
+        scope: 'Routes, status codes, response shape',
+        result: 'pass',
+        reason: 'Every endpoint responds with the correct status code and the expected response shape.'
+      },
+      {
+        name: 'Consumer contract tests',
+        scope: 'Fields and types the consumer depends on',
+        result: 'pass',
+        reason: 'All fields the consumer depends on are present with the correct types. The contract is fully satisfied.'
+      }
+    ],
+    insight: 'A green run across all three levels is the only reliable signal that your change is safe to ship.',
+    insightType: 'good'
+  }
+];
+
+/* ── State ── */
+let current = 0;
+let running  = false;
+let ranOnce  = false;
+
+/* ── DOM helpers ── */
+const levelsEl  = document.getElementById('levels');
+const runBtn    = document.getElementById('runBtn');
+const resetBtn  = document.getElementById('resetBtn');
+const insightEl = document.getElementById('insight');
+
+function buildLevelCard(idx) {
+  const card = document.createElement('div');
+  card.className = 'level-card';
+  card.id = `lcard-${idx}`;
+  card.innerHTML = `
+    <div class="level-top">
+      <div class="level-meta">
+        <div class="level-name"  id="lname-${idx}"></div>
+        <div class="level-scope" id="lscope-${idx}"></div>
+      </div>
+      <div class="badge" id="lbadge-${idx}">&middot;&middot;&middot;</div>
+    </div>
+    <div class="level-reason" id="lreason-${idx}"></div>
+  `;
+  return card;
+}
+
+function initLevels() {
+  levelsEl.innerHTML = '';
+  for (let i = 0; i < 3; i++) levelsEl.appendChild(buildLevelCard(i));
+}
+
+function renderScenario(idx) {
+  const s = SCENARIOS[idx];
+
+  /* Change text */
+  document.getElementById('changeText').innerHTML = s.change;
+
+  /* Code block — highlight comment lines */
+  const lines = s.code.split('\n');
+  const pre = document.getElementById('codeSnippet');
+  pre.innerHTML = lines.map((line, i) => {
+    const commentIdx = line.indexOf(' #');
+    if (commentIdx !== -1) {
+      const code = line.slice(0, commentIdx);
+      const cmt  = line.slice(commentIdx);
+      return escHtml(code) + '<span class="comment">' + escHtml(cmt) + '</span>';
+    }
+    return escHtml(line);
+  }).join('\n');
+
+  /* Level cards */
+  initLevels();
+  for (let i = 0; i < 3; i++) {
+    const lvl = s.levels[i];
+    document.getElementById(`lname-${i}`).textContent  = lvl.name;
+    document.getElementById(`lscope-${i}`).textContent = lvl.scope;
+    document.getElementById(`lreason-${i}`).textContent = lvl.reason;
+  }
+
+  /* Insight */
+  insightEl.className = 'insight';
+  document.getElementById('insightText').textContent = s.insight;
+
+  /* Buttons */
+  runBtn.disabled    = false;
+  runBtn.textContent = 'Run tests';
+  ranOnce = false;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function runTests() {
+  if (running) return;
+  running = true;
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running…';
+
+  const s = SCENARIOS[current];
+
+  for (let i = 0; i < 3; i++) {
+    const card   = document.getElementById(`lcard-${i}`);
+    const badge  = document.getElementById(`lbadge-${i}`);
+    const reason = document.getElementById(`lreason-${i}`);
+
+    /* running state */
+    card.className  = 'level-card running';
+    badge.className = 'badge running';
+    badge.textContent = '▶ running';
+
+    await delay(550);
+
+    const result = s.levels[i].result;
+    card.className  = `level-card ${result}`;
+    badge.className = `badge ${result}`;
+    badge.textContent = result === 'pass' ? '✓ PASS' : '✗ FAIL';
+    reason.classList.add('visible');
+
+    await delay(260);
+  }
+
+  /* Reveal insight */
+  await delay(200);
+  insightEl.className = `insight ${s.insightType} visible`;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => insightEl.classList.add('shown'));
+  });
+
+  runBtn.textContent = 'Done';
+  ranOnce  = true;
+  running  = false;
+}
+
+function resetView() {
+  if (running) return;
+  renderScenario(current);
+}
+
+/* ── Tab switching ── */
+document.getElementById('tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.tab');
+  if (!btn || running) return;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  current = parseInt(btn.dataset.idx, 10);
+  renderScenario(current);
+});
+
+runBtn.addEventListener('click', runTests);
+resetBtn.addEventListener('click', resetView);
+
+/* ── Boot ── */
+renderScenario(0);
+</script>
+</body>
+</html>

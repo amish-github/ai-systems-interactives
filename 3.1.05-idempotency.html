@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Idempotency: Safe Retries</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    @keyframes cursor-wiggle {
+      0%,100% { transform: rotate(0deg); }
+      15%     { transform: rotate(-10deg); }
+      30%     { transform: rotate(10deg); }
+      45%     { transform: rotate(-8deg); }
+      60%     { transform: rotate(6deg); }
+      75%     { transform: rotate(-3deg); }
+      90%     { transform: rotate(0deg); }
+    }
+
+    .cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+    .hint-text   { font-size: 18px; line-height: 1.4; }
+
+    /* ── Content section ── */
+    .section {
+      padding: 20px 24px 24px;
+    }
+
+    /* ── Toggle ── */
+    .field-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 8px;
+    }
+
+    .toggle-group {
+      display: flex;
+      background: #F2F1EE;
+      border-radius: 10px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .toggle-btn {
+      flex: 1;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 15px;
+      color: rgba(0,0,0,0.50);
+      cursor: pointer;
+      transition: all 0.2s;
+      line-height: 1.3;
+    }
+
+    .toggle-btn.active {
+      background: #FFFFFF;
+      color: #1A1A1A;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .toggle-btn:not(.active):hover { background: rgba(0,0,0,0.04); }
+
+    /* ── Stage ── */
+    .stage {
+      margin-top: 20px;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .stage-actors {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .actor {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px 8px;
+      gap: 8px;
+      flex-shrink: 0;
+      width: 88px;
+      background: #F2F1EE;
+    }
+
+    .actor-icon  { font-size: 28px; line-height: 1; }
+    .actor-label { font-size: 13px; color: rgba(0,0,0,0.50); text-align: center; }
+
+    .actor-divider {
+      width: 1px;
+      background: rgba(0,0,0,0.14);
+      flex-shrink: 0;
+    }
+
+    .messages-zone {
+      flex: 1;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #FFFFFF;
+      min-height: 136px;
+    }
+
+    /* ── Message row ── */
+    .msg-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .msg-row.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .msg-dir {
+      font-size: 14px;
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
+      color: rgba(0,0,0,0.40);
+    }
+
+    .msg-chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      line-height: 1.4;
+      flex: 1;
+    }
+
+    .msg-chip.request      { background: rgba(24,120,220,0.08); border-color: rgba(24,120,220,0.20); color: #1878DC; }
+    .msg-chip.retry        { background: rgba(211,87,34,0.08);  border-color: rgba(211,87,34,0.20);  color: #D35722; }
+    .msg-chip.resp-ok      { background: rgba(50,143,81,0.08);  border-color: rgba(50,143,81,0.20);  color: #328F51; }
+    .msg-chip.resp-lost    { background: rgba(222,76,69,0.08);  border-color: rgba(222,76,69,0.20);  color: #DE4C45; text-decoration: line-through; }
+    .msg-chip.resp-bad     { background: rgba(222,76,69,0.08);  border-color: rgba(222,76,69,0.20);  color: #DE4C45; }
+    .msg-chip.resp-cached  { background: rgba(50,143,81,0.08);  border-color: rgba(50,143,81,0.20);  color: #328F51; }
+
+    .msg-badge {
+      font-size: 13px;
+      flex-shrink: 0;
+      width: 20px;
+      text-align: center;
+    }
+
+    /* ── Key store panel ── */
+    .keystore-zone {
+      border-top: 1px solid rgba(0,0,0,0.14);
+      padding: 12px 16px;
+      background: #FFFFFF;
+    }
+
+    .ks-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .ks-label { font-size: 13px; color: rgba(0,0,0,0.50); }
+
+    .ks-empty {
+      font-size: 14px;
+      color: rgba(0,0,0,0.30);
+      font-style: italic;
+    }
+
+    .ks-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .ks-table th {
+      text-align: left;
+      padding: 4px 8px;
+      color: rgba(0,0,0,0.40);
+      font-weight: 400;
+      border-bottom: 1px solid rgba(0,0,0,0.10);
+    }
+
+    .ks-table td { padding: 6px 8px; }
+
+    .ks-row.ks-new      { background: rgba(50,143,81,0.08); }
+    .ks-row.ks-checking { background: rgba(211,87,34,0.08); }
+    .ks-row.ks-hit      { background: rgba(50,143,81,0.12); }
+
+    .ks-status-stored   { color: #328F51; }
+    .ks-status-checking { color: #D35722; }
+    .ks-status-hit      { color: #328F51; }
+
+    /* ── Step box ── */
+    .step-box {
+      margin-top: 16px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .step-counter {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 8px;
+    }
+
+    .step-desc {
+      font-size: 16px;
+      line-height: 1.5;
+      color: #1A1A1A;
+    }
+
+    .step-desc code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 0.88em;
+      background: rgba(0,0,0,0.06);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    /* ── Outcome ── */
+    .outcome {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      line-height: 1.4;
+    }
+
+    .outcome.show { display: flex; }
+    .outcome.bad  { background: rgba(222,76,69,0.10);  border: 1px solid rgba(222,76,69,0.20);  color: #DE4C45; }
+    .outcome.good { background: rgba(50,143,81,0.10);  border: 1px solid rgba(50,143,81,0.20);  color: #328F51; }
+    .outcome-icon { font-size: 20px; flex-shrink: 0; }
+
+    /* ── Controls ── */
+    .controls {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      flex: 1;
+      padding: 12px 20px;
+      background: #1878DC;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: #1465C0; }
+    .btn-primary:disabled {
+      background: rgba(0,0,0,0.10);
+      color: rgba(0,0,0,0.30);
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-secondary {
+      padding: 12px 16px;
+      background: transparent;
+      color: rgba(0,0,0,0.50);
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      font-family: 'Suisse Intl', sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover { background: #F2F1EE; color: #1A1A1A; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hint-header, .section { padding-left: 16px; padding-right: 16px; }
+      .actor { width: 64px; padding: 12px 4px; }
+      .actor-icon { font-size: 22px; }
+      .messages-zone { padding: 10px; }
+      .toggle-btn { font-size: 13px; padding: 8px 6px; }
+    }
+
+    @media (max-width: 360px) {
+      .actor { width: 52px; }
+      .actor-icon { font-size: 18px; }
+      .actor-label { font-size: 11px; }
+      .msg-chip { font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Toggle the scenario, then step through to see what happens when a response is lost.</span>
+  </div>
+
+  <div class="section">
+
+    <!-- Toggle -->
+    <div class="field-label">Scenario</div>
+    <div class="toggle-group">
+      <button class="toggle-btn" id="btn-no-key"   onclick="setMode('no-key')">Without idempotency key</button>
+      <button class="toggle-btn active" id="btn-with-key" onclick="setMode('with-key')">With idempotency key</button>
+    </div>
+
+    <!-- Stage -->
+    <div class="stage" id="stage">
+      <div class="stage-actors">
+        <!-- Client -->
+        <div class="actor">
+          <div class="actor-icon">💻</div>
+          <div class="actor-label">Client</div>
+        </div>
+        <div class="actor-divider"></div>
+        <!-- Messages -->
+        <div class="messages-zone" id="messages-zone"></div>
+        <div class="actor-divider"></div>
+        <!-- Server -->
+        <div class="actor">
+          <div class="actor-icon">🖥️</div>
+          <div class="actor-label">Server</div>
+        </div>
+      </div>
+      <!-- Key store (with-key mode only) -->
+      <div class="keystore-zone" id="keystore-zone" style="display:none">
+        <div class="ks-header">
+          <span style="font-size:16px">🗄️</span>
+          <span class="ks-label">Server-side key store</span>
+        </div>
+        <div id="ks-content">
+          <span class="ks-empty">Empty — no keys recorded yet</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step description -->
+    <div class="step-box">
+      <div class="step-counter" id="step-counter">Step 1 of 5</div>
+      <div class="step-desc"   id="step-desc"></div>
+    </div>
+
+    <!-- Outcome badge -->
+    <div class="outcome" id="outcome">
+      <span class="outcome-icon" id="outcome-icon"></span>
+      <span id="outcome-text"></span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn-primary"   id="btn-next" onclick="next()">Next step →</button>
+      <button class="btn-secondary"              onclick="reset()">↺ Reset</button>
+    </div>
+
+  </div><!-- /section -->
+</div><!-- /container -->
+
+<script>
+// ─── Scenario data ────────────────────────────────────────────────────────────
+
+const SCENARIOS = {
+
+  'no-key': [
+    {
+      desc: 'The client sends <code>POST /payments</code> with <code>amount=$50</code>. No idempotency key is attached to this request.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  amount=$50', cls: 'request', badge: '' }
+      ],
+      ks: null
+    },
+    {
+      desc: 'The server receives and processes the payment: $50 is charged. It sends back <code>200 OK</code>.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  amount=$50',   cls: 'request',  badge: '' },
+        { dir: '←', label: '200 OK  — $50 charged',        cls: 'resp-ok',  badge: '✓' }
+      ],
+      ks: null
+    },
+    {
+      desc: '⚠️ The response is lost in the network before reaching the client. The client sees a timeout and assumes the request failed.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  amount=$50',   cls: 'request',   badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',    cls: 'resp-lost', badge: '✗' }
+      ],
+      ks: null
+    },
+    {
+      desc: 'The client retries — it sends the exact same <code>POST /payments</code> request again. From its side the first attempt failed.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  amount=$50',      cls: 'request',  badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',       cls: 'resp-lost', badge: '✗' },
+        { dir: '→', label: 'POST /payments  amount=$50  [retry]', cls: 'retry', badge: '' }
+      ],
+      ks: null
+    },
+    {
+      desc: 'The server has no memory of the first request. It treats the retry as a new payment and charges $50 again.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  amount=$50',          cls: 'request',  badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',           cls: 'resp-lost', badge: '✗' },
+        { dir: '→', label: 'POST /payments  amount=$50  [retry]', cls: 'retry',    badge: '' },
+        { dir: '←', label: '200 OK  — $50 charged again',         cls: 'resp-bad', badge: '✗' }
+      ],
+      ks: null,
+      outcome: { type: 'bad', icon: '✗', text: 'Double charge — the customer was billed $100 instead of $50.' }
+    }
+  ],
+
+  'with-key': [
+    {
+      desc: 'The client generates a unique idempotency key and sends <code>POST /payments</code> with the header <code>Idempotency-Key: K-7f3a</code>.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a', cls: 'request', badge: '' }
+      ],
+      ks: { entries: [], state: 'empty' }
+    },
+    {
+      desc: 'The server checks the key store: <code>K-7f3a</code> is not found. It processes the payment, charges $50, and stores the result under that key.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a', cls: 'request', badge: '' },
+        { dir: '←', label: '200 OK  — $50 charged',                   cls: 'resp-ok', badge: '✓' }
+      ],
+      ks: {
+        entries: [{
+          key: 'K-7f3a',
+          result: '200 OK — $50 charged',
+          rowCls: 'ks-new',
+          sCls: 'ks-status-stored',
+          sText: '✓ stored'
+        }]
+      }
+    },
+    {
+      desc: '⚠️ Again the response is lost before reaching the client. The client sees a timeout and assumes the first attempt failed.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a', cls: 'request',   badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',               cls: 'resp-lost', badge: '✗' }
+      ],
+      ks: {
+        entries: [{
+          key: 'K-7f3a',
+          result: '200 OK — $50 charged',
+          rowCls: '',
+          sCls: 'ks-status-stored',
+          sText: '✓ stored'
+        }]
+      }
+    },
+    {
+      desc: 'The client retries using the <em>same</em> key <code>K-7f3a</code>. The server looks up the key store.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a',         cls: 'request',   badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',                        cls: 'resp-lost', badge: '✗' },
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a  [retry]', cls: 'retry',     badge: '' }
+      ],
+      ks: {
+        entries: [{
+          key: 'K-7f3a',
+          result: '200 OK — $50 charged',
+          rowCls: 'ks-checking',
+          sCls: 'ks-status-checking',
+          sText: '🔍 checking…'
+        }]
+      }
+    },
+    {
+      desc: '<code>K-7f3a</code> found in the key store. The server skips processing entirely and returns the cached result. No second charge.',
+      msgs: [
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a',              cls: 'request',     badge: '' },
+        { dir: '←', label: '200 OK  — lost in network',                             cls: 'resp-lost',   badge: '✗' },
+        { dir: '→', label: 'POST /payments  Idempotency-Key: K-7f3a  [retry]',     cls: 'retry',       badge: '' },
+        { dir: '←', label: '200 OK  — cached result (no new charge)',               cls: 'resp-cached', badge: '✓' }
+      ],
+      ks: {
+        entries: [{
+          key: 'K-7f3a',
+          result: '200 OK — $50 charged',
+          rowCls: 'ks-hit',
+          sCls: 'ks-status-hit',
+          sText: '✓ cache hit'
+        }]
+      },
+      outcome: { type: 'good', icon: '✓', text: 'Safe retry — the customer was charged exactly once.' }
+    }
+  ]
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
+let mode = 'with-key';
+let step = 0;
+
+// ─── Controls ────────────────────────────────────────────────────────────────
+
+function setMode(m) {
+  mode = m;
+  step = 0;
+  document.getElementById('btn-no-key').classList.toggle('active',   m === 'no-key');
+  document.getElementById('btn-with-key').classList.toggle('active', m === 'with-key');
+  render();
+}
+
+function next() {
+  if (step < SCENARIOS[mode].length - 1) { step++; render(); }
+}
+
+function reset() { step = 0; render(); }
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+function renderKeystore(ks) {
+  const zone    = document.getElementById('keystore-zone');
+  const content = document.getElementById('ks-content');
+
+  if (!ks) { zone.style.display = 'none'; return; }
+  zone.style.display = 'block';
+
+  if (!ks.entries || ks.entries.length === 0) {
+    content.innerHTML = '<span class="ks-empty">Empty — no keys recorded yet</span>';
+    return;
+  }
+
+  let html = '<table class="ks-table"><thead><tr><th>Key</th><th>Stored result</th><th>Status</th></tr></thead><tbody>';
+  ks.entries.forEach(e => {
+    html += `<tr class="ks-row ${e.rowCls}">
+      <td>${e.key}</td>
+      <td>${e.result}</td>
+      <td class="${e.sCls}">${e.sText}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  content.innerHTML = html;
+}
+
+function render() {
+  const data  = SCENARIOS[mode][step];
+  const total = SCENARIOS[mode].length;
+
+  // Counter
+  document.getElementById('step-counter').textContent = `Step ${step + 1} of ${total}`;
+
+  // Description
+  document.getElementById('step-desc').innerHTML = data.desc;
+
+  // Messages — rebuild with staggered fade-in
+  const zone = document.getElementById('messages-zone');
+  zone.innerHTML = '';
+  (data.msgs || []).forEach((m, i) => {
+    const row = document.createElement('div');
+    row.className = 'msg-row';
+    row.innerHTML = `
+      <span class="msg-dir">${m.dir}</span>
+      <span class="msg-chip ${m.cls}">${m.label}</span>
+      <span class="msg-badge">${m.badge}</span>
+    `;
+    zone.appendChild(row);
+    // slight stagger so each message visibly appears
+    setTimeout(() => row.classList.add('visible'), i * 80);
+  });
+
+  // Key store
+  renderKeystore(data.ks);
+
+  // Outcome badge
+  const outcomeEl = document.getElementById('outcome');
+  if (data.outcome) {
+    outcomeEl.className = `outcome show ${data.outcome.type}`;
+    document.getElementById('outcome-icon').textContent = data.outcome.icon;
+    document.getElementById('outcome-text').textContent  = data.outcome.text;
+  } else {
+    outcomeEl.className = 'outcome';
+  }
+
+  // Next button
+  const btnNext = document.getElementById('btn-next');
+  const last = step === total - 1;
+  btnNext.disabled    = last;
+  btnNext.textContent = last ? 'Done — try the other scenario' : 'Next step →';
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

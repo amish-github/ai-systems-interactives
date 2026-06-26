@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Growth, Headroom, and the Cost of Scale</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+.wrap { width: 100%; max-width: 700px; background: #FFFFFF; }
+
+/* ── Hint header ── */
+.hint {
+  display: flex; align-items: center; gap: 8px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.hint-icon { animation: wiggle 4s ease-in-out infinite; flex-shrink: 0; }
+@keyframes wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+}
+
+/* ── Controls ── */
+.controls {
+  background: #F2F1EE;
+  padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+.ctrl { display: flex; flex-direction: column; gap: 8px; }
+.ctrl-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px; color: rgba(0,0,0,0.5);
+  text-transform: uppercase; letter-spacing: 0.6px;
+}
+.btn-group { display: flex; flex-wrap: wrap; gap: 4px; }
+.btn {
+  padding: 8px 12px;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 14px; color: #1A1A1A;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+  white-space: nowrap; line-height: 1.3;
+}
+.btn:hover { border-color: rgba(0,0,0,0.30); }
+.btn.active { background: #1A1A1A; color: #FFFFFF; border-color: #1A1A1A; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+input[type=range] { flex: 1; accent-color: #1878DC; cursor: pointer; }
+.slider-val {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px; color: #1878DC; min-width: 32px; text-align: right;
+}
+.toggle-row { display: flex; align-items: center; gap: 10px; }
+.toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.15);
+  border-radius: 12px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+.toggle-track::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: #fff; border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+}
+.toggle input:checked ~ .toggle-track { background: #328F51; }
+.toggle input:checked ~ .toggle-track::before { transform: translateX(20px); }
+.toggle-lbl { font-size: 16px; }
+
+/* ── Chart ── */
+.chart-section { padding: 24px 24px 0; }
+.chart-cap {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px; color: rgba(0,0,0,0.4);
+  text-transform: uppercase; letter-spacing: 0.6px;
+  margin-bottom: 8px;
+}
+canvas { display: block; width: 100%; height: auto; }
+
+/* ── Legend ── */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  padding: 12px 24px 16px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(0,0,0,0.55); }
+.legend-swatch { width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── Stats ── */
+.stats {
+  display: grid; grid-template-columns: 1fr 1fr 1fr;
+  margin: 0 24px 16px;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px; overflow: hidden;
+  box-shadow: 0 0 0.5px rgba(0,0,0,0.30), 0 1px 3px rgba(0,0,0,0.15);
+}
+.stat {
+  padding: 16px; background: #FFFFFF;
+  border-right: 1px solid rgba(0,0,0,0.14);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat:last-child { border-right: none; }
+.stat-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px; color: rgba(0,0,0,0.45);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.stat-value { font-family: 'Suisse Intl Mono', monospace; font-size: 22px; }
+.stat-value.good { color: #328F51; }
+.stat-value.warn { color: #F48E00; }
+.stat-value.bad  { color: #DE4C45; }
+
+/* ── Message ── */
+.msg {
+  margin: 0 24px 28px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 15px; line-height: 1.55;
+  border: 1px solid transparent;
+}
+.msg.good { background: #eef7f1; border-color: #328F51; }
+.msg.warn { background: #fff8ec; border-color: #F48E00; }
+.msg.bad  { background: #fdf0f0; border-color: #DE4C45; }
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .hint, .controls, .chart-section { padding-left: 16px; padding-right: 16px; }
+  .legend { padding-left: 16px; }
+  .stats { margin-left: 16px; margin-right: 16px; }
+  .msg   { margin-left: 16px; margin-right: 16px; }
+}
+@media (max-width: 360px) {
+  .stats { grid-template-columns: 1fr 1fr; }
+  .stat:nth-child(2) { border-right: none; }
+  .stat:nth-child(3) {
+    border-top: 1px solid rgba(0,0,0,0.14);
+    grid-column: 1 / -1;
+  }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint -->
+  <div class="hint">
+    <div class="hint-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span>Adjust the three sizing decisions and see how cost and coverage change</span>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+
+    <div class="ctrl">
+      <div class="ctrl-label">Size for</div>
+      <div class="btn-group">
+        <button class="btn" id="btn-avg"  onclick="setSize('avg')">Today's average</button>
+        <button class="btn active" id="btn-peak" onclick="setSize('peak')">Today's peak</button>
+        <button class="btn" id="btn-proj" onclick="setSize('proj')">12-month projected peak</button>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-label">Headroom margin</div>
+      <div class="slider-row">
+        <input type="range" id="headSlider" min="0" max="50" value="20"
+               oninput="setHeadroom(+this.value)">
+        <div class="slider-val" id="headVal">20%</div>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="autoToggle" onchange="setAuto(this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+        <span class="toggle-lbl">Autoscaling</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-section">
+    <div class="chart-cap">Requests per second — one full day (24 h)</div>
+    <canvas id="chart" width="652" height="280"></canvas>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#1878DC;"></div>
+      <span>Demand</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:#328F51;"></div>
+      <span>Provisioned capacity</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(222,76,69,0.28); border:1px solid rgba(222,76,69,0.55);"></div>
+      <span>Outage zone</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:rgba(0,0,0,0.07); border:1px solid rgba(0,0,0,0.14);"></div>
+      <span>Idle waste</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Peak coverage</div>
+      <div class="stat-value" id="stCov">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Idle waste</div>
+      <div class="stat-value" id="stWaste">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Status</div>
+      <div class="stat-value" id="stStatus">—</div>
+    </div>
+  </div>
+
+  <!-- Message -->
+  <div class="msg good" id="msg">Adjust the controls above to explore the trade-offs.</div>
+
+</div><!-- .wrap -->
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────────────
+// 24 hourly demand values (normalized; 1.0 = evening peak at 19:00)
+const DN = [
+  0.08, 0.06, 0.05, 0.05, 0.06, 0.10,   // 00–05  overnight
+  0.18, 0.32, 0.50, 0.64, 0.72, 0.74,   // 06–11  morning ramp
+  0.70, 0.65, 0.60, 0.58, 0.62, 0.72,   // 12–17  afternoon
+  0.88, 1.00, 0.94, 0.78, 0.52, 0.25    // 18–23  evening peak + fall
+];
+const PEAK_RPS = 900;                          // today's peak  (rps)
+const AVG_RPS  = DN.reduce((s,v)=>s+v,0)/24 * PEAK_RPS; // ~440 rps
+const PROJ_RPS = PEAK_RPS * 1.6;              // 12-month projected peak (rps)
+
+// ── State ─────────────────────────────────────────────────────────────────
+const S = { size: 'peak', headroom: 20, auto: false };
+
+function baseCap()  { return S.size==='avg'?AVG_RPS : S.size==='peak'?PEAK_RPS : PROJ_RPS; }
+function provCap()  { return baseCap() * (1 + S.headroom/100); }
+function capAtH(h)  { return S.auto ? DN[h]*PEAK_RPS*(1+S.headroom/100) : provCap(); }
+function yMaxVal()  { return Math.max(provCap() * 1.08, PROJ_RPS * 1.18); }
+
+// ── Canvas setup ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('chart');
+const ctx    = canvas.getContext('2d');
+const PAD    = { t:24, r:32, b:36, l:64 };
+
+function cssW() { return parseInt(canvas.style.width)  || 652; }
+function cssH() { return parseInt(canvas.style.height) || 280; }
+
+// Draw a smooth bezier curve through an array of {x,y} points
+function smoothLine(pts) {
+  if (!pts.length) return;
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i-1], c = pts[i];
+    const mx = (p.x + c.x) / 2;
+    ctx.bezierCurveTo(mx, p.y, mx, c.y, c.x, c.y);
+  }
+}
+
+// ── Main draw ─────────────────────────────────────────────────────────────
+function draw() {
+  const W  = cssW(), H = cssH();
+  const cW = W - PAD.l - PAD.r;
+  const cH = H - PAD.t - PAD.b;
+  const ym = yMaxVal();
+
+  ctx.clearRect(0, 0, W, H);
+
+  const xf = h => PAD.l + (h / 23) * cW;
+  const yf = v => PAD.t + cH * (1 - v / ym);
+
+  const x0   = xf(0),  x23 = xf(23);
+  const yBot = yf(0);
+
+  // Pre-compute point arrays
+  const dPts = DN.map((v,h) => ({ x: xf(h), y: yf(v * PEAK_RPS) }));
+  const cPts = DN.map((v,h) => ({ x: xf(h), y: yf(capAtH(h)) }));
+
+  // ── Reference grid lines ─────────────────────────────────────────────
+  const refs = [
+    { v: AVG_RPS,  color: 'rgba(0,0,0,0.12)', dash: [2,4] },
+    { v: PEAK_RPS, color: 'rgba(0,0,0,0.16)', dash: [2,4] },
+    { v: PROJ_RPS, color: 'rgba(211,87,34,0.25)', dash: [3,3] }
+  ];
+  refs.forEach(r => {
+    if (r.v > ym) return;
+    const y = yf(r.v);
+    ctx.save();
+    ctx.beginPath();
+    ctx.setLineDash(r.dash);
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 1;
+    ctx.moveTo(x0, y); ctx.lineTo(x23, y);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Y-axis labels (rps values at reference lines)
+  ctx.save();
+  ctx.font = '10px SuisseIntlMono, monospace';
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.textAlign = 'right';
+  [
+    { v: AVG_RPS,  lbl: 'avg' },
+    { v: PEAK_RPS, lbl: 'peak' },
+    { v: PROJ_RPS, lbl: '12-mo' }
+  ].forEach(({ v, lbl }) => {
+    if (v > ym) return;
+    const y = yf(v);
+    ctx.fillText(Math.round(v), x0 - 6, y - 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillText(lbl, x0 - 6, y + 8);
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  });
+  ctx.restore();
+
+  // X-axis labels
+  ctx.save();
+  ctx.font = '10px SuisseIntlMono, monospace';
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.textAlign = 'center';
+  [0, 6, 12, 18, 23].forEach(h => {
+    ctx.fillText(h + ':00', xf(h), H - 6);
+  });
+  ctx.restore();
+
+  // ── Fills ────────────────────────────────────────────────────────────
+  const cap  = provCap();
+  const capY = yf(cap);
+
+  if (!S.auto) {
+    // WASTE fill: area above demand but below static cap line.
+    // Clip to the vertical band at or below capY (canvas y >= capY).
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l, capY, cW, yBot - capY + 2);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(x0, capY);
+    ctx.lineTo(x23, capY);
+    ctx.lineTo(x23, dPts[23].y);
+    for (let h = 22; h >= 0; h--) ctx.lineTo(xf(h), dPts[h].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fill();
+    ctx.restore();
+
+    // OUTAGE fill: area above cap line where demand exceeds capacity.
+    // Clip to the vertical band above capY (canvas y <= capY).
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(PAD.l, PAD.t, cW, Math.max(0, capY - PAD.t) + 1);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(x0, capY);
+    for (let h = 0; h < 24; h++) ctx.lineTo(xf(h), dPts[h].y);
+    ctx.lineTo(x23, capY);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(222,76,69,0.22)';
+    ctx.fill();
+    ctx.restore();
+
+  } else {
+    // AUTOSCALING waste fill: thin band between capacity curve and demand.
+    ctx.beginPath();
+    smoothLine(cPts);
+    // Reverse along demand (straight lines are fine for fill edges)
+    for (let h = 23; h >= 0; h--) ctx.lineTo(xf(h), dPts[h].y);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(50,143,81,0.13)';
+    ctx.fill();
+  }
+
+  // ── Demand area (subtle fill below curve) ────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  smoothLine(dPts);
+  ctx.lineTo(x23, yBot);
+  ctx.lineTo(x0,  yBot);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(24,120,220,0.07)';
+  ctx.fill();
+  ctx.restore();
+
+  // ── Demand curve stroke ───────────────────────────────────────────────
+  ctx.save();
+  ctx.beginPath();
+  smoothLine(dPts);
+  ctx.strokeStyle = '#1878DC';
+  ctx.lineWidth   = 2.5;
+  ctx.stroke();
+  ctx.restore();
+
+  // ── Capacity line/curve stroke ────────────────────────────────────────
+  ctx.save();
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#328F51';
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  if (!S.auto) {
+    ctx.moveTo(x0,  capY);
+    ctx.lineTo(x23, capY);
+  } else {
+    smoothLine(cPts);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Capacity label at right edge (static only)
+  if (!S.auto) {
+    ctx.save();
+    ctx.font = '10px SuisseIntlMono, monospace';
+    ctx.fillStyle = '#328F51';
+    ctx.textAlign = 'left';
+    const labelY = Math.max(PAD.t + 10, Math.min(capY + 4, yBot - 4));
+    ctx.fillText(Math.round(cap) + ' rps', x23 + 4, labelY);
+    ctx.restore();
+  }
+
+  // ── Evening peak dot annotation ───────────────────────────────────────
+  const peakX = xf(19), peakY = yf(PEAK_RPS);
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(peakX, peakY, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#1878DC';
+  ctx.fill();
+  ctx.restore();
+
+  updateStats();
+}
+
+// ── Stats / message update ─────────────────────────────────────────────────
+function updateStats() {
+  const cap = provCap();
+
+  // Peak coverage vs today's actual peak
+  const cov = Math.min(100, Math.round(cap / PEAK_RPS * 100));
+
+  // Idle waste: average (capacity - demand) / capacity across 24 h
+  let wasteSum = 0, capSum = 0;
+  for (let h = 0; h < 24; h++) {
+    const d = DN[h] * PEAK_RPS;
+    const c = capAtH(h);
+    wasteSum += Math.max(0, c - d);
+    capSum   += c;
+  }
+  const wastePct = Math.round(wasteSum / capSum * 100);
+
+  let covClass, wasteClass, statusText, statusClass, msgText;
+
+  if (cap < PEAK_RPS * 0.99) {
+    // Under today's peak — will fail every evening
+    statusText = 'FAILING';
+    statusClass = 'bad';
+    msgText = 'Capacity (' + Math.round(cap) + ' rps) is below today\'s evening peak (' + Math.round(PEAK_RPS) + ' rps). The system returns errors every day when traffic reaches its daily high point. Size for the peak, not the average.';
+  } else if (S.headroom === 0) {
+    // Exactly at forecast — no buffer
+    statusText = 'BRITTLE';
+    statusClass = 'warn';
+    msgText = 'Capacity matches the target exactly but carries no buffer. Any traffic spike, forecast miss, or single failed machine immediately pushes the system past its limit. Add headroom to absorb surprises.';
+  } else if (cap < PROJ_RPS * 0.99) {
+    // Covers today but not the growth horizon
+    statusText = 'OK TODAY';
+    statusClass = 'warn';
+    msgText = 'Capacity handles today\'s peak but sits below the 12-month projected peak (' + Math.round(PROJ_RPS) + ' rps). The system will run out of room as the product grows. Switch to the 12-month horizon to get ahead of growth.';
+  } else {
+    // Healthy
+    statusText = 'HEALTHY';
+    statusClass = 'good';
+    const autoNote = S.auto
+      ? ' Autoscaling matches capacity to the demand curve — idle waste shrinks to just the headroom margin instead of paying for peak capacity overnight.'
+      : ' With static provisioning, ' + wastePct + '% of capacity sits idle on average — autoscaling can recover most of that cost.';
+    msgText = 'Capacity covers the 12-month projected peak with a ' + S.headroom + '% headroom margin.' + autoNote;
+  }
+
+  covClass   = cov   >= 100 ? 'good' : 'bad';
+  wasteClass = wastePct > 40 ? 'warn' : 'good';
+
+  g('stCov').textContent   = cov + '%';
+  g('stCov').className     = 'stat-value ' + covClass;
+  g('stWaste').textContent = wastePct + '%';
+  g('stWaste').className   = 'stat-value ' + wasteClass;
+  g('stStatus').textContent = statusText;
+  g('stStatus').className   = 'stat-value ' + statusClass;
+
+  const msgEl = g('msg');
+  msgEl.textContent = msgText;
+  msgEl.className   = 'msg ' + statusClass;
+}
+
+// ── Event handlers ─────────────────────────────────────────────────────────
+function setSize(s) {
+  S.size = s;
+  ['avg','peak','proj'].forEach(k => g('btn-'+k).classList.toggle('active', k===s));
+  draw();
+}
+function setHeadroom(v) {
+  S.headroom = v;
+  g('headVal').textContent = v + '%';
+  draw();
+}
+function setAuto(v) { S.auto = v; draw(); }
+function g(id) { return document.getElementById(id); }
+
+// ── Responsive canvas resize ───────────────────────────────────────────────
+function resize() {
+  const dpr  = window.devicePixelRatio || 1;
+  const wrap = canvas.parentElement;
+  const cssw = wrap.clientWidth;
+  const cssh = Math.round(cssw * 0.43);
+  canvas.style.width  = cssw + 'px';
+  canvas.style.height = cssh + 'px';
+  canvas.width  = Math.round(cssw * dpr);
+  canvas.height = Math.round(cssh * dpr);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(dpr, dpr);
+  draw();
+}
+window.addEventListener('resize', resize);
+resize();
+</script>
+</body>
+</html>

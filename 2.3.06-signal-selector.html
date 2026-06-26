@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Which Signal Answers This?</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+    }
+
+    /* ── Main content ── */
+    .main {
+      padding: 28px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Progress ── */
+    .progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .progress-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.25s;
+    }
+
+    .dot.done   { background: #328F51; }
+    .dot.active { background: #1878DC; }
+
+    .progress-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    /* ── Question card ── */
+    .question-card {
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .question-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+
+    .question-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.55;
+    }
+
+    /* ── Answer buttons ── */
+    .answers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .answer-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      cursor: pointer;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: #1A1A1A;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s, transform 0.1s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      width: 100%;
+    }
+
+    .answer-btn:hover:not(:disabled) {
+      border-color: rgba(0,0,0,0.30);
+      background: #F2F1EE;
+      transform: translateY(-1px);
+    }
+
+    .answer-btn:active:not(:disabled) {
+      transform: translateY(0);
+    }
+
+    .answer-btn:disabled {
+      cursor: default;
+    }
+
+    .answer-btn.state-correct {
+      border-color: #328F51;
+      background: rgba(50, 143, 81, 0.08);
+    }
+
+    .answer-btn.state-wrong {
+      border-color: #DE4C45;
+      background: rgba(222, 76, 69, 0.08);
+    }
+
+    .signal-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    .chip-metric { background: #1878DC; }
+    .chip-log    { background: #D35722; }
+    .chip-trace  { background: #8754FD; }
+
+    .answer-body {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .answer-name {
+      font-size: 16px;
+      color: #1A1A1A;
+    }
+
+    .answer-desc {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    /* ── Feedback ── */
+    .feedback {
+      border-radius: 10px;
+      padding: 16px 20px;
+      font-size: 16px;
+      line-height: 1.55;
+      display: none;
+    }
+
+    .feedback.visible { display: block; }
+
+    .feedback.fb-correct {
+      background: rgba(50, 143, 81, 0.10);
+      border: 1px solid rgba(50, 143, 81, 0.30);
+    }
+
+    .feedback.fb-wrong {
+      background: rgba(222, 76, 69, 0.08);
+      border: 1px solid rgba(222, 76, 69, 0.25);
+    }
+
+    .fb-icon {
+      font-size: 14px;
+      font-weight: 700;
+      margin-right: 6px;
+    }
+
+    /* ── Next button ── */
+    .next-btn {
+      align-self: flex-end;
+      padding: 12px 24px;
+      border-radius: 8px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      display: none;
+    }
+
+    .next-btn.visible {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .next-btn:hover { opacity: 0.80; transform: translateY(-1px); }
+    .next-btn:active { transform: translateY(0); }
+
+    /* ── Score screen ── */
+    .score-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      padding: 48px 20px 40px;
+      text-align: center;
+    }
+
+    .score-screen.visible { display: flex; }
+
+    .score-ring {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.14);
+      background: #F2F1EE;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #1A1A1A;
+    }
+
+    .score-title {
+      font-size: 20px;
+      color: #1A1A1A;
+      max-width: 380px;
+      line-height: 1.4;
+    }
+
+    .score-sub {
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      max-width: 420px;
+      line-height: 1.55;
+    }
+
+    .restart-btn {
+      padding: 12px 28px;
+      border-radius: 8px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .restart-btn:hover { opacity: 0.80; }
+
+    /* ── Responsive ── */
+    @media (max-width: 400px) {
+      .hint-header { padding: 12px 16px; }
+      .main        { padding: 20px 16px; gap: 20px; }
+      .question-card { padding: 20px 16px; }
+      .answer-btn  { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Pick the best signal to answer each operational question.</span>
+  </div>
+
+  <!-- Quiz area -->
+  <div class="main" id="quiz-area">
+
+    <div class="progress-row">
+      <div class="progress-dots" id="progress-dots"></div>
+      <span class="progress-label" id="progress-label">1 / 6</span>
+    </div>
+
+    <div class="question-card">
+      <div class="question-label">Operational question</div>
+      <div class="question-text" id="question-text"></div>
+    </div>
+
+    <div class="answers">
+      <button class="answer-btn" id="btn-metric" onclick="pickSignal('metric')">
+        <span class="signal-chip chip-metric">metric</span>
+        <div class="answer-body">
+          <span class="answer-name">Metric</span>
+          <span class="answer-desc">Rates, counts, and trends over time</span>
+        </div>
+      </button>
+      <button class="answer-btn" id="btn-log" onclick="pickSignal('log')">
+        <span class="signal-chip chip-log">log</span>
+        <div class="answer-body">
+          <span class="answer-name">Log</span>
+          <span class="answer-desc">Full detail of a single event</span>
+        </div>
+      </button>
+      <button class="answer-btn" id="btn-trace" onclick="pickSignal('trace')">
+        <span class="signal-chip chip-trace">trace</span>
+        <div class="answer-body">
+          <span class="answer-name">Trace</span>
+          <span class="answer-desc">Where time went across a request's path</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <button class="next-btn" id="next-btn" onclick="advanceQuestion()">
+      Next question &rarr;
+    </button>
+
+  </div>
+
+  <!-- Score screen -->
+  <div class="score-screen" id="score-screen">
+    <div class="score-ring" id="score-ring"></div>
+    <div class="score-title" id="score-title"></div>
+    <div class="score-sub" id="score-sub"></div>
+    <button class="restart-btn" onclick="restart()">Try again</button>
+  </div>
+
+</div>
+
+<script>
+var questions = [
+  {
+    q: "The database is feeling sluggish. How many queries per second has it handled over the last hour, and is that rate still climbing?",
+    answer: "metric",
+    wrong: {
+      log:   "Logs record individual events, not rates. You'd have to count thousands of log lines to reconstruct a trend — metrics do that automatically.",
+      trace: "Traces show where time went inside one request. They don't aggregate across all requests to give you a requests-per-second trend over an hour."
+    },
+    correct: "Right. Rates and trends over time are exactly what metrics are built for. A metric time-series shows requests-per-second at every point in the last hour, so you can see at a glance whether load is growing."
+  },
+  {
+    q: "A specific request just returned a 500 error to a user. Which service threw the error, and what was the exact error message?",
+    answer: "log",
+    wrong: {
+      metric: "A metric tells you the error rate is elevated, but not what message any specific request produced or which service caused it. Metrics aggregate — they discard per-event detail.",
+      trace:  "A trace shows timing across services, not the error message itself. The log line emitted at the moment of failure is what contains the message and stack trace."
+    },
+    correct: "Right. Logs capture the full detail of a single event. The error message, stack trace, and the service that wrote it are all recorded in the log at the moment it happened."
+  },
+  {
+    q: "A user says their search took eight seconds. The request passed through the API gateway, the embedding service, and the vector database. Which step was the bottleneck?",
+    answer: "trace",
+    wrong: {
+      metric: "Metrics give averages across all requests, not the breakdown for this specific eight-second call. You'd see that embedding latency is high on average, but not the path for this user's request.",
+      log:    "Individual log lines might note when each service started and stopped, but you'd have to correlate lines across services by hand. A trace was designed for exactly this cross-service timing question."
+    },
+    correct: "Right. A trace follows one request through every service it touches, recording how long each span took. You'll see exactly which step consumed the eight seconds."
+  },
+  {
+    q: "Has the API gateway's error rate been stable over the past 24 hours? Was there a spike around 2 AM?",
+    answer: "metric",
+    wrong: {
+      log:   "You could count error log lines per minute, but that's rebuilding a metric by hand. The metric already tracks this continuously for you.",
+      trace: "Traces don't summarize error rates. They show the internals of individual requests. Seeing a trend over 24 hours requires a metric."
+    },
+    correct: "Right. Error rate over a time window is a metric. Plot it over 24 hours and any spike appears immediately on the chart."
+  },
+  {
+    q: "The cache returned a miss. You need the exact key that was looked up, the reason the miss was recorded, and the timestamp — for this one event.",
+    answer: "log",
+    wrong: {
+      metric: "A cache-miss metric tells you the miss rate, not the specific key or reason for any individual miss. Metrics aggregate away per-event detail.",
+      trace:  "A trace would show that time was spent in the cache layer, but not the specific key or miss reason. Those details live in the log line the cache service emitted."
+    },
+    correct: "Right. A log entry captures exactly the detail of a single event: the key, the reason, the timestamp, and any other context the service chose to record at that moment."
+  },
+  {
+    q: "Your SLA requires p99 latency below 2 seconds. Is the platform currently meeting that target across all requests?",
+    answer: "metric",
+    wrong: {
+      log:   "You could compute p99 from logs, but only by processing every log line — expensive and slow. Metrics pre-aggregate percentiles for you on an ongoing basis.",
+      trace: "Individual traces show the latency of specific requests, but you'd need to aggregate across many thousands of traces to compute p99. That aggregation is exactly what a metric does."
+    },
+    correct: "Right. Latency percentiles are metrics. A p99 latency metric is computed continuously, so you can alert the moment it crosses 2 seconds."
+  }
+];
+
+var current = 0;
+var score   = 0;
+var done    = false;
+
+function renderQuestion() {
+  done = false;
+  var q = questions[current];
+
+  document.getElementById('question-text').textContent = q.q;
+  document.getElementById('progress-label').textContent = (current + 1) + ' / ' + questions.length;
+
+  ['metric', 'log', 'trace'].forEach(function(s) {
+    var btn = document.getElementById('btn-' + s);
+    btn.disabled = false;
+    btn.className = 'answer-btn';
+  });
+
+  var fb = document.getElementById('feedback');
+  fb.className = 'feedback';
+  fb.innerHTML = '';
+
+  var nb = document.getElementById('next-btn');
+  nb.className = 'next-btn';
+  nb.textContent = (current === questions.length - 1) ? 'See results →' : 'Next question →';
+
+  renderDots();
+}
+
+function renderDots() {
+  var c = document.getElementById('progress-dots');
+  c.innerHTML = '';
+  for (var i = 0; i < questions.length; i++) {
+    var d = document.createElement('div');
+    d.className = 'dot' + (i < current ? ' done' : i === current ? ' active' : '');
+    c.appendChild(d);
+  }
+}
+
+function pickSignal(choice) {
+  if (done) return;
+  done = true;
+
+  var q       = questions[current];
+  var correct = (choice === q.answer);
+  if (correct) score++;
+
+  ['metric', 'log', 'trace'].forEach(function(s) {
+    var btn = document.getElementById('btn-' + s);
+    btn.disabled = true;
+    if (s === q.answer) {
+      btn.classList.add('state-correct');
+    } else if (s === choice && !correct) {
+      btn.classList.add('state-wrong');
+    }
+  });
+
+  var fb  = document.getElementById('feedback');
+  var msg = correct ? q.correct : q.wrong[choice];
+  fb.className = 'feedback visible ' + (correct ? 'fb-correct' : 'fb-wrong');
+  fb.innerHTML = '<span class="fb-icon">' + (correct ? '✓' : '✗') + '</span>' + msg;
+
+  document.getElementById('next-btn').className = 'next-btn visible';
+}
+
+function advanceQuestion() {
+  current++;
+  if (current >= questions.length) {
+    showScore();
+  } else {
+    renderQuestion();
+  }
+}
+
+function showScore() {
+  document.getElementById('quiz-area').style.display = 'none';
+  var ss = document.getElementById('score-screen');
+  ss.className = 'score-screen visible';
+
+  document.getElementById('score-ring').textContent = score + '/' + questions.length;
+
+  var title, sub;
+  if (score === questions.length) {
+    title = 'Perfect — you have this pattern down.';
+    sub   = 'You matched every question to the right signal. In your project, apply the same logic: rate or trend over time = metric, detail of one event = log, cross-service timing = trace.';
+  } else if (score >= 4) {
+    title = 'Strong — a couple worth revisiting.';
+    sub   = 'You got most right. Review the questions you missed and notice whether you confused metric vs. log or trace vs. log — those are the most common mix-ups in Group B.';
+  } else {
+    title = 'Good practice run — try again.';
+    sub   = 'Review the feedback for each question, then retry. Key rule: metrics aggregate over time, logs capture per-event detail, traces follow one request across services.';
+  }
+
+  document.getElementById('score-title').textContent = title;
+  document.getElementById('score-sub').textContent   = sub;
+}
+
+function restart() {
+  current = 0;
+  score   = 0;
+  done    = false;
+  document.getElementById('score-screen').className = 'score-screen';
+  document.getElementById('quiz-area').style.display = '';
+  renderQuestion();
+}
+
+renderQuestion();
+</script>
+</body>
+</html>

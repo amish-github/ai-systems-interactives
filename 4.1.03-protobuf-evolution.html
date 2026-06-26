@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Protobuf Evolution and Compatibility</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #F2F1EE;
+      font-size: 18px;
+    }
+
+    .cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      15%  { transform: rotate(-10deg); }
+      30%  { transform: rotate(10deg); }
+      45%  { transform: rotate(-8deg); }
+      60%  { transform: rotate(6deg); }
+      75%  { transform: rotate(-3deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #FFFFFF;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      margin: 20px 24px;
+      overflow: hidden;
+    }
+
+    /* ── Card header ── */
+    .card-header {
+      background: #F2F1EE;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .step-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+      margin-bottom: 4px;
+    }
+    .step-title { font-size: 18px; font-weight: 600; color: #1A1A1A; }
+
+    /* ── Card body ── */
+    .card-body { padding: 20px; }
+    .card-body p {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #1A1A1A;
+      margin-bottom: 12px;
+    }
+
+    /* ── Schema code block ── */
+    .schema-block {
+      background: #F2F1EE;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      margin: 12px 0;
+    }
+    .kw  { color: #8754FD; }
+    .mn  { color: #1878DC; }
+    .ty  { color: #328F51; }
+    .tg  { color: #D35722; font-weight: 700; }
+    .cm  { color: rgba(0,0,0,0.35); }
+    .row-new  { background: rgba(50,143,81,0.10); border-radius: 4px; padding: 0 4px; }
+    .row-bad  { background: rgba(222,76,69,0.10); border-radius: 4px; padding: 0 4px; }
+
+    /* ── Wire chips ── */
+    .wire-section { margin: 16px 0 4px; }
+    .wire-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      font-family: 'Suisse Intl Mono', monospace;
+      margin-bottom: 8px;
+    }
+    .wire-visual {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+    .wire-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .wire-tag {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+      background: #1A1A1A;
+      padding: 4px 12px;
+      border-radius: 6px;
+    }
+    .wire-tag.green  { background: #328F51; }
+    .wire-tag.orange { background: #F48E00; }
+    .wire-tag.red    { background: #DE4C45; }
+    .wire-tag.muted  { background: rgba(0,0,0,0.18); color: #1A1A1A; }
+    .wire-name {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.50);
+    }
+    .wire-name.warn  { color: #DE4C45; }
+    .wire-name.orange { color: #F48E00; }
+    .wire-dot { font-size: 18px; color: rgba(0,0,0,0.18); margin-top: 4px; }
+
+    /* ── Inline highlight chip ── */
+    .chip {
+      display: inline-block;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: #FFFFFF;
+      background: #D35722;
+      padding: 2px 7px;
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+    .chip.green { background: #328F51; }
+    .chip.red   { background: #DE4C45; }
+
+    /* ── Explanation banner ── */
+    .explanation {
+      border-left: 3px solid #1878DC;
+      background: #F2F1EE;
+      border-radius: 0 8px 8px 0;
+      padding: 14px 16px;
+      font-size: 16px;
+      line-height: 1.6;
+      margin: 16px 0 0;
+    }
+    .explanation.green { border-left-color: #328F51; }
+    .explanation.red   { border-left-color: #DE4C45; }
+
+    /* ── Flow diagram ── */
+    .flow-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+    .flow-node {
+      background: #FFFFFF;
+      border: 1px solid rgba(0,0,0,0.18);
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      line-height: 1.4;
+      text-align: center;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 3px 0 rgba(0,0,0,0.10);
+    }
+    .flow-node.new { border-color: #1878DC; }
+    .flow-node small { display: block; color: rgba(0,0,0,0.45); font-size: 12px; font-family: 'Suisse Intl Mono', monospace; margin-top: 2px; }
+    .flow-arrow { color: rgba(0,0,0,0.28); font-size: 20px; flex-shrink: 0; }
+
+    /* ── Outcome box ── */
+    .outcome {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 12px 0 0;
+    }
+    .outcome.bad {
+      background: rgba(222,76,69,0.06);
+      border: 1px solid rgba(222,76,69,0.18);
+    }
+    .outcome-icon { font-size: 22px; flex-shrink: 0; margin-top: 1px; }
+    .outcome-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .outcome-title.red { color: #DE4C45; }
+    .outcome-desc { font-size: 14px; color: rgba(0,0,0,0.55); line-height: 1.5; }
+    .outcome-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-top: 8px;
+    }
+    .badge-ok  { background: rgba(50,143,81,0.12);  color: #328F51; }
+    .badge-err { background: rgba(222,76,69,0.10); color: #DE4C45; }
+
+    /* ── Navigation ── */
+    .nav-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(0,0,0,0.10);
+    }
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .nav-btn:hover:not(:disabled) { background: #F2F1EE; }
+    .nav-btn.primary {
+      background: #1878DC;
+      color: #FFFFFF;
+      border-color: #1878DC;
+    }
+    .nav-btn.primary:hover:not(:disabled) { background: #1265BC; }
+    .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .step-dots { display: flex; gap: 6px; align-items: center; }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.14);
+      transition: background 0.2s;
+    }
+    .dot.active { background: #1878DC; }
+    .dot.done   { background: #328F51; }
+
+    /* ── Steps ── */
+    .step { display: none; }
+    .step.active { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .card { margin: 16px 12px; }
+      .flow-row { flex-direction: column; align-items: flex-start; }
+      .flow-arrow { transform: rotate(90deg); }
+    }
+    @media (max-width: 325px) {
+      .card { margin: 12px 8px; }
+      .card-body { padding: 16px; }
+      .card-header { padding: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <span class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+    <span>Step through to see how schema changes travel on the wire</span>
+  </div>
+
+  <div class="card">
+
+    <!-- ── Step 1: Field number = contract ── -->
+    <div class="step active" id="step-1">
+      <div class="card-header">
+        <div class="step-label">Step 1 of 5</div>
+        <div class="step-title">The field number is the contract</div>
+      </div>
+      <div class="card-body">
+        <p>Every Protobuf field has a name, a type, and a number. On the wire, the <strong>name is never sent</strong>. Only the number travels between systems.</p>
+        <div class="schema-block">
+<span class="kw">message</span> <span class="mn">User</span> {<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;email&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">1</span>;<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;display_name&nbsp;&nbsp;= <span class="tg">2</span>;<br>
+&nbsp;&nbsp;<span class="ty">int32</span>&nbsp;&nbsp;&nbsp;age&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">3</span>;<br>
+}
+        </div>
+        <div class="wire-section">
+          <div class="wire-label">What the decoder actually sees on the wire:</div>
+          <div class="wire-visual">
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>1</b></div>
+              <div class="wire-name">email</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>2</b></div>
+              <div class="wire-name">display_name</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>3</b></div>
+              <div class="wire-name">age</div>
+            </div>
+          </div>
+        </div>
+        <div class="explanation">
+          The decoder reads <span class="chip">tag=1</span> and knows it means <code>email</code>. It never sees the word "email" in the bytes. This means <strong>renaming a field is harmless</strong>, but changing a number breaks every client that relied on the old one.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Safe change — add a field ── -->
+    <div class="step" id="step-2">
+      <div class="card-header">
+        <div class="step-label">Step 2 of 5</div>
+        <div class="step-title">Safe change: adding a new field</div>
+      </div>
+      <div class="card-body">
+        <p>To add <code>phone_number</code>, pick the <strong>next unused number</strong> and leave all existing numbers untouched.</p>
+        <div class="schema-block">
+<span class="kw">message</span> <span class="mn">User</span> {<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;email&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">1</span>;<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;display_name&nbsp;&nbsp;= <span class="tg">2</span>;<br>
+&nbsp;&nbsp;<span class="ty">int32</span>&nbsp;&nbsp;&nbsp;age&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">3</span>;<br>
+&nbsp;&nbsp;<span class="row-new"><span class="ty">string</span>&nbsp;&nbsp;phone_number&nbsp;&nbsp;= <span class="tg">4</span>;</span>&nbsp;&nbsp;<span class="cm">// ← new</span><br>
+}
+        </div>
+        <div class="wire-section">
+          <div class="wire-label">Wire — v2 client now sends:</div>
+          <div class="wire-visual">
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>1</b></div>
+              <div class="wire-name">email</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>2</b></div>
+              <div class="wire-name">display_name</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>3</b></div>
+              <div class="wire-name">age</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag green">tag=<b>4</b></div>
+              <div class="wire-name">phone_number</div>
+            </div>
+          </div>
+        </div>
+        <div class="explanation green">
+          <span class="chip green">tag=4</span> has never existed before, so no existing client has ever sent it. Old clients keep sending tags 1–3 and work without any change. This is how a Protobuf schema grows safely.
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Backward compat — old client, new server ── -->
+    <div class="step" id="step-3">
+      <div class="card-header">
+        <div class="step-label">Step 3 of 5</div>
+        <div class="step-title">Backward compatibility: old client → new server</div>
+      </div>
+      <div class="card-body">
+        <p>After adding field 4, we deploy the new server. An <strong>old client</strong> that only knows tags 1–3 sends a message. What does the new server do with the missing field?</p>
+        <div class="flow-row">
+          <div class="flow-node">
+            Old client
+            <small>knows tags 1, 2, 3</small>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node new">
+            New server
+            <small>knows tags 1, 2, 3, 4</small>
+          </div>
+        </div>
+        <div class="wire-section">
+          <div class="wire-label">Wire — old client sends only:</div>
+          <div class="wire-visual">
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>1</b></div>
+              <div class="wire-name">email</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>2</b></div>
+              <div class="wire-name">display_name</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>3</b></div>
+              <div class="wire-name">age</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag muted">—</div>
+              <div class="wire-name warn">missing</div>
+            </div>
+          </div>
+        </div>
+        <div class="outcome">
+          <div class="outcome-icon">⚙️</div>
+          <div>
+            <div class="outcome-title">New server handles it</div>
+            <div class="outcome-desc">Tag 4 (<code>phone_number</code>) is absent. Protobuf fills it with the default value for its type — an empty string. No error is raised.</div>
+            <div class="outcome-badge badge-ok">✓ Request handled normally</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 4: Forward compat — new client, old server ── -->
+    <div class="step" id="step-4">
+      <div class="card-header">
+        <div class="step-label">Step 4 of 5</div>
+        <div class="step-title">Forward compatibility: new client → old server</div>
+      </div>
+      <div class="card-body">
+        <p>Now the new client is deployed before all servers are updated. A <strong>new client</strong> sends tag 4. The <strong>old server</strong> has never heard of it. What happens?</p>
+        <div class="flow-row">
+          <div class="flow-node new">
+            New client
+            <small>knows tags 1, 2, 3, 4</small>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node">
+            Old server
+            <small>knows tags 1, 2, 3</small>
+          </div>
+        </div>
+        <div class="wire-section">
+          <div class="wire-label">Wire — new client sends:</div>
+          <div class="wire-visual">
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>1</b></div>
+              <div class="wire-name">email</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>2</b></div>
+              <div class="wire-name">display_name</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag">tag=<b>3</b></div>
+              <div class="wire-name">age</div>
+            </div>
+            <div class="wire-dot">·</div>
+            <div class="wire-chip">
+              <div class="wire-tag orange">tag=<b>4</b></div>
+              <div class="wire-name orange">unknown</div>
+            </div>
+          </div>
+        </div>
+        <div class="outcome">
+          <div class="outcome-icon">⚙️</div>
+          <div>
+            <div class="outcome-title">Old server handles it</div>
+            <div class="outcome-desc">The old server sees <span class="chip" style="background:#F48E00">tag=4</span> and has no schema entry for it. Protobuf skips those bytes entirely and processes the rest of the message normally.</div>
+            <div class="outcome-badge badge-ok">✓ Request handled normally</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Step 5: Breaking change — reuse a number ── -->
+    <div class="step" id="step-5">
+      <div class="card-header">
+        <div class="step-label">Step 5 of 5</div>
+        <div class="step-title">Breaking change: reusing a retired tag number</div>
+      </div>
+      <div class="card-body">
+        <p>Someone removes <code>age</code> and places a new <code>role</code> field at the same number to "avoid a gap." Old clients still send <code>age</code> data as <span class="chip">tag=3</span>.</p>
+        <div class="schema-block">
+<span class="kw">message</span> <span class="mn">User</span> {<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;email&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">1</span>;<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;display_name&nbsp;&nbsp;= <span class="tg">2</span>;<br>
+&nbsp;&nbsp;<span class="row-bad"><span class="ty">string</span>&nbsp;&nbsp;role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">3</span>;&nbsp;&nbsp;<span style="color:#DE4C45">// ← reused!</span></span><br>
+}
+        </div>
+        <div class="outcome bad">
+          <div class="outcome-icon">💥</div>
+          <div>
+            <div class="outcome-title red">Silent data corruption</div>
+            <div class="outcome-desc">Old clients send <code>age = 42</code> as <span class="chip red">tag=3</span>. The new server reads that as <code>role</code> and tries to decode a 32-bit integer as a string. No error is raised — just wrong data flowing silently through the system.</div>
+            <div class="outcome-badge badge-err">✗ Data silently corrupted</div>
+          </div>
+        </div>
+        <div class="explanation red">
+          The fix: use <code>reserved</code> when removing a field. This tells the compiler to reject any future field that tries to claim that number or name.
+          <div class="schema-block" style="margin-top:12px; margin-bottom:0;">
+<span class="kw">message</span> <span class="mn">User</span> {<br>
+&nbsp;&nbsp;<span class="row-new"><span class="kw">reserved</span> <span class="tg">3</span>;&nbsp;&nbsp;<span class="kw">reserved</span> <span class="cm">"age"</span>;</span>&nbsp;&nbsp;<span class="cm">// locked forever</span><br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;email&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">1</span>;<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;display_name&nbsp;&nbsp;= <span class="tg">2</span>;<br>
+&nbsp;&nbsp;<span class="ty">string</span>&nbsp;&nbsp;role&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= <span class="tg">4</span>;&nbsp;&nbsp;<span class="cm">// safe new number</span><br>
+}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-row">
+      <button class="nav-btn" id="btn-prev" onclick="nav(-1)" disabled>← Back</button>
+      <div class="step-dots" id="dots"></div>
+      <button class="nav-btn primary" id="btn-next" onclick="nav(1)">Next →</button>
+    </div>
+  </div>
+
+</div>
+<script>
+  const TOTAL = 5;
+  let cur = 1;
+
+  function renderDots() {
+    const c = document.getElementById('dots');
+    c.innerHTML = '';
+    for (let i = 1; i <= TOTAL; i++) {
+      const d = document.createElement('div');
+      d.className = 'dot' + (i === cur ? ' active' : i < cur ? ' done' : '');
+      c.appendChild(d);
+    }
+  }
+
+  function nav(dir) {
+    const next = cur + dir;
+    if (next < 1 || next > TOTAL) return;
+    document.getElementById('step-' + cur).classList.remove('active');
+    cur = next;
+    document.getElementById('step-' + cur).classList.add('active');
+    document.getElementById('btn-prev').disabled = cur === 1;
+    const nb = document.getElementById('btn-next');
+    if (cur === TOTAL) {
+      nb.textContent = '✓ Done';
+      nb.disabled = true;
+    } else {
+      nb.textContent = 'Next →';
+      nb.disabled = false;
+    }
+    renderDots();
+  }
+
+  renderDots();
+</script>
+</body>
+</html>

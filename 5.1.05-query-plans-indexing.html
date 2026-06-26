@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sequential Scan vs Index Scan</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400; font-style: normal;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* ── Outer wrap ── */
+.wrap {
+  width: 100%;
+  max-width: 700px;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,.30), 0 1px 3px 0 rgba(0,0,0,.15);
+  align-self: flex-start;
+}
+
+/* ── Hint header ── */
+.hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(0,0,0,.14);
+}
+.hint-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  animation: wiggle 4s ease-in-out infinite;
+}
+@keyframes wiggle {
+  0%,100% { transform: rotate(0deg); }
+  15%     { transform: rotate(-10deg); }
+  30%     { transform: rotate(10deg); }
+  45%     { transform: rotate(-8deg); }
+  60%     { transform: rotate(6deg); }
+  75%     { transform: rotate(-3deg); }
+  90%     { transform: rotate(0deg); }
+}
+.hint-text {
+  font-size: 18px;
+  line-height: 1.45;
+}
+.hl {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 15px;
+  background: #F2F1EE;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ── Query strip ── */
+.qbar {
+  padding: 16px 24px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,.14);
+}
+.qlabel {
+  font-size: 12px;
+  color: rgba(0,0,0,.5);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 8px;
+}
+.qcode {
+  display: block;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  background: #1A1A1A;
+  color: #e8e8e8;
+  padding: 12px 16px;
+  border-radius: 8px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+/* ── Two-panel grid ── */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+  border-bottom: 1px solid rgba(0,0,0,.14);
+}
+.pane {
+  padding: 20px;
+}
+.pane + .pane {
+  border-left: 1px solid rgba(0,0,0,.14);
+}
+
+/* Panel labels */
+.pane-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+.pane-tag.bad  { color: #D35722; background: #FDF0EA; }
+.pane-tag.good { color: #328F51; background: #EAF5ED; }
+
+.pane-plan {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,.5);
+  margin-bottom: 16px;
+}
+
+/* ── Row list (seq scan) ── */
+.rowlist {
+  max-height: 288px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,.18) transparent;
+}
+.rowlist::-webkit-scrollbar { width: 4px; }
+.rowlist::-webkit-scrollbar-thumb { background: rgba(0,0,0,.18); border-radius: 4px; }
+
+.rc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: #FAFAFA;
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: background .12s, border-color .12s, opacity .2s;
+}
+.rc .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.15);
+  flex-shrink: 0;
+  transition: background .12s;
+}
+.rc.scanning          { background: #FDF3EC; border-color: #D35722; }
+.rc.scanning .dot     { background: #D35722; }
+.rc.skipped           { opacity: .28; }
+.rc.match             { background: #EAF6ED; border-color: #328F51; }
+.rc.match .dot        { background: #328F51; }
+
+/* ── B-tree (index panel) ── */
+.btree {
+  display: none;
+  margin-bottom: 16px;
+}
+.btree.show { display: block; }
+
+.bt-row { display: flex; justify-content: center; }
+.bt-node {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(0,0,0,.12);
+  background: #F2F1EE;
+  text-align: center;
+  max-width: 200px;
+  transition: border-color .25s, background .25s, color .25s;
+}
+.bt-node.lit  { border-color: #1878DC; background: #EBF4FF; color: #1878DC; }
+.bt-node.done { border-color: #328F51; background: #EAF6ED; color: #328F51; font-weight: 600; }
+
+.bt-arrow {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(0,0,0,.2);
+  padding: 3px 0;
+  transition: color .25s;
+}
+.bt-arrow.lit { color: #1878DC; }
+
+.bt-caption {
+  text-align: center;
+  font-size: 11px;
+  color: rgba(0,0,0,.4);
+  font-family: 'Suisse Intl Mono', monospace;
+  margin-top: 6px;
+  margin-bottom: 12px;
+}
+
+/* ── Index result rows ── */
+.idxlist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+  min-height: 40px;
+}
+.idxnote {
+  font-size: 11px;
+  color: rgba(0,0,0,.4);
+  font-family: 'Suisse Intl Mono', monospace;
+  text-align: center;
+  padding: 4px 0 0;
+}
+
+/* ── Stats box ── */
+.sbox {
+  background: #F2F1EE;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.srow { display: flex; justify-content: space-between; font-size: 13px; }
+.sk { color: rgba(0,0,0,.5); }
+.sv { font-family: 'Suisse Intl Mono', monospace; }
+.sv.bad  { color: #D35722; }
+.sv.good { color: #328F51; }
+
+/* ── Buttons ── */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 8px;
+  border: none;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 15px;
+  cursor: pointer;
+  transition: opacity .18s, transform .1s;
+}
+.btn:hover:not(:disabled) { opacity: .85; }
+.btn:active:not(:disabled) { transform: scale(.99); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.bad  { background: #D35722; color: #fff; }
+.btn.good { background: #328F51; color: #fff; }
+
+/* ── Footer ── */
+.foot {
+  padding: 12px 24px;
+  font-size: 13px;
+  color: rgba(0,0,0,.4);
+  text-align: center;
+  font-family: 'Suisse Intl Mono', monospace;
+}
+
+/* ── Responsive ── */
+@media (max-width: 500px) {
+  .panels { grid-template-columns: 1fr; }
+  .pane + .pane { border-left: none; border-top: 1px solid rgba(0,0,0,.14); }
+  .hint { padding: 16px; }
+  .pane { padding: 16px; }
+  .qbar { padding: 12px 16px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg class="hint-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click <strong>Run</strong> on each side to see how the database finds <span class="hl">customer_id = 4815</span> without and with an index</span>
+  </div>
+
+  <!-- Query bar -->
+  <div class="qbar">
+    <div class="qlabel">Query</div>
+    <code class="qcode">SELECT * FROM orders WHERE customer_id = 4815;</code>
+  </div>
+
+  <!-- Panels -->
+  <div class="panels">
+
+    <!-- Left: Sequential scan -->
+    <div class="pane">
+      <div class="pane-tag bad">No index</div>
+      <div class="pane-plan">Seq Scan on orders</div>
+
+      <div class="rowlist" id="seq-list"></div>
+
+      <div class="sbox">
+        <div class="srow"><span class="sk">Rows examined</span><span class="sv" id="s-ex">—</span></div>
+        <div class="srow"><span class="sk">Rows removed</span><span class="sv" id="s-rm">—</span></div>
+        <div class="srow"><span class="sk">Execution time</span><span class="sv" id="s-t">—</span></div>
+      </div>
+
+      <button class="btn bad" id="seq-btn" onclick="runSeq()">Run without index &#8594;</button>
+    </div>
+
+    <!-- Right: Index scan -->
+    <div class="pane">
+      <div class="pane-tag good">With index</div>
+      <div class="pane-plan">Index Scan on orders</div>
+
+      <div class="btree" id="btree">
+        <div class="bt-row"><div class="bt-node" id="bn0">Root node</div></div>
+        <div class="bt-arrow" id="ba0">&#8595;</div>
+        <div class="bt-row"><div class="bt-node" id="bn1">3,000 &#8211; 6,999</div></div>
+        <div class="bt-arrow" id="ba1">&#8595;</div>
+        <div class="bt-row"><div class="bt-node" id="bn2">4,800 &#8211; 4,899</div></div>
+        <div class="bt-arrow" id="ba2">&#8595;</div>
+        <div class="bt-row"><div class="bt-node" id="bn3">4,815 &#10003;</div></div>
+        <div class="bt-caption">B-tree navigates to exact value</div>
+      </div>
+
+      <div class="idxlist" id="idx-list"></div>
+
+      <div class="sbox">
+        <div class="srow"><span class="sk">Rows examined</span><span class="sv" id="i-ex">—</span></div>
+        <div class="srow"><span class="sk">Rows removed</span><span class="sv" id="i-rm">—</span></div>
+        <div class="srow"><span class="sk">Execution time</span><span class="sv" id="i-t">—</span></div>
+      </div>
+
+      <button class="btn good" id="idx-btn" onclick="runIdx()">Run with index &#8594;</button>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="foot">20 of 1,000,000 rows shown &nbsp;&middot;&nbsp; stats match the EXPLAIN ANALYZE example in the lesson</div>
+
+</div>
+
+<script>
+// 20 customer_ids; match 4815 is at index 13
+var DATA = [
+  1002, 2847, 3391, 5621, 6034,
+  7198, 8447, 9012, 1234, 2156,
+  4100, 5503, 6677, 4815, 7821,
+  8034, 9456, 1678, 2933, 3789
+];
+var MATCH = 4815;
+var seqBusy = false;
+var idxBusy = false;
+
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+function initSeq() {
+  var list = document.getElementById('seq-list');
+  list.innerHTML = '';
+  DATA.forEach(function(id, i) {
+    var d = document.createElement('div');
+    d.className = 'rc';
+    d.id = 'sr' + i;
+    d.innerHTML = '<div class="dot"></div><span>customer_id = ' + id + '</span>';
+    list.appendChild(d);
+  });
+  resetStat('s-ex'); resetStat('s-rm'); resetStat('s-t');
+}
+
+function initIdx() {
+  document.getElementById('idx-list').innerHTML = '';
+  document.getElementById('btree').classList.remove('show');
+  ['bn0','bn1','bn2','bn3'].forEach(function(id) {
+    var el = document.getElementById(id);
+    el.classList.remove('lit','done');
+  });
+  ['ba0','ba1','ba2'].forEach(function(id) {
+    document.getElementById(id).classList.remove('lit');
+  });
+  resetStat('i-ex'); resetStat('i-rm'); resetStat('i-t');
+}
+
+function resetStat(id) {
+  var el = document.getElementById(id);
+  el.textContent = '—';
+  el.className = 'sv';
+}
+
+function setStat(id, value, cls) {
+  var el = document.getElementById(id);
+  el.textContent = value;
+  el.className = 'sv' + (cls ? ' ' + cls : '');
+}
+
+async function runSeq() {
+  if (seqBusy) return;
+  seqBusy = true;
+  initSeq();
+  var btn = document.getElementById('seq-btn');
+  btn.disabled = true;
+  btn.textContent = 'Scanning…';
+
+  await sleep(200);
+
+  var list = document.getElementById('seq-list');
+
+  for (var i = 0; i < DATA.length; i++) {
+    var chip = document.getElementById('sr' + i);
+    chip.classList.add('scanning');
+
+    // Auto-scroll: keep scanning row centered in the container
+    var chipCenter = chip.offsetTop + chip.clientHeight / 2;
+    list.scrollTop = chipCenter - list.clientHeight / 2;
+
+    // Live counter (extrapolated to 1,000,000)
+    var pct = (i + 1) / DATA.length;
+    setStat('s-ex', Math.round(pct * 1000000).toLocaleString());
+
+    await sleep(95);
+
+    chip.classList.remove('scanning');
+    if (DATA[i] === MATCH) {
+      chip.classList.add('match');
+    } else {
+      chip.classList.add('skipped');
+    }
+  }
+
+  await sleep(180);
+  setStat('s-ex', '1,000,000', 'bad');
+  setStat('s-rm', '999,988',   'bad');
+  setStat('s-t',  '86.3 ms',   'bad');
+
+  btn.textContent = 'Run again →';
+  btn.disabled = false;
+  seqBusy = false;
+}
+
+async function runIdx() {
+  if (idxBusy) return;
+  idxBusy = true;
+  initIdx();
+  var btn = document.getElementById('idx-btn');
+  btn.disabled = true;
+  btn.textContent = 'Navigating B-tree…';
+
+  await sleep(200);
+
+  // Reveal B-tree
+  document.getElementById('btree').classList.add('show');
+  await sleep(280);
+
+  // Animate traversal node by node
+  document.getElementById('bn0').classList.add('lit');
+  await sleep(380);
+  document.getElementById('ba0').classList.add('lit');
+  await sleep(180);
+  document.getElementById('bn1').classList.add('lit');
+  await sleep(380);
+  document.getElementById('ba1').classList.add('lit');
+  await sleep(180);
+  document.getElementById('bn2').classList.add('lit');
+  await sleep(380);
+  document.getElementById('ba2').classList.add('lit');
+  await sleep(180);
+  document.getElementById('bn3').classList.add('done');
+  await sleep(360);
+
+  // Show matching rows
+  var list = document.getElementById('idx-list');
+  var orders = [90000, 90137, 90274, 90411, 90548];
+  for (var j = 0; j < orders.length; j++) {
+    var d = document.createElement('div');
+    d.className = 'rc match';
+    d.innerHTML = '<div class="dot"></div><span>customer_id = 4815 · order #' + orders[j] + '</span>';
+    list.appendChild(d);
+    await sleep(72);
+  }
+  var note = document.createElement('div');
+  note.className = 'idxnote';
+  note.textContent = '+ 7 more matching rows';
+  list.appendChild(note);
+
+  await sleep(200);
+  setStat('i-ex', '12',      'good');
+  setStat('i-rm', '0',       'good');
+  setStat('i-t',  '0.8 ms',  'good');
+
+  btn.textContent = 'Run again →';
+  btn.disabled = false;
+  idxBusy = false;
+}
+
+// Initialise on load
+initSeq();
+initIdx();
+</script>
+</body>
+</html>

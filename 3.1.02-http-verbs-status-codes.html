@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HTTP Verbs and Status Codes</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ─────────────────────────────────────────────── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%,100% { transform: rotate(0deg); }
+      14%      { transform: rotate(-10deg); }
+      28%      { transform: rotate(10deg); }
+      42%      { transform: rotate(-8deg); }
+      56%      { transform: rotate(6deg); }
+      70%      { transform: rotate(-3deg); }
+      84%      { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+
+    /* ── Tabs ────────────────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+      padding: 0 16px;
+    }
+
+    .tab-btn {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -1px;
+      line-height: 1;
+    }
+
+    .tab-btn:hover { color: #1A1A1A; }
+
+    .tab-btn.active {
+      color: #1A1A1A;
+      border-bottom-color: #1878DC;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared chip styles ───────────────────────────────────────── */
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 20px 16px 0;
+    }
+
+    .chip {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      cursor: pointer;
+      color: #1A1A1A;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
+      line-height: 1.4;
+    }
+
+    .chip:hover {
+      background: #F2F1EE;
+      border-color: rgba(0,0,0,0.28);
+    }
+
+    /* ── Verb tab ─────────────────────────────────────────────────── */
+    .chip.verb-active {
+      background: #1878DC;
+      border-color: #1878DC;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(24,120,220,0.40), 0 2px 6px 0 rgba(24,120,220,0.25);
+    }
+
+    .verb-detail {
+      margin: 16px 16px 20px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      animation: fadeSlideIn 0.18s ease;
+    }
+
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .verb-detail-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-family: 'Suisse Intl Mono', monospace;
+    }
+
+    .verb-detail-desc {
+      font-size: 16px;
+      color: rgba(0,0,0,0.68);
+      line-height: 1.55;
+      margin-bottom: 16px;
+    }
+
+    .prop-row {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .prop-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .prop-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+    }
+
+    .badge {
+      font-size: 13px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+
+    .badge-yes     { background: rgba(50,143,81,0.12);  color: #328F51; }
+    .badge-no      { background: rgba(222,76,69,0.12);  color: #DE4C45; }
+    .badge-partial { background: rgba(244,142,0,0.12);  color: #F48E00; }
+
+    /* ── Status codes tab ─────────────────────────────────────────── */
+    .family-block {
+      padding: 20px 16px 0;
+    }
+
+    .family-block + .family-block { padding-top: 16px; }
+
+    .family-heading {
+      font-size: 13px;
+      color: rgba(0,0,0,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 8px;
+    }
+
+    .family-heading span {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px;
+      vertical-align: middle;
+      position: relative;
+      top: -1px;
+    }
+
+    .dot-2xx { background: #328F51; }
+    .dot-4xx { background: #D35722; }
+    .dot-5xx { background: #DE4C45; }
+
+    .chip.active-2xx {
+      background: #328F51;
+      border-color: #328F51;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(50,143,81,0.40), 0 2px 6px 0 rgba(50,143,81,0.25);
+    }
+
+    .chip.active-4xx {
+      background: #D35722;
+      border-color: #D35722;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(211,87,34,0.40), 0 2px 6px 0 rgba(211,87,34,0.25);
+    }
+
+    .chip.active-5xx {
+      background: #DE4C45;
+      border-color: #DE4C45;
+      color: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(222,76,69,0.40), 0 2px 6px 0 rgba(222,76,69,0.25);
+    }
+
+    /* ── Status detail card ───────────────────────────────────────── */
+    .status-detail {
+      margin: 16px 16px 20px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      animation: fadeSlideIn 0.18s ease;
+    }
+
+    .status-detail-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sd-code {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .sd-name {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .family-pill {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-left: auto;
+    }
+
+    .pill-2xx { background: rgba(50,143,81,0.12);  color: #328F51; }
+    .pill-4xx { background: rgba(211,87,34,0.12);  color: #D35722; }
+    .pill-5xx { background: rgba(222,76,69,0.12);  color: #DE4C45; }
+
+    .sd-meaning {
+      font-size: 16px;
+      color: rgba(0,0,0,0.68);
+      line-height: 1.55;
+      margin-bottom: 12px;
+    }
+
+    .action-box {
+      background: #FFFFFF;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+      border-left: 3px solid #1878DC;
+    }
+
+    .action-box-label {
+      font-size: 12px;
+      color: rgba(0,0,0,0.45);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 4px;
+    }
+
+    .action-box-text {
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.5;
+    }
+
+    .confuse-box {
+      background: rgba(244,142,0,0.07);
+      border-radius: 8px;
+      padding: 12px 16px;
+      border-left: 3px solid #F48E00;
+    }
+
+    .confuse-box-label {
+      font-size: 12px;
+      color: #F48E00;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 4px;
+    }
+
+    .confuse-box-text {
+      font-size: 14px;
+      color: rgba(0,0,0,0.68);
+      line-height: 1.55;
+    }
+
+    /* ── Placeholder ─────────────────────────────────────────────── */
+    .placeholder {
+      text-align: center;
+      color: rgba(0,0,0,0.30);
+      font-size: 16px;
+      padding: 28px 20px 28px;
+      line-height: 1.5;
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .hint-text { font-size: 16px; }
+      .tab-btn   { padding: 10px 12px; font-size: 15px; }
+      .sd-code   { font-size: 22px; }
+      .sd-name   { font-size: 16px; }
+    }
+
+    @media (max-width: 360px) {
+      .chips-row, .family-block .chips-row-inner { gap: 6px; }
+      .chip { font-size: 13px; padding: 5px 10px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click any chip to explore its meaning and the client action it triggers.</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-verbs" onclick="switchTab('verbs')">HTTP Verbs</button>
+    <button class="tab-btn" id="tab-btn-codes" onclick="switchTab('codes')">Status Codes</button>
+  </div>
+
+  <!-- ── Verbs panel ─────────────────────────────────────────────── -->
+  <div class="tab-panel active" id="panel-verbs">
+    <div class="chips-row">
+      <button class="chip" id="vchip-GET"    onclick="selectVerb(this,'GET')">GET</button>
+      <button class="chip" id="vchip-POST"   onclick="selectVerb(this,'POST')">POST</button>
+      <button class="chip" id="vchip-PUT"    onclick="selectVerb(this,'PUT')">PUT</button>
+      <button class="chip" id="vchip-PATCH"  onclick="selectVerb(this,'PATCH')">PATCH</button>
+      <button class="chip" id="vchip-DELETE" onclick="selectVerb(this,'DELETE')">DELETE</button>
+    </div>
+
+    <div class="verb-detail" id="verb-detail" style="display:none">
+      <div class="verb-detail-title" id="vd-title"></div>
+      <div class="verb-detail-desc"  id="vd-desc"></div>
+      <div class="prop-row">
+        <div class="prop-item">
+          <span class="prop-label">Safe</span>
+          <span class="badge" id="vd-safe"></span>
+        </div>
+        <div class="prop-item">
+          <span class="prop-label">Idempotent</span>
+          <span class="badge" id="vd-idempotent"></span>
+        </div>
+      </div>
+    </div>
+    <div class="placeholder" id="verb-placeholder">Select a verb above to see what it promises.</div>
+  </div>
+
+  <!-- ── Status Codes panel ─────────────────────────────────────── -->
+  <div class="tab-panel" id="panel-codes">
+
+    <div class="family-block">
+      <div class="family-heading">
+        <span class="dot-2xx"></span>2xx &nbsp;·&nbsp; Success
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="chip" data-fam="2xx" onclick="selectCode(this,200)">200</button>
+        <button class="chip" data-fam="2xx" onclick="selectCode(this,201)">201</button>
+        <button class="chip" data-fam="2xx" onclick="selectCode(this,204)">204</button>
+      </div>
+    </div>
+
+    <div class="family-block">
+      <div class="family-heading">
+        <span class="dot-4xx"></span>4xx &nbsp;·&nbsp; Client Error
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,400)">400</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,401)">401</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,403)">403</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,404)">404</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,409)">409</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,422)">422</button>
+        <button class="chip" data-fam="4xx" onclick="selectCode(this,429)">429</button>
+      </div>
+    </div>
+
+    <div class="family-block">
+      <div class="family-heading">
+        <span class="dot-5xx"></span>5xx &nbsp;·&nbsp; Server Error
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        <button class="chip" data-fam="5xx" onclick="selectCode(this,500)">500</button>
+        <button class="chip" data-fam="5xx" onclick="selectCode(this,503)">503</button>
+      </div>
+    </div>
+
+    <div class="status-detail" id="status-detail" style="display:none">
+      <div class="status-detail-header">
+        <span class="sd-code" id="sd-code"></span>
+        <span class="sd-name" id="sd-name"></span>
+        <span class="family-pill" id="sd-pill"></span>
+      </div>
+      <div class="sd-meaning" id="sd-meaning"></div>
+      <div class="action-box">
+        <div class="action-box-label">Client should</div>
+        <div class="action-box-text" id="sd-action"></div>
+      </div>
+      <div class="confuse-box" id="sd-confuse" style="display:none">
+        <div class="confuse-box-label">Don't confuse with</div>
+        <div class="confuse-box-text" id="sd-confuse-text"></div>
+      </div>
+    </div>
+    <div class="placeholder" id="code-placeholder">Select a status code above to see what it signals to the client.</div>
+
+  </div><!-- /panel-codes -->
+
+</div><!-- /container -->
+
+<script>
+// ── Data ──────────────────────────────────────────────────────────
+
+const VERBS = {
+  GET: {
+    title: 'GET',
+    headline: 'Read a resource',
+    desc: 'Fetches a resource from the server. GET must never change server state — it only reads. Because it is safe, browsers, proxies, and caches can call it freely. Because it is idempotent, calling it many times always returns the same data.',
+    safe: 'Yes',
+    idempotent: 'Yes',
+  },
+  POST: {
+    title: 'POST',
+    headline: 'Create or trigger',
+    desc: 'Creates a new resource or triggers an action that produces a new effect on each call. POST is neither safe nor idempotent — calling it twice is expected to create two records, or charge a card twice.',
+    safe: 'No',
+    idempotent: 'No',
+  },
+  PUT: {
+    title: 'PUT',
+    headline: 'Replace entirely',
+    desc: 'Replaces a resource in full with the version you send. Any field you leave out may be cleared. PUT is idempotent: sending the same request ten times leaves the resource in the same final state as sending it once.',
+    safe: 'No',
+    idempotent: 'Yes',
+  },
+  PATCH: {
+    title: 'PATCH',
+    headline: 'Update partially',
+    desc: 'Updates only the fields you include, leaving everything else untouched. This makes it convenient for partial edits. Whether it is idempotent depends on how you design it — a "set name to Alice" patch is idempotent, but an "increment counter by 1" patch is not.',
+    safe: 'No',
+    idempotent: 'Not guaranteed',
+  },
+  DELETE: {
+    title: 'DELETE',
+    headline: 'Remove a resource',
+    desc: 'Removes a resource from the server. DELETE is idempotent: if the resource is already gone, a second DELETE has no further effect. This makes retries safe on unreliable networks — you can resend without worrying about double-deletions.',
+    safe: 'No',
+    idempotent: 'Yes',
+  },
+};
+
+const CODES = {
+  200: {
+    name: 'OK',
+    family: '2xx',
+    meaning: 'The request succeeded and the response body contains the result.',
+    action: 'Read the body and continue processing.',
+    confuse: null,
+  },
+  201: {
+    name: 'Created',
+    family: '2xx',
+    meaning: 'The request succeeded and a new resource was created. The Location header usually points to the new resource.',
+    action: 'Read the Location header to find the created resource, then continue.',
+    confuse: null,
+  },
+  204: {
+    name: 'No Content',
+    family: '2xx',
+    meaning: 'The request succeeded but there is nothing to return in the body. Common after a successful DELETE or an update that needs no acknowledgment.',
+    action: 'Continue without expecting a body — there is none to read.',
+    confuse: null,
+  },
+  400: {
+    name: 'Bad Request',
+    family: '4xx',
+    meaning: 'The server could not read or parse the request at all. The JSON may be broken, a required header may be missing, or the format is completely wrong.',
+    action: 'Fix the shape of the request before retrying. Do not retry unchanged.',
+    confuse: '422 Unprocessable Entity. A 400 means the request was unreadable. A 422 means the server read it fine but the values failed a business rule. If the JSON is valid and all required fields are present, you likely want 422, not 400 — otherwise you send the developer hunting for a formatting bug that does not exist.',
+  },
+  401: {
+    name: 'Unauthorized',
+    family: '4xx',
+    meaning: 'The server does not know who is making the request. No credentials were sent, or the credentials that were sent are invalid.',
+    action: 'Prompt the user to log in or provide valid credentials, then retry the request.',
+    confuse: '403 Forbidden. A 401 means "I don\'t know who you are." A 403 means "I know exactly who you are, and you\'re not allowed." Returning 401 for a permissions problem sends the client into a pointless login loop that will never resolve the issue.',
+  },
+  403: {
+    name: 'Forbidden',
+    family: '4xx',
+    meaning: 'The server knows exactly who the caller is and has decided they are not permitted to perform this action.',
+    action: 'Show a permission-denied message. Do not prompt to log in — the user is already identified and logging in again will not change their permissions.',
+    confuse: '401 Unauthorized. A 403 means the user is authenticated but not authorised. Returning 403 when credentials are simply missing would confuse clients that look for 401 to trigger a login flow.',
+  },
+  404: {
+    name: 'Not Found',
+    family: '4xx',
+    meaning: 'The resource at this URL does not exist. The path may be wrong, the ID may be stale, or the resource may have been deleted.',
+    action: 'Inform the user that the resource does not exist. Do not retry unchanged — the result will be the same.',
+    confuse: null,
+  },
+  409: {
+    name: 'Conflict',
+    family: '4xx',
+    meaning: 'The request conflicts with the current state of the resource — a duplicate value was submitted, or a version number does not match.',
+    action: 'Resolve the conflict (fetch the latest version, pick a unique value) and then retry.',
+    confuse: null,
+  },
+  422: {
+    name: 'Unprocessable Entity',
+    family: '4xx',
+    meaning: 'The request was well formed and fully understood, but the values it contained failed a business rule — an email is already taken, an order total exceeds a credit limit.',
+    action: 'Surface validation errors to the user so they can correct the specific fields that failed.',
+    confuse: '400 Bad Request. A 422 means the request was readable but failed validation. A 400 means the server could not even parse the request. Using 400 for a validation failure points the developer at a formatting bug that does not exist.',
+  },
+  429: {
+    name: 'Too Many Requests',
+    family: '4xx',
+    meaning: 'The client is sending requests faster than the server allows. A Retry-After header often specifies how long to wait.',
+    action: 'Back off and retry after a delay. Check the Retry-After header if present.',
+    confuse: null,
+  },
+  500: {
+    name: 'Internal Server Error',
+    family: '5xx',
+    meaning: 'The server hit an unexpected error while handling a request that may have been perfectly valid. This is a server-side bug, not a client mistake.',
+    action: 'Retry with exponential backoff. If the problem persists, surface a generic error to the user and alert on-call.',
+    confuse: null,
+  },
+  503: {
+    name: 'Service Unavailable',
+    family: '5xx',
+    meaning: 'The server is temporarily unable to handle requests — it may be overloaded, restarting, or waiting for a dependency to recover.',
+    action: 'Retry with backoff after a short wait. This is usually temporary, unlike 500 which may indicate a persistent bug.',
+    confuse: null,
+  },
+};
+
+// ── State ─────────────────────────────────────────────────────────
+
+let activeVerbChip = null;
+let activeCodeChip = null;
+
+// ── Tab switching ─────────────────────────────────────────────────
+
+function switchTab(tab) {
+  document.getElementById('tab-btn-verbs').classList.toggle('active', tab === 'verbs');
+  document.getElementById('tab-btn-codes').classList.toggle('active', tab === 'codes');
+  document.getElementById('panel-verbs').classList.toggle('active', tab === 'verbs');
+  document.getElementById('panel-codes').classList.toggle('active', tab === 'codes');
+}
+
+// ── Verb selection ────────────────────────────────────────────────
+
+function selectVerb(el, verb) {
+  if (activeVerbChip) activeVerbChip.classList.remove('verb-active');
+  el.classList.add('verb-active');
+  activeVerbChip = el;
+
+  const d = VERBS[verb];
+
+  document.getElementById('vd-title').textContent = d.title + ' — ' + d.headline;
+  document.getElementById('vd-desc').textContent  = d.desc;
+
+  const safeBadge = document.getElementById('vd-safe');
+  safeBadge.textContent  = d.safe;
+  safeBadge.className    = 'badge ' + (d.safe === 'Yes' ? 'badge-yes' : 'badge-no');
+
+  const idemBadge = document.getElementById('vd-idempotent');
+  idemBadge.textContent = d.idempotent;
+  idemBadge.className   = 'badge ' + (
+    d.idempotent === 'Yes'           ? 'badge-yes'     :
+    d.idempotent === 'No'            ? 'badge-no'      :
+                                       'badge-partial'
+  );
+
+  const detail      = document.getElementById('verb-detail');
+  const placeholder = document.getElementById('verb-placeholder');
+
+  // Re-trigger animation
+  detail.style.display = 'none';
+  // Force reflow
+  void detail.offsetWidth;
+  detail.style.display = 'block';
+  placeholder.style.display = 'none';
+}
+
+// ── Code selection ────────────────────────────────────────────────
+
+function selectCode(el, code) {
+  if (activeCodeChip) {
+    activeCodeChip.classList.remove('active-2xx', 'active-4xx', 'active-5xx');
+  }
+  const fam = el.dataset.fam;
+  el.classList.add('active-' + fam);
+  activeCodeChip = el;
+
+  const d = CODES[code];
+
+  document.getElementById('sd-code').textContent = code;
+  document.getElementById('sd-name').textContent = d.name;
+
+  const pill = document.getElementById('sd-pill');
+  pill.textContent = d.family;
+  pill.className   = 'family-pill ' + (
+    fam === '2xx' ? 'pill-2xx' :
+    fam === '4xx' ? 'pill-4xx' :
+                    'pill-5xx'
+  );
+
+  document.getElementById('sd-meaning').textContent = d.meaning;
+  document.getElementById('sd-action').textContent  = d.action;
+
+  const confuseBox  = document.getElementById('sd-confuse');
+  if (d.confuse) {
+    document.getElementById('sd-confuse-text').textContent = d.confuse;
+    confuseBox.style.display = 'block';
+  } else {
+    confuseBox.style.display = 'none';
+  }
+
+  const detail      = document.getElementById('status-detail');
+  const placeholder = document.getElementById('code-placeholder');
+
+  // Re-trigger animation
+  detail.style.display = 'none';
+  void detail.offsetWidth;
+  detail.style.display = 'block';
+  placeholder.style.display = 'none';
+}
+</script>
+</body>
+</html>

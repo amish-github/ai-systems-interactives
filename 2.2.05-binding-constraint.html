@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finding the Binding Constraint</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-size: 18px;
+      line-height: 1.5;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    /* ── Hint header ─────────────────────────────────────── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    @keyframes cursor-wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      15%       { transform: rotate(-10deg); }
+      30%       { transform: rotate(10deg); }
+      45%       { transform: rotate(-8deg); }
+      60%       { transform: rotate(6deg); }
+      75%       { transform: rotate(-3deg); }
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      animation: cursor-wiggle 4s ease-in-out infinite;
+    }
+
+    .hint-text { font-size: 18px; }
+
+    /* ── Main content area ───────────────────────────────── */
+    .main { padding: 24px 24px 32px; }
+
+    .intro-label {
+      font-size: 16px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 20px;
+    }
+
+    .intro-label strong {
+      font-family: 'Suisse Intl Mono', monospace;
+      color: #1A1A1A;
+      font-weight: 400;
+    }
+
+    /* ── Component cards ─────────────────────────────────── */
+    .comp-card {
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 12px;
+      padding: 16px;
+      background: #FFFFFF;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .comp-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .comp-card.is-constraint {
+      border-color: rgba(222, 76, 69, 0.45);
+      background: #FFF8F8;
+    }
+
+    .comp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .comp-name {
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      line-height: 1.3;
+    }
+
+    .comp-name.red { color: #DE4C45; }
+
+    .badge {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #F2F1EE;
+      white-space: nowrap;
+      flex-shrink: 0;
+      line-height: 1.6;
+    }
+
+    .badge.over {
+      background: #DE4C45;
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+
+    .tag {
+      font-size: 11px;
+      font-family: 'Suisse Intl Mono', monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(135, 84, 253, 0.12);
+      color: #8754FD;
+    }
+
+    .comp-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+    }
+
+    .util-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .util-label { color: rgba(0,0,0,0.50); }
+
+    .util-pct {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-weight: 600;
+    }
+
+    .util-pct.green  { color: #328F51; }
+    .util-pct.yellow { color: #F48E00; }
+    .util-pct.red    { color: #DE4C45; }
+
+    .bar-track {
+      height: 8px;
+      background: rgba(0,0,0,0.08);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      width: 0%;
+      transition: width 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .bar-fill.green  { background: #328F51; }
+    .bar-fill.yellow { background: #F48E00; }
+    .bar-fill.red    { background: #DE4C45; }
+
+    .comp-note {
+      margin-top: 10px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.50);
+      line-height: 1.45;
+    }
+
+    /* ── Connector arrows ────────────────────────────────── */
+    .connector {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2px 0;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .connector.visible { opacity: 1; }
+
+    .connector-label {
+      font-size: 12px;
+      font-family: 'Suisse Intl Mono', monospace;
+      color: rgba(0,0,0,0.35);
+      margin-bottom: 2px;
+      text-align: center;
+    }
+
+    .conn-line {
+      width: 1px;
+      height: 14px;
+      background: rgba(0,0,0,0.20);
+    }
+
+    .conn-line.dashed {
+      background: none;
+      border-left: 2px dashed rgba(0,0,0,0.20);
+      width: 0;
+    }
+
+    .conn-arrow {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid rgba(0,0,0,0.20);
+    }
+
+    /* ── Constraint callout ──────────────────────────────── */
+    .callout {
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 16px;
+      margin-bottom: 24px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.35s ease 0.2s, transform 0.35s ease 0.2s;
+      border: 1px solid rgba(222, 76, 69, 0.20);
+      border-left: 4px solid #DE4C45;
+      background: #FFF8F8;
+      line-height: 1.6;
+    }
+
+    .callout.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .callout strong { color: #DE4C45; }
+
+    /* ── Controls ────────────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: #333333; }
+    .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+
+    .btn-primary:disabled {
+      background: rgba(0, 0, 0, 0.10);
+      color: rgba(0, 0, 0, 0.30);
+      cursor: default;
+    }
+
+    .btn-secondary {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      background: transparent;
+      color: rgba(0,0,0,0.50);
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 8px;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-secondary:hover {
+      background: #F2F1EE;
+      color: #1A1A1A;
+    }
+
+    .step-indicator {
+      margin-left: auto;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.40);
+    }
+
+    /* ── Responsive ──────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .main { padding: 16px 16px 24px; }
+      .hint-header { padding: 12px 16px; }
+      .hint-text { font-size: 16px; }
+      .comp-stats { grid-template-columns: 1fr; gap: 6px; }
+      .badge.over { font-size: 11px; }
+    }
+
+    @media (max-width: 325px) {
+      .main { padding: 12px 12px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <div class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="hint-text">Step through the request path to find where the system runs out of room.</span>
+  </div>
+
+  <div class="main">
+
+    <p class="intro-label">
+      Peak load: <strong>2,000 req/s</strong> &nbsp;·&nbsp; 1,800 reads + 200 writes &nbsp;·&nbsp; cache hit rate 70%
+    </p>
+
+    <!-- Flow of components (all hidden until stepped through) -->
+    <div id="flow" style="margin-bottom: 20px;">
+
+      <!-- Card 0: Web Tier -->
+      <div class="comp-card" id="card-0">
+        <div class="comp-header">
+          <div class="comp-name">Web Tier</div>
+          <div class="badge">~20%</div>
+        </div>
+        <div class="comp-stats">
+          <div>
+            <div class="stat-label">Load arriving</div>
+            <div class="stat-value">2,000 req/s</div>
+          </div>
+          <div>
+            <div class="stat-label">Capacity</div>
+            <div class="stat-value">~10,000 req/s</div>
+          </div>
+        </div>
+        <div class="util-row">
+          <span class="util-label">Utilization</span>
+          <span class="util-pct green">20%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill green" data-target="20"></div>
+        </div>
+        <div class="comp-note">Every request enters here. Plenty of headroom.</div>
+      </div>
+
+      <!-- Connector 0 → 1 -->
+      <div class="connector" id="conn-0">
+        <div class="conn-line"></div>
+        <div class="conn-arrow"></div>
+      </div>
+
+      <!-- Card 1: Application Service Tier -->
+      <div class="comp-card" id="card-1">
+        <div class="comp-header">
+          <div class="comp-name">Application Service Tier</div>
+          <div class="badge">~67%</div>
+        </div>
+        <div class="comp-stats">
+          <div>
+            <div class="stat-label">Load arriving</div>
+            <div class="stat-value">2,000 req/s</div>
+          </div>
+          <div>
+            <div class="stat-label">Capacity</div>
+            <div class="stat-value">~3,000 req/s (6 servers)</div>
+          </div>
+        </div>
+        <div class="util-row">
+          <span class="util-label">Utilization</span>
+          <span class="util-pct yellow">67%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill yellow" data-target="67"></div>
+        </div>
+        <div class="comp-note">Busy but not saturated. Stateless — adding copies is easy.</div>
+      </div>
+
+      <!-- Connector 1 → 2 -->
+      <div class="connector" id="conn-1">
+        <div class="conn-line"></div>
+        <div class="conn-arrow"></div>
+      </div>
+
+      <!-- Card 2: Shared Cache -->
+      <div class="comp-card" id="card-2">
+        <div class="comp-header">
+          <div class="comp-name">
+            Shared Cache
+            <span class="tag">SPOF</span>
+          </div>
+          <div class="badge">&lt;5%</div>
+        </div>
+        <div class="comp-stats">
+          <div>
+            <div class="stat-label">Load arriving</div>
+            <div class="stat-value">~1,800 lookups/s</div>
+          </div>
+          <div>
+            <div class="stat-label">Capacity</div>
+            <div class="stat-value">tens of thousands/s</div>
+          </div>
+        </div>
+        <div class="util-row">
+          <span class="util-label">Utilization</span>
+          <span class="util-pct green">&lt;5%</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill green" data-target="4"></div>
+        </div>
+        <div class="comp-note">Serves 70% of reads (1,260/s). The remaining 30% miss and fall through to the database.</div>
+      </div>
+
+      <!-- Connector 2 → 3 (cache-miss path, dashed) -->
+      <div class="connector" id="conn-2">
+        <div class="connector-label">cache misses only (30% of reads)</div>
+        <div class="conn-line dashed"></div>
+        <div class="conn-arrow"></div>
+      </div>
+
+      <!-- Card 3: Single Primary Database -->
+      <div class="comp-card is-constraint" id="card-3">
+        <div class="comp-header">
+          <div class="comp-name red">
+            Single Primary Database
+            <span class="tag">SPOF</span>
+          </div>
+          <div class="badge over">BINDING CONSTRAINT</div>
+        </div>
+        <div class="comp-stats">
+          <div>
+            <div class="stat-label">Load arriving</div>
+            <div class="stat-value">~740 queries/s</div>
+          </div>
+          <div>
+            <div class="stat-label">Capacity</div>
+            <div class="stat-value">~700 queries/s</div>
+          </div>
+        </div>
+        <div class="util-row">
+          <span class="util-label">Utilization</span>
+          <span class="util-pct red">~106% &#x26A0;</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill red" data-target="100"></div>
+        </div>
+        <div class="comp-note">540 read misses/s + 200 writes/s = ~740 q/s against ~700 q/s capacity. Over its limit — latency climbs sharply here.</div>
+      </div>
+
+    </div><!-- /#flow -->
+
+    <!-- Callout: binding constraint found -->
+    <div class="callout" id="callout">
+      <strong>Binding constraint found: the database.</strong> It is the first — and only — component to exceed capacity. Every other tier has room to spare. Adding application servers only sends more queries to an already overloaded database; the ceiling does not move. The fix must target the database: add a read replica, raise the cache hit rate, or both.
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn-primary" id="btn-next">
+        <span id="btn-label">Trace: Web Tier</span>
+        <span aria-hidden="true">&#x2192;</span>
+      </button>
+      <button class="btn-secondary" id="btn-reset">Reset</button>
+      <span class="step-indicator" id="step-ind">0 / 4</span>
+    </div>
+
+  </div><!-- /.main -->
+</div><!-- /.container -->
+
+<script>
+  (function () {
+    // Each entry: the card id, the connector id that precedes it (null for first), bar color class
+    var STEPS = [
+      { cardId: 'card-0', connId: null,   barClass: 'green',  target: 20  },
+      { cardId: 'card-1', connId: 'conn-0', barClass: 'yellow', target: 67 },
+      { cardId: 'card-2', connId: 'conn-1', barClass: 'green',  target: 4  },
+      { cardId: 'card-3', connId: 'conn-2', barClass: 'red',    target: 100 },
+    ];
+
+    var NAMES = ['Web Tier', 'Application Tier', 'Shared Cache', 'Database'];
+    var currentStep = 0;
+
+    function getEl(id) { return document.getElementById(id); }
+
+    function hideAll() {
+      STEPS.forEach(function (s) {
+        var card = getEl(s.cardId);
+        card.style.display = 'none';
+        card.classList.remove('visible');
+        var bar = card.querySelector('.bar-fill');
+        if (bar) bar.style.width = '0%';
+
+        if (s.connId) {
+          var conn = getEl(s.connId);
+          conn.style.display = 'none';
+          conn.classList.remove('visible');
+        }
+      });
+
+      var callout = getEl('callout');
+      callout.style.display = 'none';
+      callout.classList.remove('visible');
+    }
+
+    function show(el, displayValue) {
+      el.style.display = displayValue || 'block';
+      // Force reflow so the CSS transition fires from the initial state
+      el.getBoundingClientRect();
+      el.classList.add('visible');
+    }
+
+    function revealStep(i) {
+      var s = STEPS[i];
+
+      // Show connector first (if any)
+      if (s.connId) {
+        show(getEl(s.connId), 'flex');
+      }
+
+      // Show card
+      var card = getEl(s.cardId);
+      show(card, 'block');
+
+      // Animate bar after a short delay
+      setTimeout(function () {
+        var bar = card.querySelector('.bar-fill');
+        if (bar) {
+          bar.style.width = Math.min(s.target, 100) + '%';
+        }
+      }, 180);
+
+      // Show callout after the last step
+      if (i === STEPS.length - 1) {
+        setTimeout(function () {
+          var callout = getEl('callout');
+          callout.style.display = 'block';
+          callout.getBoundingClientRect();
+          callout.classList.add('visible');
+        }, 550);
+      }
+    }
+
+    function updateUI() {
+      var btn   = getEl('btn-next');
+      var label = getEl('btn-label');
+      var ind   = getEl('step-ind');
+
+      ind.textContent = currentStep + ' / ' + STEPS.length;
+
+      if (currentStep >= STEPS.length) {
+        btn.disabled = true;
+        label.textContent = 'All components traced';
+      } else {
+        btn.disabled = false;
+        label.textContent = 'Trace: ' + NAMES[currentStep];
+      }
+    }
+
+    function init() {
+      hideAll();
+      currentStep = 0;
+      updateUI();
+    }
+
+    getEl('btn-next').addEventListener('click', function () {
+      if (currentStep < STEPS.length) {
+        revealStep(currentStep);
+        currentStep++;
+        updateUI();
+      }
+    });
+
+    getEl('btn-reset').addEventListener('click', init);
+
+    // Start hidden
+    init();
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Latency Numbers Worth Knowing</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 0;
+    }
+
+    /* ── Cursor wiggle ── */
+    @keyframes cursor-wiggle {
+      0%, 55%, 100% { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+    .hint-cursor {
+      animation: cursor-wiggle 4s infinite;
+      flex-shrink: 0;
+    }
+    .hint-text { font-size: 18px; }
+
+    /* ── Main content ── */
+    .content { padding: 24px 20px; }
+
+    .section-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(0,0,0,0.38);
+      margin-bottom: 12px;
+    }
+
+    /* ── Latency Ladder ── */
+    .ladder { display: flex; flex-direction: column; gap: 0; }
+
+    .ladder-item { /* wrapper */ }
+
+    .ladder-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .ladder-row:hover { background: #F2F1EE; }
+    .ladder-item.open .ladder-row {
+      background: #F2F1EE;
+      border-color: rgba(0,0,0,0.14);
+      border-radius: 10px 10px 0 0;
+    }
+
+    .ladder-label {
+      flex: 0 0 168px;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+
+    .bar-track {
+      flex: 1;
+      height: 24px;
+      background: rgba(0,0,0,0.07);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .ladder-range {
+      flex: 0 0 136px;
+      text-align: right;
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.48);
+    }
+
+    .ladder-detail {
+      display: none;
+      padding: 8px 12px 12px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: rgba(0,0,0,0.62);
+      background: #F2F1EE;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      margin-bottom: 4px;
+    }
+    .ladder-item.open .ladder-detail { display: block; }
+
+    .scale-note {
+      margin-top: 8px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.38);
+      text-align: center;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      height: 1px;
+      background: rgba(0,0,0,0.10);
+      margin: 24px 0;
+    }
+
+    /* ── Bottleneck Finder ── */
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 14px;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .tab-btn:hover:not(.active):not(:disabled) { background: #F2F1EE; }
+    .tab-btn.active {
+      background: #1A1A1A;
+      color: #FFFFFF;
+      border-color: #1A1A1A;
+    }
+    .tab-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .scenario-desc {
+      font-size: 16px;
+      color: rgba(0,0,0,0.68);
+      line-height: 1.55;
+      padding: 12px 16px;
+      background: #F2F1EE;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    /* ── Path steps ── */
+    .path-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 16px;
+    }
+
+    .path-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #FFFFFF;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      border-radius: 10px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.20), 0 1px 2px 0 rgba(0,0,0,0.08);
+      transition: border-color 0.35s, background 0.35s, box-shadow 0.35s;
+    }
+    .path-step.tier-fast {
+      border-color: rgba(50,143,81,0.45);
+      background: #F4FBF6;
+    }
+    .path-step.tier-mid {
+      border-color: rgba(244,142,0,0.40);
+      background: #FFFBF2;
+    }
+    .path-step.tier-bottleneck {
+      border-color: #DE4C45;
+      background: #FEF1F0;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 2px 8px 0 rgba(222,76,69,0.20);
+    }
+
+    .step-icon {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .step-name {
+      flex: 1;
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .step-badge {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(0,0,0,0.07);
+      color: rgba(0,0,0,0.50);
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+    .path-step.tier-fast .step-badge,
+    .path-step.tier-mid .step-badge {
+      opacity: 1;
+    }
+    .path-step.tier-bottleneck .step-badge {
+      opacity: 1;
+      background: rgba(222,76,69,0.12);
+      color: #DE4C45;
+    }
+
+    .bottleneck-tag {
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: #DE4C45;
+      color: #FFFFFF;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+    .path-step.tier-bottleneck .bottleneck-tag { opacity: 1; }
+
+    .arrow-row {
+      text-align: center;
+      color: rgba(0,0,0,0.22);
+      font-size: 16px;
+      padding: 4px 0;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    /* ── Result box ── */
+    .result-box {
+      padding: 16px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(0,0,0,0.10);
+      background: #F2F1EE;
+      font-size: 15px;
+      line-height: 1.6;
+      color: rgba(0,0,0,0.38);
+      min-height: 56px;
+      transition: background 0.35s, border-color 0.35s, color 0.35s;
+    }
+    .result-box.revealed {
+      background: #FEF5F0;
+      border-color: rgba(211,87,34,0.30);
+      color: #1A1A1A;
+    }
+
+    /* ── Buttons ── */
+    .reveal-btn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: #1878DC;
+      color: #FFFFFF;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .reveal-btn:hover { background: #1466C7; }
+
+    .try-again-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1.5px solid rgba(0,0,0,0.14);
+      background: #FFFFFF;
+      color: #1A1A1A;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: none;
+    }
+    .try-again-btn:hover { background: #F2F1EE; }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      .ladder-label { flex: 0 0 124px; font-size: 13px; }
+      .ladder-range  { flex: 0 0 104px; font-size: 12px; }
+    }
+    @media (max-width: 400px) {
+      .ladder-range { display: none; }
+      .ladder-label { flex: 0 0 108px; font-size: 13px; }
+      .step-name    { font-size: 14px; }
+    }
+    @media (max-width: 325px) {
+      .content { padding: 16px 12px; }
+      .hint-header { padding: 16px 12px 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="hint-cursor" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click each row to explore why it costs what it does, then find the bottleneck.</span>
+  </div>
+
+  <div class="content">
+
+    <!-- ── SECTION 1: Latency Ladder ── -->
+    <p class="section-label">Latency Ladder — click to explore</p>
+
+    <div class="ladder" id="ladder">
+
+      <div class="ladder-item" data-idx="0">
+        <div class="ladder-row" onclick="toggleLadder(0)">
+          <div class="ladder-label">Read from memory</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:10%; background:#328F51;"></div>
+          </div>
+          <div class="ladder-range">ns → µs</div>
+        </div>
+        <div class="ladder-detail">
+          Data already lives inside your process — no hardware I/O happens at all. For almost any capacity reasoning, this is effectively free. It sets your baseline.
+        </div>
+      </div>
+
+      <div class="ladder-item" data-idx="1">
+        <div class="ladder-row" onclick="toggleLadder(1)">
+          <div class="ladder-label">Read from local SSD</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:40%; background:#1878DC;"></div>
+          </div>
+          <div class="ladder-range">0.1 ms → few ms</div>
+        </div>
+        <div class="ladder-detail">
+          Data moves from storage hardware into memory. No network is involved, but the hardware access itself takes time — typically hundreds to thousands of times slower than a memory read.
+        </div>
+      </div>
+
+      <div class="ladder-item" data-idx="2">
+        <div class="ladder-row" onclick="toggleLadder(2)">
+          <div class="ladder-label">Network, same data center</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:58%; background:#D35722;"></div>
+          </div>
+          <div class="ladder-range">&lt;1 ms → few ms</div>
+        </div>
+        <div class="ladder-detail">
+          Even machines that are physically close require a full network round-trip: the OS, the NIC, the switch, and back again. Distance is short but the stack overhead is real and unavoidable.
+        </div>
+      </div>
+
+      <div class="ladder-item" data-idx="3">
+        <div class="ladder-row" onclick="toggleLadder(3)">
+          <div class="ladder-label">Network, cross region</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:88%; background:#DE4C45;"></div>
+          </div>
+          <div class="ladder-range">10s → 100s ms</div>
+        </div>
+        <div class="ladder-detail">
+          Data travels hundreds or thousands of miles. The speed of light sets a floor no engineering can remove. A cross-region call can be tens of thousands of times slower than a memory read.
+        </div>
+      </div>
+
+    </div>
+    <p class="scale-note">Bars use a logarithmic scale — each step is roughly 1,000× slower than the one before it.</p>
+
+    <div class="divider"></div>
+
+    <!-- ── SECTION 2: Bottleneck Finder ── -->
+    <p class="section-label">Bottleneck Finder — pick a request path</p>
+
+    <div class="scenario-tabs" id="scenarioTabs">
+      <button class="tab-btn active" onclick="pickScenario(0)">Scenario A</button>
+      <button class="tab-btn"        onclick="pickScenario(1)">Scenario B</button>
+      <button class="tab-btn"        onclick="pickScenario(2)">Scenario C</button>
+    </div>
+
+    <div class="scenario-desc" id="scenarioDesc"></div>
+    <div class="path-steps" id="pathSteps"></div>
+    <div class="result-box" id="resultBox">Press "Find Bottleneck" to see which step dominates the total time.</div>
+
+    <button class="reveal-btn"    id="revealBtn"    onclick="doReveal()">Find Bottleneck</button>
+    <button class="try-again-btn" id="tryAgainBtn"  onclick="doReset()">Try a different scenario</button>
+
+  </div><!-- /content -->
+</div><!-- /container -->
+
+<script>
+  /* ── Ladder ── */
+  function toggleLadder(idx) {
+    const items = document.querySelectorAll('.ladder-item');
+    const wasOpen = items[idx].classList.contains('open');
+    items.forEach(i => i.classList.remove('open'));
+    if (!wasOpen) items[idx].classList.add('open');
+  }
+
+  /* ── Scenarios ── */
+  const SCENARIOS = [
+    {
+      desc: 'A route handler reads a feature flag from an in-process config map, loads a user record from a local SSD, then calls a recommendation service in the same data center.',
+      steps: [
+        { icon: '⚡', name: 'Read feature flag from in-process config', range: 'ns → µs',        tier: 'fast' },
+        { icon: '💾', name: 'Load user record from local SSD',          range: '0.1 ms → few ms', tier: 'mid' },
+        { icon: '🔗', name: 'Call recommendation service (same data center)', range: '<1 ms → few ms', tier: 'bottleneck' },
+      ],
+      explanation: 'The same-data-center call dominates. The memory read is nanoseconds — effectively free — and the SSD read is fast by comparison. Optimizing either of those while this network call remains untouched will make no noticeable difference to total time.'
+    },
+    {
+      desc: 'A mobile API verifies a session token from in-process memory, writes a log entry to a local SSD, then fetches the user\'s settings from a service in another region.',
+      steps: [
+        { icon: '⚡', name: 'Verify session token (in-process memory)', range: 'ns → µs',         tier: 'fast' },
+        { icon: '💾', name: 'Write log entry to local SSD',             range: '0.1 ms → few ms',  tier: 'mid' },
+        { icon: '🌐', name: 'Fetch user settings (cross region)',        range: '10s → 100s ms',    tier: 'bottleneck' },
+      ],
+      explanation: 'The cross-region call dominates by a very wide margin — it can be tens of thousands of times slower than the memory read. Caching the user settings locally or nearby would remove this bottleneck from the hot path entirely.'
+    },
+    {
+      desc: 'A search handler reads a cached index pointer from in-process memory, then reads the index shard directly from a local SSD. There are no network calls on this path at all.',
+      steps: [
+        { icon: '⚡', name: 'Read index pointer (in-process memory)',   range: 'ns → µs',          tier: 'fast' },
+        { icon: '💾', name: 'Read index shard from local SSD',          range: '0.1 ms → few ms',  tier: 'bottleneck' },
+      ],
+      explanation: 'With no network calls on this path, the local SSD read is the bottleneck — but notice how much cheaper this path is overall. The fastest way to improve it further would be to keep a hot subset of the index in memory, avoiding the disk entirely.'
+    }
+  ];
+
+  let current  = 0;
+  let revealed = false;
+
+  function pickScenario(idx) {
+    if (revealed) return;
+    current = idx;
+    document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i === idx));
+    render();
+  }
+
+  function render() {
+    const s = SCENARIOS[current];
+    document.getElementById('scenarioDesc').textContent = s.desc;
+
+    const container = document.getElementById('pathSteps');
+    container.innerHTML = '';
+
+    s.steps.forEach((step, i) => {
+      if (i > 0) {
+        const arrow = document.createElement('div');
+        arrow.className = 'arrow-row';
+        arrow.textContent = '↓';
+        container.appendChild(arrow);
+      }
+      const el = document.createElement('div');
+      el.className = 'path-step';
+      el.dataset.tier = step.tier;
+      el.innerHTML =
+        `<span class="step-icon">${step.icon}</span>` +
+        `<span class="step-name">${step.name}</span>` +
+        `<span class="step-badge">${step.range}</span>` +
+        `<span class="bottleneck-tag">BOTTLENECK</span>`;
+      container.appendChild(el);
+    });
+
+    const rb = document.getElementById('resultBox');
+    rb.classList.remove('revealed');
+    rb.textContent = 'Press "Find Bottleneck" to see which step dominates the total time.';
+  }
+
+  function doReveal() {
+    revealed = true;
+    const s = SCENARIOS[current];
+    const steps = document.querySelectorAll('.path-step');
+
+    steps.forEach((el, i) => {
+      const tier = s.steps[i].tier;
+      setTimeout(() => el.classList.add('tier-' + tier), i * 260);
+    });
+
+    setTimeout(() => {
+      const rb = document.getElementById('resultBox');
+      rb.classList.add('revealed');
+      rb.textContent = s.explanation;
+    }, steps.length * 260 + 140);
+
+    document.getElementById('revealBtn').style.display   = 'none';
+    document.getElementById('tryAgainBtn').style.display = 'block';
+    document.querySelectorAll('.tab-btn').forEach(b => { b.disabled = true; });
+  }
+
+  function doReset() {
+    revealed = false;
+    document.querySelectorAll('.tab-btn').forEach(b => { b.disabled = false; });
+    document.getElementById('revealBtn').style.display   = 'block';
+    document.getElementById('tryAgainBtn').style.display = 'none';
+    render();
+  }
+
+  // Init
+  render();
+</script>
+</body>
+</html>

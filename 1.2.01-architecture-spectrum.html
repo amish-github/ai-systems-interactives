@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture Spectrum — What Each Architecture Actually Is</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    /* ── Hint header ── */
+    .hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 24px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .hint svg {
+      flex-shrink: 0;
+      animation: wiggle 4s ease-in-out infinite;
+    }
+
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      20%       { transform: rotate(-10deg); }
+      40%       { transform: rotate(10deg); }
+      55%       { transform: rotate(-8deg); }
+      70%       { transform: rotate(6deg); }
+      85%       { transform: rotate(-3deg); }
+    }
+
+    .hint-text { font-size: 18px; line-height: 1.4; }
+
+    /* ── Spectrum ── */
+    .spectrum {
+      padding: 20px 24px 0;
+    }
+
+    .spectrum-label {
+      font-size: 14px;
+      color: rgba(0,0,0,0.50);
+      margin-bottom: 12px;
+    }
+
+    .spectrum-rail {
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      padding-top: 10px;
+    }
+
+    .spectrum-rail::before {
+      content: '';
+      position: absolute;
+      top: 20px;
+      left: 12.5%;
+      right: 12.5%;
+      height: 2px;
+      background: rgba(0,0,0,0.12);
+      pointer-events: none;
+    }
+
+    .spec-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      border: none;
+      background: none;
+      padding: 0 4px;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+    }
+
+    .spec-dot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid rgba(0,0,0,0.18);
+      position: relative;
+      z-index: 1;
+      transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .spec-btn:hover .spec-dot       { border-color: #1878DC; transform: scale(1.25); }
+    .spec-btn.active .spec-dot      { background: #1878DC; border-color: #1878DC; }
+    .spec-btn.warn:hover .spec-dot  { border-color: #DE4C45; transform: scale(1.25); }
+    .spec-btn.warn.active .spec-dot { background: #DE4C45; border-color: #DE4C45; }
+
+    .spec-lbl {
+      font-size: 12px;
+      color: rgba(0,0,0,0.45);
+      text-align: center;
+      line-height: 1.3;
+      max-width: 72px;
+      transition: color 0.15s ease;
+    }
+
+    .spec-btn.active .spec-lbl      { color: #1878DC; }
+    .spec-btn.warn.active .spec-lbl { color: #DE4C45; }
+
+    /* ── Card ── */
+    .card {
+      margin: 16px 24px 0;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 16px 20px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .chip {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 13px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      line-height: 1.6;
+      white-space: nowrap;
+    }
+
+    .chip-num    { background: #ffffff; border: 1px solid rgba(0,0,0,0.14); color: rgba(0,0,0,0.50); }
+    .chip-blue   { background: rgba(24,120,220,0.12); color: #1878DC; }
+    .chip-green  { background: rgba(50,143,81,0.12);  color: #328F51; }
+    .chip-red    { background: rgba(222,76,69,0.12);  color: #DE4C45; }
+
+    .card-title {
+      font-size: 20px;
+      color: #1A1A1A;
+      line-height: 1.2;
+    }
+
+    /* ── Diagram ── */
+    .diagram {
+      padding: 24px 20px 16px;
+      background: #ffffff;
+      display: flex;
+      justify-content: center;
+    }
+
+    .diagram svg {
+      width: 100%;
+      max-width: 480px;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Properties ── */
+    .props {
+      padding: 0 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .prop {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #F2F1EE;
+      border-radius: 12px;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .prop-icon { flex-shrink: 0; font-size: 15px; margin-top: 2px; }
+
+    /* ── Callout ── */
+    .callout {
+      margin: 0 24px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .callout-blue  { background: rgba(24,120,220,0.08); border-left: 3px solid #1878DC; }
+    .callout-green { background: rgba(50,143,81,0.08);  border-left: 3px solid #328F51; }
+    .callout-red   { background: rgba(222,76,69,0.08);  border-left: 3px solid #DE4C45; }
+
+    /* ── Navigation ── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px 24px;
+    }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.14);
+      background: #ffffff;
+      font-family: 'Suisse Intl', system-ui, sans-serif;
+      font-size: 16px;
+      color: #1A1A1A;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    .nav-btn:hover:not(:disabled) { background: #F2F1EE; border-color: rgba(0,0,0,0.24); }
+    .nav-btn:disabled { opacity: 0.30; cursor: default; box-shadow: none; }
+
+    .nav-count {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+    }
+
+    /* ── Fade-up transition ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .anim { animation: fadeUp 0.22s ease; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .hint, .spectrum, .nav { padding-left: 16px; padding-right: 16px; }
+      .card { margin-left: 16px; margin-right: 16px; }
+      .callout { margin-left: 16px; margin-right: 16px; }
+      .card-head { padding: 12px 16px; }
+      .diagram { padding: 20px 16px 12px; }
+      .props { padding: 0 16px 16px; }
+      .card-title { font-size: 18px; }
+      .hint-text  { font-size: 16px; }
+      .nav-btn    { padding: 10px 16px; font-size: 15px; }
+    }
+
+    @media (max-width: 360px) {
+      .hint, .spectrum, .nav { padding-left: 12px; padding-right: 12px; }
+      .card { margin-left: 12px; margin-right: 12px; }
+      .callout { margin-left: 12px; margin-right: 12px; }
+      .spec-lbl { font-size: 10px; max-width: 60px; }
+      .nav-btn { padding: 8px 12px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Hint header -->
+  <div class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click any point on the spectrum — or use the buttons — to step through all four architecture types.</span>
+  </div>
+
+  <!-- Spectrum rail -->
+  <div class="spectrum">
+    <div class="spectrum-label">The deployment spectrum — from one unit to many independent services</div>
+    <div class="spectrum-rail" id="rail">
+      <button class="spec-btn active" onclick="goTo(0)">
+        <div class="spec-dot"></div>
+        <div class="spec-lbl">Monolith</div>
+      </button>
+      <button class="spec-btn" onclick="goTo(1)">
+        <div class="spec-dot"></div>
+        <div class="spec-lbl">Modular Monolith</div>
+      </button>
+      <button class="spec-btn" onclick="goTo(2)">
+        <div class="spec-dot"></div>
+        <div class="spec-lbl">Microservices</div>
+      </button>
+      <button class="spec-btn warn" onclick="goTo(3)">
+        <div class="spec-dot"></div>
+        <div class="spec-lbl">Distributed Monolith</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="card" id="card">
+    <div class="card-head">
+      <span class="chip chip-num" id="num">01</span>
+      <span class="card-title" id="title">Monolith</span>
+      <span class="chip chip-blue" id="badge">One deployment</span>
+    </div>
+    <div class="diagram" id="diagram"></div>
+    <div class="props"   id="props"></div>
+  </div>
+
+  <div style="height:16px"></div>
+  <div class="callout callout-blue" id="callout"></div>
+
+  <!-- Navigation -->
+  <div class="nav">
+    <button class="nav-btn" id="prev" onclick="navigate(-1)" disabled>&#8592; Previous</button>
+    <span class="nav-count" id="count">1 / 4</span>
+    <button class="nav-btn" id="next" onclick="navigate(1)">Next &#8594;</button>
+  </div>
+
+</div>
+
+<script>
+/* ─────────────────────────────────────────
+   Data
+───────────────────────────────────────── */
+var DATA = [
+  /* 0 — Monolith */
+  {
+    num: '01', title: 'Monolith',
+    badge: 'One deployment', badgeCls: 'chip-blue',
+    calloutCls: 'callout-blue',
+    callout: 'The word <em>monolith</em> describes how the application is deployed — not how good the code is. A monolith can be clean, well-organized, and exactly the right design. Internal structure and deployment shape are two separate questions.',
+    props: [
+      ['📦', '<strong>Single deployable artifact</strong> — built, shipped, and run as one unit'],
+      ['⚡', '<strong>In-process communication</strong> — all code talks internally; no network involved'],
+      ['📐', '<strong>Not a quality judgment</strong> — can be tidy and modern or a tangled mess; the word says nothing about the code inside'],
+      ['✅', '<strong>Simple to operate</strong> — one thing to build, deploy, monitor, and debug'],
+    ],
+    svg: [
+      '<svg viewBox="0 0 480 176" fill="none" xmlns="http://www.w3.org/2000/svg">',
+      '  <!-- deployment boundary -->',
+      '  <rect x="16" y="12" width="448" height="152" rx="14" fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5" stroke-dasharray="7 4"/>',
+      '  <text x="240" y="30" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.38)">one deployment boundary</text>',
+      '  <!-- single process box -->',
+      '  <rect x="60" y="42" width="360" height="108" rx="12" fill="rgba(24,120,220,0.10)" stroke="#1878DC" stroke-width="1.5"/>',
+      '  <text x="240" y="92" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="22" fill="#1878DC">All application code</text>',
+      '  <text x="240" y="118" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="14" fill="rgba(24,120,220,0.60)">runs in one process</text>',
+      '</svg>'
+    ].join('\n')
+  },
+
+  /* 1 — Modular Monolith */
+  {
+    num: '02', title: 'Modular Monolith',
+    badge: 'One deployment · strong boundaries', badgeCls: 'chip-green',
+    calloutCls: 'callout-green',
+    callout: 'A modular monolith gives you clear ownership and enforced boundaries without paying for a network between every part of the system. Crossing a boundary is a plain function call — fast, reliable, and easy to test. For many real systems this is the right answer, reached for far less often than it should be.',
+    props: [
+      ['📦', '<strong>Still one deployment</strong> — ships and runs as a single artifact'],
+      ['🔲', '<strong>Strong internal module boundaries</strong> — each module owns its area; others go through a defined interface'],
+      ['⚡', '<strong>In-process calls between modules</strong> — fast and reliable, no network failure to design around'],
+      ['🏆', '<strong>The underrated middle ground</strong> — discipline of services at the cost of a monolith'],
+    ],
+    svg: [
+      '<svg viewBox="0 0 480 176" fill="none" xmlns="http://www.w3.org/2000/svg">',
+      '  <defs>',
+      '    <marker id="mg" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">',
+      '      <path d="M0,0 L0,6 L7,3 z" fill="#328F51"/>',
+      '    </marker>',
+      '  </defs>',
+      '  <!-- outer boundary -->',
+      '  <rect x="16" y="12" width="448" height="152" rx="14" fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5" stroke-dasharray="7 4"/>',
+      '  <text x="240" y="30" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="12" fill="rgba(0,0,0,0.38)">one deployment boundary</text>',
+      '  <!-- module A -->',
+      '  <rect x="32" y="42" width="116" height="108" rx="10" fill="rgba(50,143,81,0.10)" stroke="#328F51" stroke-width="1.5"/>',
+      '  <text x="90" y="93" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="15" fill="#328F51">Orders</text>',
+      '  <text x="90" y="112" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="12" fill="rgba(50,143,81,0.60)">module</text>',
+      '  <!-- arrow A → B -->',
+      '  <path d="M149 96 L175 96" stroke="#328F51" stroke-width="1.5" marker-end="url(#mg)"/>',
+      '  <text x="162" y="89" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(0,0,0,0.42)">fn()</text>',
+      '  <!-- module B -->',
+      '  <rect x="176" y="42" width="128" height="108" rx="10" fill="rgba(50,143,81,0.10)" stroke="#328F51" stroke-width="1.5"/>',
+      '  <text x="240" y="93" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="15" fill="#328F51">Billing</text>',
+      '  <text x="240" y="112" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="12" fill="rgba(50,143,81,0.60)">module</text>',
+      '  <!-- arrow B → C -->',
+      '  <path d="M305 96 L331 96" stroke="#328F51" stroke-width="1.5" marker-end="url(#mg)"/>',
+      '  <text x="318" y="89" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(0,0,0,0.42)">fn()</text>',
+      '  <!-- module C -->',
+      '  <rect x="332" y="42" width="116" height="108" rx="10" fill="rgba(50,143,81,0.10)" stroke="#328F51" stroke-width="1.5"/>',
+      '  <text x="390" y="93" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="15" fill="#328F51">Catalog</text>',
+      '  <text x="390" y="112" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="12" fill="rgba(50,143,81,0.60)">module</text>',
+      '</svg>'
+    ].join('\n')
+  },
+
+  /* 2 — Microservices */
+  {
+    num: '03', title: 'Microservices',
+    badge: 'Independent deployments', badgeCls: 'chip-blue',
+    calloutCls: 'callout-blue',
+    callout: 'The network is both the defining feature and the main cost of microservices. A call across a network can be slow, can fail halfway through, or can succeed but never return. Everything simple inside a process — a call that either runs or does not — becomes something you must design for explicitly once a network sits in the middle.',
+    props: [
+      ['🚀', '<strong>Independently deployable</strong> — ship one service without coordinating a release of the others'],
+      ['🗄️', '<strong>Each service owns its own data</strong> — no other service reaches into its database directly'],
+      ['🌐', '<strong>Network calls between services</strong> — calls can be slow, fail, or time out; must be designed for explicitly'],
+      ['💰', '<strong>Real operational cost</strong> — failure handling, distributed tracing, separate deployments, harder debugging'],
+    ],
+    svg: [
+      '<svg viewBox="0 0 480 194" fill="none" xmlns="http://www.w3.org/2000/svg">',
+      '  <defs>',
+      '    <marker id="mo" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">',
+      '      <path d="M0,0 L0,6 L7,3 z" fill="#D35722"/>',
+      '    </marker>',
+      '  </defs>',
+      '  <!-- Service A -->',
+      '  <rect x="8" y="12" width="132" height="168" rx="12" fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5" stroke-dasharray="6 3"/>',
+      '  <text x="74" y="28" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="11" fill="rgba(0,0,0,0.36)">deploy A</text>',
+      '  <rect x="20" y="36" width="108" height="56" rx="9" fill="rgba(24,120,220,0.10)" stroke="#1878DC" stroke-width="1.5"/>',
+      '  <text x="74" y="62" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#1878DC">Orders</text>',
+      '  <text x="74" y="79" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(24,120,220,0.58)">service</text>',
+      '  <rect x="42" y="112" width="64" height="24" fill="rgba(24,120,220,0.10)" stroke="none"/>',
+      '  <ellipse cx="74" cy="136" rx="32" ry="9" fill="rgba(24,120,220,0.15)" stroke="#1878DC" stroke-width="1"/>',
+      '  <ellipse cx="74" cy="112" rx="32" ry="9" fill="rgba(24,120,220,0.22)" stroke="#1878DC" stroke-width="1"/>',
+      '  <text x="74" y="160" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="10" fill="rgba(24,120,220,0.55)">own data</text>',
+      '  <!-- HTTP arrow A → B -->',
+      '  <path d="M141 64 L170 64" stroke="#D35722" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mo)"/>',
+      '  <text x="156" y="56" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="10" fill="#D35722">HTTP</text>',
+      '  <!-- Service B -->',
+      '  <rect x="172" y="12" width="136" height="168" rx="12" fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5" stroke-dasharray="6 3"/>',
+      '  <text x="240" y="28" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="11" fill="rgba(0,0,0,0.36)">deploy B</text>',
+      '  <rect x="184" y="36" width="112" height="56" rx="9" fill="rgba(24,120,220,0.10)" stroke="#1878DC" stroke-width="1.5"/>',
+      '  <text x="240" y="62" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#1878DC">Billing</text>',
+      '  <text x="240" y="79" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(24,120,220,0.58)">service</text>',
+      '  <rect x="208" y="112" width="64" height="24" fill="rgba(24,120,220,0.10)" stroke="none"/>',
+      '  <ellipse cx="240" cy="136" rx="32" ry="9" fill="rgba(24,120,220,0.15)" stroke="#1878DC" stroke-width="1"/>',
+      '  <ellipse cx="240" cy="112" rx="32" ry="9" fill="rgba(24,120,220,0.22)" stroke="#1878DC" stroke-width="1"/>',
+      '  <text x="240" y="160" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="10" fill="rgba(24,120,220,0.55)">own data</text>',
+      '  <!-- HTTP arrow B → C -->',
+      '  <path d="M309 64 L338 64" stroke="#D35722" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mo)"/>',
+      '  <text x="324" y="56" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="10" fill="#D35722">HTTP</text>',
+      '  <!-- Service C -->',
+      '  <rect x="340" y="12" width="132" height="168" rx="12" fill="#F2F1EE" stroke="rgba(0,0,0,0.14)" stroke-width="1.5" stroke-dasharray="6 3"/>',
+      '  <text x="406" y="28" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="11" fill="rgba(0,0,0,0.36)">deploy C</text>',
+      '  <rect x="352" y="36" width="108" height="56" rx="9" fill="rgba(24,120,220,0.10)" stroke="#1878DC" stroke-width="1.5"/>',
+      '  <text x="406" y="62" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#1878DC">Catalog</text>',
+      '  <text x="406" y="79" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(24,120,220,0.58)">service</text>',
+      '  <rect x="374" y="112" width="64" height="24" fill="rgba(24,120,220,0.10)" stroke="none"/>',
+      '  <ellipse cx="406" cy="136" rx="32" ry="9" fill="rgba(24,120,220,0.15)" stroke="#1878DC" stroke-width="1"/>',
+      '  <ellipse cx="406" cy="112" rx="32" ry="9" fill="rgba(24,120,220,0.22)" stroke="#1878DC" stroke-width="1"/>',
+      '  <text x="406" y="160" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="10" fill="rgba(24,120,220,0.55)">own data</text>',
+      '</svg>'
+    ].join('\n')
+  },
+
+  /* 3 — Distributed Monolith */
+  {
+    num: '⚠', title: 'Distributed Monolith',
+    badge: '⚠ The trap', badgeCls: 'chip-red',
+    calloutCls: 'callout-red',
+    callout: 'Two mistakes lead here: assuming that splitting code across services automatically makes them independent (it does not), and letting services share a database. Real independence comes from clear boundaries and separate data ownership — not from drawing a network line between two pieces of code.',
+    props: [
+      ['❌', '<strong>Separate services, tightly coupled</strong> — network hops exist but services are not truly independent'],
+      ['🗄️', '<strong>Shared database</strong> — all services read and write the same store, creating invisible coupling'],
+      ['🔒', '<strong>Lockstep deployments</strong> — a change to one service forces a full release of all others'],
+      ['💸', '<strong>Worst of both worlds</strong> — full operational cost of distribution, none of the independence benefit'],
+    ],
+    svg: [
+      '<svg viewBox="0 0 480 206" fill="none" xmlns="http://www.w3.org/2000/svg">',
+      '  <defs>',
+      '    <marker id="mr" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">',
+      '      <path d="M0,0 L0,6 L7,3 z" fill="#DE4C45"/>',
+      '    </marker>',
+      '  </defs>',
+      '  <!-- must deploy together fence -->',
+      '  <rect x="6" y="6" width="468" height="194" rx="14" fill="none" stroke="#DE4C45" stroke-width="1.5" stroke-dasharray="7 4"/>',
+      '  <text x="240" y="21" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="11" fill="#DE4C45">must always deploy together</text>',
+      '  <!-- Service A -->',
+      '  <rect x="20" y="30" width="116" height="60" rx="10" fill="rgba(222,76,69,0.08)" stroke="#DE4C45" stroke-width="1.5"/>',
+      '  <text x="78" y="57" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#DE4C45">Orders</text>',
+      '  <text x="78" y="75" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(222,76,69,0.60)">service</text>',
+      '  <path d="M137 60 L168 60" stroke="#DE4C45" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mr)"/>',
+      '  <!-- Service B -->',
+      '  <rect x="182" y="30" width="116" height="60" rx="10" fill="rgba(222,76,69,0.08)" stroke="#DE4C45" stroke-width="1.5"/>',
+      '  <text x="240" y="57" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#DE4C45">Billing</text>',
+      '  <text x="240" y="75" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(222,76,69,0.60)">service</text>',
+      '  <path d="M299 60 L344 60" stroke="#DE4C45" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#mr)"/>',
+      '  <!-- Service C -->',
+      '  <rect x="344" y="30" width="116" height="60" rx="10" fill="rgba(222,76,69,0.08)" stroke="#DE4C45" stroke-width="1.5"/>',
+      '  <text x="402" y="57" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#DE4C45">Catalog</text>',
+      '  <text x="402" y="75" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(222,76,69,0.60)">service</text>',
+      '  <!-- Lines to shared DB -->',
+      '  <line x1="78"  y1="90" x2="160" y2="146" stroke="#DE4C45" stroke-width="1" stroke-opacity="0.45"/>',
+      '  <line x1="240" y1="90" x2="240" y2="146" stroke="#DE4C45" stroke-width="1" stroke-opacity="0.45"/>',
+      '  <line x1="402" y1="90" x2="321" y2="146" stroke="#DE4C45" stroke-width="1" stroke-opacity="0.45"/>',
+      '  <!-- Shared DB -->',
+      '  <rect x="120" y="146" width="240" height="50" rx="10" fill="rgba(222,76,69,0.12)" stroke="#DE4C45" stroke-width="1.5"/>',
+      '  <text x="240" y="168" text-anchor="middle" font-family="Suisse Intl,system-ui,sans-serif" font-size="14" fill="#DE4C45">Shared database</text>',
+      '  <text x="240" y="186" text-anchor="middle" font-family="Suisse Intl Mono,Courier New,monospace" font-size="11" fill="rgba(222,76,69,0.62)">all services read &amp; write here</text>',
+      '</svg>'
+    ].join('\n')
+  },
+];
+
+/* ─────────────────────────────────────────
+   State & render
+───────────────────────────────────────── */
+var cur = 0;
+
+function render(idx, animate) {
+  var d = DATA[idx];
+
+  document.getElementById('num').textContent = d.num;
+  document.getElementById('title').textContent = d.title;
+
+  var badge = document.getElementById('badge');
+  badge.textContent = d.badge;
+  badge.className = 'chip ' + d.badgeCls;
+
+  document.getElementById('diagram').innerHTML = d.svg;
+
+  document.getElementById('props').innerHTML = d.props.map(function(p) {
+    return '<div class="prop"><span class="prop-icon">' + p[0] + '</span><span>' + p[1] + '</span></div>';
+  }).join('');
+
+  var callout = document.getElementById('callout');
+  callout.className = 'callout ' + d.calloutCls;
+  callout.innerHTML = d.callout;
+
+  document.querySelectorAll('.spec-btn').forEach(function(btn, i) {
+    btn.classList.toggle('active', i === idx);
+  });
+
+  document.getElementById('prev').disabled = (idx === 0);
+  document.getElementById('next').disabled = (idx === DATA.length - 1);
+  document.getElementById('count').textContent = (idx + 1) + ' / ' + DATA.length;
+
+  if (animate) {
+    var card = document.getElementById('card');
+    card.classList.remove('anim');
+    void card.offsetWidth;
+    card.classList.add('anim');
+  }
+}
+
+function goTo(idx) {
+  cur = idx;
+  render(idx, true);
+}
+
+function navigate(dir) {
+  var n = cur + dir;
+  if (n >= 0 && n < DATA.length) goTo(n);
+}
+
+render(0, false);
+</script>
+</body>
+</html>

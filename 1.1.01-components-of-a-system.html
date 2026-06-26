@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Components of a Modern System</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+/* ─ Outer wrapper ──────────────────────────────────────────────── */
+.outer {
+  width: 100%;
+  max-width: 700px;
+  /* no padding on outermost — children carry their own */
+}
+
+/* ─ Hint header ────────────────────────────────────────────────── */
+.hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.hint > svg {
+  flex-shrink: 0;
+  animation: wiggle 4s ease-in-out infinite;
+  transform-origin: 50% 50%;
+}
+
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-10deg); }
+  30%  { transform: rotate(10deg); }
+  45%  { transform: rotate(-8deg); }
+  60%  { transform: rotate(6deg); }
+  75%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.hint-text {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* ─ Body ───────────────────────────────────────────────────────── */
+.body {
+  padding: 24px 20px 20px;
+}
+
+/* ─ Two-column layout ──────────────────────────────────────────── */
+.main {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  align-items: flex-start;
+}
+
+/* Left: vertical flow diagram */
+.col-flow {
+  flex-shrink: 0;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Right: component detail */
+.col-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ─ Flow diagram ───────────────────────────────────────────────── */
+.flow-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chip {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #F2F1EE;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.25;
+  color: rgba(0,0,0,0.45);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+  user-select: none;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  background: #E8E7E4;
+  color: rgba(0,0,0,0.75);
+  outline: none;
+}
+
+.chip.is-active {
+  background: #1878DC;
+  color: #FFFFFF;
+  border-color: #1878DC;
+  box-shadow: 0 0 0 3px rgba(24,120,220,0.16);
+}
+
+.chip.is-past {
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.55);
+}
+
+.chip.is-future {
+  background: #FFFFFF;
+  color: rgba(0,0,0,0.25);
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* Vertical connector with arrowhead */
+.vline {
+  width: 1px;
+  height: 12px;
+  background: rgba(0,0,0,0.16);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.vline::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: -3px;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid rgba(0,0,0,0.16);
+}
+
+/* ─ Component detail ────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.comp-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.comp-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #F2F1EE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.comp-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1A1A1A;
+  margin-bottom: 4px;
+  line-height: 1.2;
+}
+
+.comp-sub {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 12px;
+  color: rgba(0,0,0,0.45);
+}
+
+.comp-desc {
+  font-size: 16px;
+  line-height: 1.65;
+  color: #1A1A1A;
+  margin-bottom: 16px;
+}
+
+.comp-desc strong { font-weight: 600; }
+.comp-desc em { font-style: italic; }
+
+/* ─ Rule callout ────────────────────────────────────────────────── */
+.rule-box {
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: rgba(222,76,69,0.07);
+  border: 1px solid rgba(222,76,69,0.22);
+}
+
+.rule-tag {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: #DE4C45;
+  margin-bottom: 6px;
+}
+
+.rule-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1A1A1A;
+}
+
+/* ─ Nav bar ─────────────────────────────────────────────────────── */
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid rgba(0,0,0,0.10);
+  padding-top: 20px;
+}
+
+.step-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 13px;
+  color: rgba(0,0,0,0.40);
+  white-space: nowrap;
+}
+
+.btn {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.14);
+  background: #FFFFFF;
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  color: #1A1A1A;
+  cursor: pointer;
+  transition: background 0.12s, opacity 0.12s;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.btn:hover:not([disabled]) { background: #F2F1EE; }
+.btn:active:not([disabled]) { background: #E8E7E4; }
+.btn[disabled] { opacity: 0.28; cursor: not-allowed; box-shadow: none; }
+
+.btn-primary {
+  background: #1878DC;
+  color: #FFFFFF;
+  border-color: #1878DC;
+}
+.btn-primary:hover:not([disabled]) { background: #1568C4; border-color: #1568C4; }
+.btn-primary:active:not([disabled]) { background: #1258B0; }
+
+/* ─ Mobile (<560px): horizontal scroll mini-map ──────────────────── */
+@media (max-width: 559px) {
+  .main {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .col-flow {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .col-flow::-webkit-scrollbar { display: none; }
+
+  .flow-item {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .chip {
+    width: auto;
+    white-space: nowrap;
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  /* Horizontal connector with rightward arrowhead */
+  .vline {
+    width: 20px;
+    height: 1px;
+    flex-shrink: 0;
+  }
+  .vline::after {
+    top: -3px;
+    right: -2px;
+    left: auto;
+    bottom: auto;
+    border-left: 4px solid rgba(0,0,0,0.16);
+    border-right: none;
+    border-top: 3.5px solid transparent;
+    border-bottom: 3.5px solid transparent;
+  }
+}
+</style>
+</head>
+<body>
+<div class="outer">
+
+  <header class="hint">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Click Next to step through each layer of a backend system.</span>
+  </header>
+
+  <div class="body">
+    <div class="main">
+      <div class="col-flow" id="colFlow" role="group" aria-label="System layers"></div>
+      <div class="col-detail" id="colDetail" aria-live="polite" aria-atomic="true"></div>
+    </div>
+
+    <nav class="nav" aria-label="Step navigation">
+      <button class="btn" id="btnBack" onclick="go(-1)" disabled>&#8592; Back</button>
+      <span class="step-label" id="stepLabel" aria-live="polite">1 / 6</span>
+      <button class="btn btn-primary" id="btnNext" onclick="go(1)">Next &#8594;</button>
+    </nav>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var STEPS = [
+    {
+      label: 'Client',
+      sub: 'browser · app · script · service',
+      icon: '🖥',
+      desc: 'The client is whatever starts the request — a browser, a mobile app, another service, or a script. It sits <strong>outside your trust boundary</strong>: it can send anything it likes, in any order, at any rate. Everything further inside the system must assume the client could be wrong, slow, or malicious.',
+      rule: null
+    },
+    {
+      label: 'Load Balancer',
+      sub: 'ingress · traffic distribution',
+      icon: '⚖',
+      desc: 'The load balancer is a single entry point that spreads incoming traffic across many identical copies of your service. It lets you run ten copies behind one address — and if one copy fails, the whole system keeps running.',
+      rule: null
+    },
+    {
+      label: 'API Gateway',
+      sub: 'routing · auth · rate limiting',
+      icon: '🚪',
+      desc: 'The API gateway is the first component inside your system that a request reaches. It handles the concerns that apply to <em>every</em> request: routing to the correct service, checking authentication, and limiting call frequency. It decides <strong>whether and where</strong> a request should go — not what the answer should be.',
+      rule: {
+        tag: 'Design Rule 2',
+        text: 'Business logic belongs in services, not in the gateway. The gateway\'s job is to decide whether and where a request goes. Placing business rules inside it creates a fragile bottleneck that every request must pass through, and that is painful to test or scale independently.'
+      }
+    },
+    {
+      label: 'App Services',
+      sub: 'stateless · business logic',
+      icon: '⚙',
+      desc: 'Application services are where real business logic lives — placing an order, processing a payment, building a personalized feed. The key property is that services are <strong>stateless</strong>: they keep no information about a specific user between requests. Because any copy can handle any request, you scale by simply running more copies.',
+      rule: null
+    },
+    {
+      label: 'Database + Cache',
+      sub: 'source of truth · fast reads',
+      icon: '🗄',
+      desc: 'The <strong>database</strong> is the durable source of truth — when any two parts of the system disagree, the database wins. The <strong>cache</strong> is a small, fast, temporary copy of data that exists only to speed up reads. Cache data is <em>derived</em>: it can always be rebuilt from the database, and it can disappear at any moment without losing any information.',
+      rule: {
+        tag: 'Design Rule 1',
+        text: 'The cache is derived data, never the source of truth. You must be able to lose the entire cache and lose no information — only speed. The moment data exists only in the cache, it has stopped being a cache and has become an unreliable database.'
+      }
+    },
+    {
+      label: 'Message Broker',
+      sub: 'queue · async work',
+      icon: '📬',
+      desc: 'A message broker is a buffer that lets one component hand work to another <strong>without waiting</strong> for it to finish. It separates the fast path of answering a request from slower follow-up work — sending an email, updating a search index, running a fraud check. It also absorbs sudden spikes that would overwhelm a slower component downstream.',
+      rule: null
+    }
+  ];
+
+  var cur = 0;
+
+  function render() {
+    var n = STEPS.length;
+    var s = STEPS[cur];
+
+    // ── Flow diagram ──────────────────────────────────────────────
+    var cf = document.getElementById('colFlow');
+    cf.innerHTML = '';
+
+    STEPS.forEach(function (step, i) {
+      var item = document.createElement('div');
+      item.className = 'flow-item';
+
+      if (i > 0) {
+        var line = document.createElement('div');
+        line.className = 'vline';
+        item.appendChild(line);
+      }
+
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip ' + (i === cur ? 'is-active' : i < cur ? 'is-past' : 'is-future');
+      chip.textContent = step.label;
+      chip.setAttribute('aria-pressed', String(i === cur));
+      (function (idx) {
+        chip.addEventListener('click', function () { cur = idx; render(); });
+      }(i));
+
+      item.appendChild(chip);
+      cf.appendChild(item);
+    });
+
+    // Scroll active chip into view on mobile
+    var activeChip = cf.querySelector('.is-active');
+    if (activeChip) {
+      try { activeChip.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+    }
+
+    // ── Component detail ──────────────────────────────────────────
+    var ruleHtml = '';
+    if (s.rule) {
+      ruleHtml =
+        '<div class="rule-box">' +
+          '<div class="rule-tag">' + s.rule.tag + '</div>' +
+          '<div class="rule-text">' + s.rule.text + '</div>' +
+        '</div>';
+    }
+
+    var detail = document.getElementById('colDetail');
+    detail.innerHTML =
+      '<div class="comp-head">' +
+        '<div class="comp-icon" aria-hidden="true">' + s.icon + '</div>' +
+        '<div>' +
+          '<div class="comp-name">' + s.label + '</div>' +
+          '<div class="comp-sub">' + s.sub + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<p class="comp-desc">' + s.desc + '</p>' +
+      ruleHtml;
+
+    // Trigger fade-in animation
+    detail.style.animation = 'none';
+    detail.offsetHeight; /* force reflow */
+    detail.style.animation = 'fade-in 0.22s ease both';
+
+    // ── Step label ────────────────────────────────────────────────
+    document.getElementById('stepLabel').textContent = (cur + 1) + ' / ' + n;
+
+    // ── Buttons ───────────────────────────────────────────────────
+    var btnBack = document.getElementById('btnBack');
+    var btnNext = document.getElementById('btnNext');
+
+    btnBack.disabled = cur === 0;
+
+    if (cur === n - 1) {
+      btnNext.textContent = '↩ Restart';
+      btnNext.onclick = function () { cur = 0; render(); };
+    } else {
+      btnNext.textContent = 'Next →';
+      btnNext.onclick = function () { go(1); };
+    }
+  }
+
+  function go(d) {
+    var n = cur + d;
+    if (n >= 0 && n < STEPS.length) { cur = n; render(); }
+  }
+
+  window.go = go;
+
+  render();
+}());
+</script>
+</body>
+</html>

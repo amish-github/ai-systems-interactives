@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resharding: Modulo vs Consistent Hashing</title>
+<style>
+@font-face {
+  font-family: 'Suisse Intl';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Suisse Intl Mono';
+  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  color: #1A1A1A;
+  background: #FFFFFF;
+  display: flex;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  max-width: 700px;
+}
+
+/* ---- Hint header ---- */
+.hint-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.cursor-icon {
+  flex-shrink: 0;
+  animation: wiggle 4s infinite;
+}
+
+@keyframes wiggle {
+  0%,100% { transform: rotate(0deg); }
+  10%      { transform: rotate(-10deg); }
+  20%      { transform: rotate(10deg); }
+  30%      { transform: rotate(-8deg); }
+  40%      { transform: rotate(6deg); }
+  50%      { transform: rotate(-3deg); }
+  60%      { transform: rotate(0deg); }
+}
+
+.hint-text {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+/* ---- Main body ---- */
+.main {
+  padding: 20px 16px 32px;
+}
+
+/* ---- Controls ---- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+button {
+  font-family: 'Suisse Intl', system-ui, sans-serif;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 10px 20px;
+  transition: background 0.15s, opacity 0.15s;
+  border: none;
+}
+
+.btn-add {
+  background: #1878DC;
+  color: #FFFFFF;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.btn-add:hover:not(:disabled) { background: #1264b8; }
+.btn-add:disabled {
+  background: rgba(0,0,0,0.14);
+  color: rgba(0,0,0,0.32);
+  cursor: default;
+  box-shadow: none;
+}
+
+.btn-reset {
+  background: #FFFFFF;
+  color: #1A1A1A;
+  border: 1px solid rgba(0,0,0,0.20);
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.14), 0 1px 2px 0 rgba(0,0,0,0.08);
+}
+.btn-reset:hover { background: #F2F1EE; }
+
+/* ---- Two-panel layout ---- */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .panels { grid-template-columns: 1fr; }
+}
+
+/* ---- Panel card ---- */
+.panel {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+
+.panel-header {
+  padding: 12px 14px;
+  background: #F2F1EE;
+  border-bottom: 1px solid rgba(0,0,0,0.14);
+}
+
+.panel-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.panel-subtitle {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 11px;
+  color: rgba(0,0,0,0.45);
+  line-height: 1.5;
+}
+
+.panel-body {
+  padding: 12px;
+}
+
+/* ---- Shards grid ---- */
+.shards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.shard {
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 68px;
+  background: #FFFFFF;
+  transition: border-color 0.25s;
+}
+
+.shard.new-shard {
+  border: 2px solid #328F51;
+  grid-column: 1 / -1;
+  min-height: 52px;
+}
+
+.shard-label {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 10px;
+  color: rgba(0,0,0,0.38);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+
+.new-shard .shard-label {
+  color: #328F51;
+}
+
+.keys-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.key {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #F2F1EE;
+  color: #1A1A1A;
+  transition: background 0.3s, color 0.3s, transform 0.2s;
+}
+
+.key.moved {
+  background: #D35722;
+  color: #FFFFFF;
+  transform: scale(1.06);
+}
+
+/* ---- Summary strip ---- */
+.summary {
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  transition: background 0.3s, color 0.3s;
+}
+.summary.neutral {
+  background: #F2F1EE;
+  color: rgba(0,0,0,0.45);
+}
+.summary.danger {
+  background: rgba(211,87,34,0.10);
+  color: #a83516;
+  font-weight: 600;
+}
+.summary.good {
+  background: rgba(50,143,81,0.10);
+  color: #1f6633;
+  font-weight: 600;
+}
+
+/* ---- Legend ---- */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: rgba(0,0,0,0.50);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ---- Comparison bar chart ---- */
+.comparison {
+  margin-top: 16px;
+  border: 1px solid rgba(0,0,0,0.14);
+  border-radius: 12px;
+  background: #F2F1EE;
+  padding: 16px;
+  display: none;
+  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+}
+.comparison.visible { display: block; }
+
+.comp-heading {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(0,0,0,0.40);
+  margin-bottom: 12px;
+}
+
+.comp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.comp-row:last-child { margin-bottom: 0; }
+
+.comp-label {
+  font-size: 13px;
+  width: 128px;
+  flex-shrink: 0;
+}
+
+.bar-track {
+  flex: 1;
+  height: 16px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  width: 0%;
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bar-fill.orange { background: #D35722; }
+.bar-fill.green  { background: #328F51; }
+
+.comp-pct {
+  font-family: 'Suisse Intl Mono', monospace;
+  font-size: 14px;
+  width: 44px;
+  text-align: right;
+  font-weight: 600;
+}
+.comp-pct.orange { color: #D35722; }
+.comp-pct.green  { color: #328F51; }
+
+/* ---- Takeaway note ---- */
+.takeaway {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #F2F1EE;
+  font-size: 14px;
+  color: rgba(0,0,0,0.65);
+  line-height: 1.5;
+  display: none;
+  border-left: 3px solid #1878DC;
+}
+.takeaway.visible { display: block; }
+.takeaway strong { color: #1A1A1A; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <div class="cursor-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="hint-text">Click <strong>Add 5th Shard</strong> to see how many keys must migrate under each strategy.</div>
+  </div>
+
+  <div class="main">
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn-add" id="btn-add">Add 5th Shard</button>
+      <button class="btn-reset" id="btn-reset">Reset</button>
+    </div>
+
+    <!-- Panels -->
+    <div class="panels">
+
+      <!-- Plain modulo panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Plain Modulo</div>
+          <div class="panel-subtitle">shard = hash(key) % num_shards</div>
+        </div>
+        <div class="panel-body">
+          <div class="shards-grid" id="modulo-grid"></div>
+          <div class="summary neutral" id="modulo-summary">4 shards &middot; 20 keys</div>
+        </div>
+      </div>
+
+      <!-- Consistent hashing panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Consistent Hashing</div>
+          <div class="panel-subtitle">keys &amp; shards placed on a ring; new shard claims one arc</div>
+        </div>
+        <div class="panel-body">
+          <div class="shards-grid" id="ch-grid"></div>
+          <div class="summary neutral" id="ch-summary">4 shards &middot; 20 keys</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Legend (shown after add) -->
+    <div class="legend" id="legend" style="display:none">
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#D35722;"></div>
+        <span>Had to migrate</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#F2F1EE; border:1px solid rgba(0,0,0,0.18);"></div>
+        <span>Stayed in place</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:#FFFFFF; border:2px solid #328F51;"></div>
+        <span>New shard</span>
+      </div>
+    </div>
+
+    <!-- Comparison bar chart -->
+    <div class="comparison" id="comparison">
+      <div class="comp-heading">Keys that had to migrate</div>
+      <div class="comp-row">
+        <div class="comp-label">Plain Modulo</div>
+        <div class="bar-track"><div class="bar-fill orange" id="bar-mod"></div></div>
+        <div class="comp-pct orange" id="pct-mod">&nbsp;</div>
+      </div>
+      <div class="comp-row">
+        <div class="comp-label">Consistent Hashing</div>
+        <div class="bar-track"><div class="bar-fill green" id="bar-ch"></div></div>
+        <div class="comp-pct green" id="pct-ch">&nbsp;</div>
+      </div>
+    </div>
+
+    <!-- Takeaway -->
+    <div class="takeaway" id="takeaway">
+      <strong>Why it matters:</strong> With plain modulo, adding one shard triggers a massive data migration because
+      <em>almost every key</em> lands on a new bucket. Consistent hashing limits the move to the keys in
+      the arc the new shard takes over&mdash;roughly <em>1&nbsp;/ N</em> of all keys&mdash;keeping each
+      reshard smaller and safer.
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ---- Data ----
+// 20 keys, K1-K20. Initial distribution across 4 shards using (i-1) % 4.
+
+const INIT = {
+  S1: ['K1', 'K5', 'K9',  'K13', 'K17'],
+  S2: ['K2', 'K6', 'K10', 'K14', 'K18'],
+  S3: ['K3', 'K7', 'K11', 'K15', 'K19'],
+  S4: ['K4', 'K8', 'K12', 'K16', 'K20'],
+};
+
+// Plain modulo after adding shard 5: new bucket = (i-1) % 5.
+// K1-K4 map to the same shard (0-3 mod 4 === 0-3 mod 5); everything else remaps.
+const MODULO5 = {
+  S1: ['K1',  'K6',  'K11', 'K16'],
+  S2: ['K2',  'K7',  'K12', 'K17'],
+  S3: ['K3',  'K8',  'K13', 'K18'],
+  S4: ['K4',  'K9',  'K14', 'K19'],
+  S5: ['K5',  'K10', 'K15', 'K20'],
+};
+// 16 of 20 keys moved (K1-K4 stayed).
+const MODULO_MOVED = new Set([
+  'K5','K6','K7','K8','K9','K10','K11','K12',
+  'K13','K14','K15','K16','K17','K18','K19','K20'
+]);
+
+// Consistent hashing: new shard placed in the arc between S4 and S1 on the ring.
+// Only K1 and K5 (those closest to the new shard's position in that arc) migrate.
+const CH5 = {
+  S1: ['K9',  'K13', 'K17'],
+  S2: ['K2',  'K6',  'K10', 'K14', 'K18'],
+  S3: ['K3',  'K7',  'K11', 'K15', 'K19'],
+  S4: ['K4',  'K8',  'K12', 'K16', 'K20'],
+  S5: ['K1',  'K5'],
+};
+// 2 of 20 keys moved.
+const CH_MOVED = new Set(['K1','K5']);
+
+// ---- Render helpers ----
+
+function renderShards(gridId, shards, movedSet, newShardId) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  for (const [sid, keys] of Object.entries(shards)) {
+    const div = document.createElement('div');
+    div.className = 'shard' + (sid === newShardId ? ' new-shard' : '');
+
+    const lbl = document.createElement('div');
+    lbl.className = 'shard-label';
+    lbl.textContent = sid === newShardId ? sid + '  ·  NEW' : sid;
+    div.appendChild(lbl);
+
+    const row = document.createElement('div');
+    row.className = 'keys-row';
+    for (const k of keys) {
+      const span = document.createElement('span');
+      span.className = 'key' + (movedSet && movedSet.has(k) ? ' moved' : '');
+      span.textContent = k;
+      row.appendChild(span);
+    }
+    div.appendChild(row);
+    grid.appendChild(div);
+  }
+}
+
+function setSummary(id, cls, text) {
+  const el = document.getElementById(id);
+  el.className = 'summary ' + cls;
+  el.textContent = text;
+}
+
+// ---- State ----
+
+function init() {
+  renderShards('modulo-grid', INIT, null, null);
+  renderShards('ch-grid',     INIT, null, null);
+  setSummary('modulo-summary', 'neutral', '4 shards · 20 keys');
+  setSummary('ch-summary',     'neutral', '4 shards · 20 keys');
+
+  document.getElementById('btn-add').disabled = false;
+  document.getElementById('legend').style.display = 'none';
+  document.getElementById('comparison').classList.remove('visible');
+  document.getElementById('takeaway').classList.remove('visible');
+
+  const bm = document.getElementById('bar-mod');
+  const bc = document.getElementById('bar-ch');
+  bm.style.transition = 'none';
+  bc.style.transition = 'none';
+  bm.style.width = '0%';
+  bc.style.width = '0%';
+  document.getElementById('pct-mod').innerHTML = '&nbsp;';
+  document.getElementById('pct-ch').innerHTML  = '&nbsp;';
+  requestAnimationFrame(() => {
+    bm.style.transition = '';
+    bc.style.transition = '';
+  });
+}
+
+function addShard() {
+  document.getElementById('btn-add').disabled = true;
+
+  renderShards('modulo-grid', MODULO5, MODULO_MOVED, 'S5');
+  setSummary('modulo-summary', 'danger',
+    MODULO_MOVED.size + ' of 20 keys had to migrate (80%)');
+
+  renderShards('ch-grid', CH5, CH_MOVED, 'S5');
+  setSummary('ch-summary', 'good',
+    CH_MOVED.size + ' of 20 keys had to migrate (10%)');
+
+  document.getElementById('legend').style.display = 'flex';
+  document.getElementById('comparison').classList.add('visible');
+  document.getElementById('takeaway').classList.add('visible');
+
+  setTimeout(() => {
+    document.getElementById('bar-mod').style.width = '80%';
+    document.getElementById('bar-ch').style.width  = '10%';
+    document.getElementById('pct-mod').textContent = '80%';
+    document.getElementById('pct-ch').textContent  = '10%';
+  }, 80);
+}
+
+document.getElementById('btn-add').addEventListener('click', addShard);
+document.getElementById('btn-reset').addEventListener('click', init);
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Traffic Estimation Chain</title>
+  <style>
+    @font-face {
+      font-family: 'Suisse Intl';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Suisse Intl Mono';
+      src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+      font-size: 18px;
+      color: #1A1A1A;
+      background: #FFFFFF;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: #FFFFFF;
+    }
+
+    /* ── Hint header ── */
+    .hint-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 20px;
+      background: #F2F1EE;
+      border-bottom: 1px solid rgba(0,0,0,0.14);
+    }
+
+    .cursor-icon {
+      flex-shrink: 0;
+      display: block;
+      transform-origin: 50% 50%;
+      animation: cursor-wiggle 4s infinite;
+    }
+
+    @keyframes cursor-wiggle {
+      0%   { transform: rotate(0deg); }
+      10%  { transform: rotate(-10deg); }
+      20%  { transform: rotate(10deg); }
+      30%  { transform: rotate(-8deg); }
+      40%  { transform: rotate(6deg); }
+      50%  { transform: rotate(-3deg); }
+      60%  { transform: rotate(0deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    .hint-text {
+      font-size: 18px;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+
+    /* ── Main content ── */
+    .content {
+      padding: 24px 20px;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(0,0,0,0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 12px;
+    }
+
+    /* ── Assumptions box ── */
+    .assumptions-box {
+      background: #F2F1EE;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 176px 1fr 72px;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .slider-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .slider-label {
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.3;
+    }
+
+    .slider-label.is-peak {
+      color: #D35722;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      -webkit-appearance: none;
+      appearance: none;
+      background: rgba(0,0,0,0.16);
+      border-radius: 4px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #1878DC;
+      cursor: pointer;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: transform 0.1s, background 0.15s;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    input[type="range"].is-peak::-webkit-slider-thumb {
+      background: #D35722;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #1878DC;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    }
+
+    input[type="range"].is-peak::-moz-range-thumb {
+      background: #D35722;
+    }
+
+    .slider-val {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 14px;
+      color: #1878DC;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .slider-val.is-peak {
+      color: #D35722;
+    }
+
+    /* ── Traffic chain ── */
+    .chain-box {
+      margin-bottom: 24px;
+    }
+
+    .chain-rail {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chain-item {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .rail-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 28px;
+      flex-shrink: 0;
+    }
+
+    .rail-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #1878DC;
+      margin-top: 20px;
+      flex-shrink: 0;
+    }
+
+    .rail-dot.is-peak {
+      background: #D35722;
+    }
+
+    .rail-line {
+      width: 2px;
+      flex: 1;
+      background: rgba(0,0,0,0.12);
+      margin-top: 3px;
+      min-height: 8px;
+    }
+
+    .chain-item:last-child .rail-line {
+      display: none;
+    }
+
+    .step-card {
+      flex: 1;
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-left: 12px;
+      margin-bottom: 4px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: opacity 0.3s, background 0.3s, border-color 0.3s;
+    }
+
+    .step-card.is-peak {
+      background: #FFF3EE;
+      border-color: rgba(211,87,34,0.22);
+    }
+
+    .step-card.is-faded {
+      opacity: 0.22;
+    }
+
+    .step-name {
+      font-size: 14px;
+      color: rgba(0,0,0,0.5);
+      margin-bottom: 2px;
+    }
+
+    .step-op {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 13px;
+      color: rgba(0,0,0,0.38);
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .step-result {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: #1A1A1A;
+      line-height: 1.2;
+    }
+
+    .step-card.is-peak .step-result {
+      color: #D35722;
+    }
+
+    /* ── Forget-peak toggle row ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #FFF3EE;
+      border: 1px solid rgba(211,87,34,0.22);
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 12px;
+      -webkit-user-select: none;
+      user-select: none;
+      transition: background 0.15s;
+    }
+
+    .toggle-row:hover {
+      background: #FFE8DC;
+    }
+
+    /* Switch widget */
+    .sw {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+
+    .sw input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .sw-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      background: rgba(0,0,0,0.16);
+      transition: background 0.2s;
+    }
+
+    .sw input:checked ~ .sw-track {
+      background: #D35722;
+    }
+
+    .sw-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      pointer-events: none;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      transition: left 0.2s;
+    }
+
+    .sw input:checked ~ .sw-thumb {
+      left: 23px;
+    }
+
+    .toggle-label {
+      font-size: 16px;
+      color: #1A1A1A;
+      line-height: 1.35;
+    }
+
+    .toggle-label strong {
+      color: #D35722;
+      font-weight: 600;
+    }
+
+    /* ── Warning box ── */
+    .warning-box {
+      display: none;
+      background: #FDECEA;
+      border: 1px solid rgba(222,76,69,0.28);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 16px;
+      color: #DE4C45;
+      line-height: 1.5;
+    }
+
+    .warning-box.visible {
+      display: block;
+    }
+
+    .warning-box b {
+      font-weight: 700;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 540px) {
+      .slider-row {
+        grid-template-columns: 1fr 68px;
+        row-gap: 4px;
+      }
+      .slider-label {
+        grid-column: 1 / -1;
+        font-size: 14px;
+      }
+      .step-result {
+        font-size: 18px;
+      }
+      .step-op {
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .content {
+        padding: 16px 12px;
+      }
+      .hint-header {
+        padding: 12px 12px;
+      }
+      .hint-text {
+        font-size: 16px;
+      }
+      .assumptions-box {
+        padding: 16px;
+      }
+    }
+
+    @media (max-width: 325px) {
+      .content {
+        padding: 12px 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hint header -->
+  <div class="hint-header">
+    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z" stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="hint-text">Adjust the sliders to see your assumptions flow through the traffic chain.</span>
+  </div>
+
+  <div class="content">
+
+    <!-- Assumptions -->
+    <div class="assumptions-box">
+      <div class="section-label">Your assumptions</div>
+
+      <div class="slider-row">
+        <div class="slider-label">Daily active users</div>
+        <input type="range" id="sl-dau" min="1" max="7" step="1" value="4" aria-label="Daily active users">
+        <div class="slider-val" id="vl-dau">10 M</div>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-label">Sessions / user / day</div>
+        <input type="range" id="sl-sess" min="1" max="10" step="1" value="5" aria-label="Sessions per user per day">
+        <div class="slider-val" id="vl-sess">5</div>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-label">Actions / session</div>
+        <input type="range" id="sl-act" min="1" max="20" step="1" value="4" aria-label="Actions per session">
+        <div class="slider-val" id="vl-act">4</div>
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-label is-peak">Peak factor</div>
+        <input type="range" id="sl-peak" min="1" max="20" step="1" value="5" class="is-peak" aria-label="Peak factor">
+        <div class="slider-val is-peak" id="vl-peak">5&times;</div>
+      </div>
+    </div>
+
+    <!-- Traffic chain -->
+    <div class="chain-box">
+      <div class="section-label">Traffic chain</div>
+      <div class="chain-rail">
+
+        <!-- Step 1 -->
+        <div class="chain-item">
+          <div class="rail-col">
+            <div class="rail-dot"></div>
+            <div class="rail-line"></div>
+          </div>
+          <div class="step-card">
+            <div class="step-name">Daily active users</div>
+            <div class="step-result" id="r-dau">10 M</div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="chain-item">
+          <div class="rail-col">
+            <div class="rail-dot"></div>
+            <div class="rail-line"></div>
+          </div>
+          <div class="step-card">
+            <div class="step-name">Requests per day</div>
+            <div class="step-op" id="op-rpd">10 M &times; 5 sessions &times; 4 actions</div>
+            <div class="step-result" id="r-rpd">200 M</div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="chain-item">
+          <div class="rail-col">
+            <div class="rail-dot"></div>
+            <div class="rail-line"></div>
+          </div>
+          <div class="step-card">
+            <div class="step-name">Average requests / second</div>
+            <div class="step-op" id="op-avg">200 M &divide; ~100,000 sec/day</div>
+            <div class="step-result" id="r-avg">~2,000 rps</div>
+          </div>
+        </div>
+
+        <!-- Step 4 — peak -->
+        <div class="chain-item">
+          <div class="rail-col">
+            <div class="rail-dot is-peak"></div>
+            <div class="rail-line"></div>
+          </div>
+          <div class="step-card is-peak" id="card-peak">
+            <div class="step-name">Peak requests / second &mdash; provision for this</div>
+            <div class="step-op" id="op-peak">~2,000 rps &times; 5&times; peak factor</div>
+            <div class="step-result" id="r-peak">~10,000 rps</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Forget-peak toggle -->
+    <label class="toggle-row">
+      <div class="sw">
+        <input type="checkbox" id="sw-forget" aria-label="Simulate forgetting the peak factor">
+        <div class="sw-track"></div>
+        <div class="sw-thumb"></div>
+      </div>
+      <div class="toggle-label">Simulate <strong>forgetting the peak factor</strong> (a common mistake)</div>
+    </label>
+
+    <!-- Warning -->
+    <div class="warning-box" id="warning-box" role="alert" aria-live="polite">
+      You provisioned for <b id="w-avg">~2,000 rps</b>. During peak hours, real traffic reaches <b id="w-peak">~10,000 rps</b> &mdash; <b id="w-factor">5&times;</b> more than your servers can handle. The system falls over every single day.
+    </div>
+
+  </div>
+</div>
+
+<script>
+  var DAU_VALUES = [100000, 500000, 1000000, 10000000, 50000000, 100000000, 1000000000];
+  var DAU_LABELS = ['100 K', '500 K', '1 M', '10 M', '50 M', '100 M', '1 B'];
+
+  function fmtNum(n) {
+    if (n >= 1e9) {
+      var v = Math.round(n / 1e8) / 10;
+      return (v === Math.floor(v) ? v.toFixed(0) : v.toFixed(1)) + ' B';
+    }
+    if (n >= 1e6) {
+      var v = Math.round(n / 1e5) / 10;
+      return (v === Math.floor(v) ? v.toFixed(0) : v.toFixed(1)) + ' M';
+    }
+    if (n >= 1e3) {
+      return addCommas(Math.round(n / 100) * 100);
+    }
+    return String(n);
+  }
+
+  function addCommas(n) {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  function roundEstimate(n) {
+    if (n <= 0) return 0;
+    var d = Math.ceil(Math.log10(n + 0.5));
+    var mag = Math.pow(10, d - 2);
+    return Math.round(n / mag) * mag;
+  }
+
+  function fmtRPS(n) {
+    var r = roundEstimate(n);
+    if (r >= 1e6) {
+      var v = Math.round(r / 1e5) / 10;
+      return '~' + (v === Math.floor(v) ? v.toFixed(0) : v.toFixed(1)) + ' M rps';
+    }
+    return '~' + addCommas(r) + ' rps';
+  }
+
+  function update() {
+    var dauIdx   = parseInt(document.getElementById('sl-dau').value, 10) - 1;
+    var sessions = parseInt(document.getElementById('sl-sess').value, 10);
+    var actions  = parseInt(document.getElementById('sl-act').value, 10);
+    var peakFact = parseInt(document.getElementById('sl-peak').value, 10);
+    var forget   = document.getElementById('sw-forget').checked;
+
+    var dau  = DAU_VALUES[dauIdx];
+    var dauL = DAU_LABELS[dauIdx];
+    var rpd  = dau * sessions * actions;
+    var avg  = rpd / 100000;
+    var peak = avg * peakFact;
+
+    document.getElementById('vl-dau').textContent  = dauL;
+    document.getElementById('vl-sess').textContent = sessions;
+    document.getElementById('vl-act').textContent  = actions;
+    document.getElementById('vl-peak').textContent = peakFact + '×';
+
+    document.getElementById('r-dau').textContent = dauL;
+
+    document.getElementById('op-rpd').textContent =
+      dauL + ' × ' + sessions + ' sess × ' + actions + ' actions';
+    document.getElementById('r-rpd').textContent = fmtNum(rpd);
+
+    document.getElementById('op-avg').textContent =
+      fmtNum(rpd) + ' ÷ ~100,000 sec/day';
+    document.getElementById('r-avg').textContent = fmtRPS(avg);
+
+    document.getElementById('op-peak').textContent =
+      fmtRPS(avg) + ' × ' + peakFact + '×';
+    document.getElementById('r-peak').textContent = fmtRPS(peak);
+
+    var card = document.getElementById('card-peak');
+    var warn = document.getElementById('warning-box');
+    if (forget) {
+      card.classList.add('is-faded');
+      warn.classList.add('visible');
+      document.getElementById('w-avg').textContent    = fmtRPS(avg);
+      document.getElementById('w-peak').textContent   = fmtRPS(peak);
+      document.getElementById('w-factor').textContent = peakFact + '×';
+    } else {
+      card.classList.remove('is-faded');
+      warn.classList.remove('visible');
+    }
+  }
+
+  ['sl-dau', 'sl-sess', 'sl-act', 'sl-peak'].forEach(function(id) {
+    document.getElementById(id).addEventListener('input', update);
+  });
+  document.getElementById('sw-forget').addEventListener('change', update);
+
+  update();
+</script>
+</body>
+</html>
