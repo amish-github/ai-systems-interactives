@@ -3,436 +3,428 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>03 — Repo Tour: Map the Three Views</title>
+<title>Reference Platform — Repository Map</title>
 <style>
-@font-face {
-  font-family: 'Suisse Intl';
-  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-}
-@font-face {
-  font-family: 'Suisse Intl Mono';
-  src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-}
+  @font-face {
+    font-family: 'Suisse Intl';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Suisse Intl Mono';
+    src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+  }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-body {
-  font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
-  font-size: 18px;
-  color: #1A1A1A;
-  background: #FFFFFF;
-}
+  html, body {
+    background: #FFFFFF;
+  }
 
-.container {
-  width: 100%;
-  max-width: 700px;
-  margin: 0 auto;
-  background: #FFFFFF;
-}
+  body {
+    font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
+    color: #1A1A1A;
+    line-height: 1.5;
+  }
 
-/* ── Hint header ─────────────────────────────────────────── */
-.hint-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 20px 20px 16px;
-  border-bottom: 1px solid rgba(0,0,0,0.14);
-}
+  /* ── Outer wrapper — no padding per spec ── */
+  .wrap {
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    background: #FFFFFF;
+  }
 
-@keyframes cursor-wiggle {
-  0%,100% { transform: rotate(0deg); }
-  10%     { transform: rotate(-10deg); }
-  20%     { transform: rotate(10deg); }
-  35%     { transform: rotate(-8deg); }
-  50%     { transform: rotate(6deg); }
-  65%     { transform: rotate(-3deg); }
-  80%     { transform: rotate(0deg); }
-}
+  /* ── Header ── */
+  .hd {
+    padding: 32px 32px 0;
+  }
 
-.cursor-icon { flex-shrink: 0; animation: cursor-wiggle 4s infinite; }
-.hint-text   { font-size: 18px; }
+  .hd-eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.50);
+    margin-bottom: 8px;
+  }
 
-/* ── Main body ───────────────────────────────────────────── */
-.main { padding: 24px 20px 28px; }
+  .hd-title {
+    font-size: 22px;
+    font-weight: 400;
+    line-height: 1.3;
+    color: #1A1A1A;
+    margin-bottom: 8px;
+  }
 
-.section-label {
-  font-size: 14px;
-  color: rgba(0,0,0,0.50);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-bottom: 10px;
-}
+  .hd-sub {
+    font-size: 14px;
+    color: rgba(0,0,0,0.50);
+    line-height: 1.5;
+  }
 
-/* ── Architecture chips ──────────────────────────────────── */
-.arch-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 24px;
-}
+  .hd-sub code {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 13px;
+  }
 
-.arch-chip {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: 1.5px solid rgba(0,0,0,0.14);
-  background: #FFFFFF;
-  cursor: pointer;
-  font-family: 'Suisse Intl', system-ui, sans-serif;
-  font-size: 16px;
-  color: #1A1A1A;
-  box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
-  transition: border-color 0.12s, background 0.12s, color 0.12s, transform 0.08s;
-  user-select: none;
-  position: relative;
-}
+  /* ── Figure wrapper ── */
+  .fig {
+    padding: 20px 32px 32px;
+  }
 
-.arch-chip:hover {
-  border-color: #1878DC;
-  color: #1878DC;
-  transform: translateY(-1px);
-}
+  /* ── Tree card ── */
+  .card {
+    background: #F2F1EE;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
 
-.arch-chip.active {
-  background: #1878DC;
-  border-color: #1878DC;
-  color: #FFFFFF;
-  transform: translateY(0);
-}
+  /* Root row */
+  .tree-root {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-bottom: 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(0,0,0,0.14);
+  }
 
-.arch-chip .tick {
-  display: none;
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 14px;
-  height: 14px;
-  background: #328F51;
-  border-radius: 50%;
-  border: 2px solid #FFFFFF;
-}
-.arch-chip.explored .tick { display: block; }
-.arch-chip.explored.active .tick { border-color: #1878DC; }
+  .root-name {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 15px;
+    color: #1A1A1A;
+  }
 
-/* ── Two-panel row ───────────────────────────────────────── */
-.two-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
-}
+  .root-badge {
+    font-size: 11px;
+    color: rgba(0,0,0,0.50);
+    background: rgba(0,0,0,0.07);
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+  }
 
-@media (max-width: 460px) {
-  .two-panel { grid-template-columns: 1fr; }
-}
+  /* ── One top-level folder group ── */
+  .sec {
+    margin-top: 0;
+  }
 
-.panel {
-  background: #F2F1EE;
-  border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.14);
-  padding: 16px;
-  min-height: 148px;
-}
+  /* Top-level folder row */
+  .sec-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 0 4px;
+  }
 
-.panel-head {
-  font-size: 14px;
-  color: rgba(0,0,0,0.50);
-  margin-bottom: 10px;
-}
+  .sec-path {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.55;
+    min-width: 128px;
+  }
 
-/* Directory tree */
-.tree { list-style: none; }
-.tree-item {
-  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
-  font-size: 13px;
-  color: rgba(0,0,0,0.40);
-  line-height: 1.8;
-  padding-left: 4px;
-  border-radius: 4px;
-  transition: background 0.15s, color 0.15s;
-}
-.tree-item.hl {
-  color: #1878DC;
-  background: rgba(24,120,220,0.07);
-  font-weight: 600;
-  padding-left: 4px;
-}
-.tree-item.hl::before { content: '▶ '; }
-.tree-item:not(.hl)::before { content: '  '; white-space: pre; }
+  .sec-path .conn {
+    color: rgba(0,0,0,0.35);
+  }
 
-/* Contents panel */
-.contents-placeholder {
-  font-size: 16px;
-  color: rgba(0,0,0,0.30);
-  line-height: 1.5;
-}
-.contents-files { list-style: none; margin-bottom: 8px; }
-.contents-file {
-  font-family: 'Suisse Intl Mono', 'Courier New', monospace;
-  font-size: 13px;
-  color: rgba(0,0,0,0.55);
-  line-height: 1.8;
-}
-.contents-file::before { content: '  '; white-space: pre; }
-.contents-note {
-  font-size: 14px;
-  color: rgba(0,0,0,0.55);
-  line-height: 1.5;
-  margin-top: 4px;
-}
+  /* Annotation chip */
+  .chip {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 12px 4px 8px;
+    border-radius: 8px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.14);
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+    flex: 1;
+    min-width: 200px;
+  }
 
-/* ── Responsibility strip ─────────────────────────────────── */
-.resp-strip {
-  background: #F2F1EE;
-  border: 1px solid rgba(0,0,0,0.14);
-  border-radius: 12px;
-  padding: 16px 20px;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  min-height: 68px;
-  margin-bottom: 24px;
-}
+  .chip-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+  }
 
-.resp-bullet {
-  flex-shrink: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.14);
-  margin-top: 7px;
-  transition: background 0.2s;
-}
-.resp-bullet.on { background: #1878DC; }
+  .chip-text {
+    font-size: 14px;
+    color: #1A1A1A;
+    line-height: 1.5;
+  }
 
-.resp-body { flex: 1; }
-.resp-rule {
-  font-size: 14px;
-  color: rgba(0,0,0,0.50);
-  margin-bottom: 2px;
-}
-.resp-text {
-  font-size: 16px;
-  color: rgba(0,0,0,0.30);
-  line-height: 1.55;
-  transition: color 0.2s;
-}
-.resp-text.on { color: #1A1A1A; }
+  /* Sub-item rows */
+  .sec-subs {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 4px;
+  }
 
-/* ── Progress ────────────────────────────────────────────── */
-.progress-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.progress-label {
-  font-size: 14px;
-  color: rgba(0,0,0,0.50);
-  white-space: nowrap;
-}
-.progress-track {
-  flex: 1;
-  height: 4px;
-  background: rgba(0,0,0,0.10);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: #328F51;
-  border-radius: 4px;
-  transition: width 0.35s ease;
-}
-.progress-done {
-  font-size: 14px;
-  color: #328F51;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.4s;
-}
-.progress-done.show { opacity: 1; }
+  .sub-path {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 12px;
+    color: rgba(0,0,0,0.40);
+    line-height: 1.8;
+    white-space: nowrap;
+    display: block;
+  }
+
+  /* Divider between sections */
+  .sec-divider {
+    height: 1px;
+    background: rgba(0,0,0,0.08);
+    margin: 0;
+  }
+
+  /* ── Per-section color tokens ── */
+  .s-services .sec-name { color: #1878DC; }
+  .s-services .chip     { border-color: rgba(24,120,220,0.24); }
+  .s-services .chip-dot { background: #1878DC; }
+
+  .s-shared .sec-name   { color: #328F51; }
+  .s-shared .chip       { border-color: rgba(50,143,81,0.24); }
+  .s-shared .chip-dot   { background: #328F51; }
+
+  .s-infra .sec-name    { color: #D35722; }
+  .s-infra .chip        { border-color: rgba(211,87,34,0.24); }
+  .s-infra .chip-dot    { background: #D35722; }
+
+  .s-tests .sec-name    { color: #DE4C45; }
+  .s-tests .chip        { border-color: rgba(222,76,69,0.24); }
+  .s-tests .chip-dot    { background: #DE4C45; }
+
+  .s-docs .sec-name     { color: #8754FD; }
+  .s-docs .chip         { border-color: rgba(135,84,253,0.24); }
+  .s-docs .chip-dot     { background: #8754FD; }
+
+  /* ── Callout note ── */
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: #F2F1EE;
+    border: 1px solid rgba(0,0,0,0.10);
+  }
+
+  .callout-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: #8754FD;
+    font-family: 'Suisse Intl Mono', monospace;
+    line-height: 1.5;
+  }
+
+  .callout-text {
+    font-size: 14px;
+    color: rgba(0,0,0,0.65);
+    line-height: 1.5;
+  }
+
+  .callout-text strong {
+    font-weight: 400;
+    color: #1A1A1A;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    margin-top: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .legend-label {
+    font-size: 12px;
+    color: rgba(0,0,0,0.50);
+    margin-right: 4px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0,0,0,0.14);
+    border-radius: 6px;
+    box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .legend-text {
+    font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+    font-size: 12px;
+    color: #1A1A1A;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 540px) {
+    .hd  { padding: 24px 20px 0; }
+    .fig { padding: 16px 20px 24px; }
+    .card { padding: 16px; }
+    .chip { min-width: 160px; }
+  }
+
+  @media (max-width: 380px) {
+    .hd  { padding: 20px 12px 0; }
+    .fig { padding: 12px 12px 20px; }
+    .hd-title { font-size: 18px; }
+    .chip { min-width: 120px; }
+    .sec-path { min-width: 100px; }
+  }
 </style>
 </head>
 <body>
-<div class="container">
+<div class="wrap">
 
-  <!-- Hint header -->
-  <div class="hint-header">
-    <span class="cursor-icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z"
-          stroke="black" stroke-opacity="0.83" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-    <span class="hint-text">Click an architecture box to find where it lives and what it owns.</span>
+  <!-- ── Header ── -->
+  <div class="hd">
+    <p class="hd-eyebrow">Sprint 1 · Chapter 1.3 · Lesson 03</p>
+    <h1 class="hd-title">Reference Platform — Repository Map</h1>
+    <p class="hd-sub">Every module in the course uses this codebase. The five top-level folders map directly to the architecture diagram from Chapter&nbsp;1.1. When you first clone the repository, open <code>docs/</code> before anything else.</p>
   </div>
 
-  <!-- Body -->
-  <div class="main">
+  <!-- ── Figure ── -->
+  <div class="fig">
+    <div class="card">
 
-    <div class="section-label">Architecture boxes</div>
-    <div class="arch-row" id="archRow"></div>
-
-    <div class="two-panel">
-      <!-- Directory tree -->
-      <div class="panel">
-        <div class="panel-head">Directory</div>
-        <ul class="tree" id="treePanel"></ul>
+      <!-- Root -->
+      <div class="tree-root">
+        <span class="root-name">ai&#x2011;systems&#x2011;platform/</span>
+        <span class="root-badge">repository root</span>
       </div>
-      <!-- Contents -->
-      <div class="panel">
-        <div class="panel-head">What lives here</div>
-        <div id="contentsPanel">
-          <span class="contents-placeholder">Select a box above.</span>
+
+      <!-- services/ ─────────────────────────────── -->
+      <div class="sec s-services">
+        <div class="sec-head">
+          <span class="sec-path"><span class="conn">&#x251C;&#x2500;&#x2500;&nbsp;</span><span class="sec-name">services/</span></span>
+          <div class="chip">
+            <div class="chip-dot"></div>
+            <span class="chip-text">One folder per running service — gateway, application service, and background workers. Each is a separate deployable unit with its own entry point.</span>
+          </div>
+        </div>
+        <div class="sec-subs">
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;gateway/</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;app&#x2011;service/</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x2514;&#x2500;&#x2500;&nbsp;worker/</span>
         </div>
       </div>
-    </div>
 
-    <!-- Responsibility -->
-    <div class="resp-strip">
-      <div class="resp-bullet" id="respBullet"></div>
-      <div class="resp-body">
-        <div class="resp-rule">Responsibility</div>
-        <div class="resp-text" id="respText">Why does this part exist? Select a box to find out.</div>
+      <div class="sec-divider"></div>
+
+      <!-- shared/ ─────────────────────────────── -->
+      <div class="sec s-shared">
+        <div class="sec-head">
+          <span class="sec-path"><span class="conn">&#x251C;&#x2500;&#x2500;&nbsp;</span><span class="sec-name">shared/</span></span>
+          <div class="chip">
+            <div class="chip-dot"></div>
+            <span class="chip-text">Code used by more than one service — data models, logging helpers, and the database client. Prevents the same logic from being copied into every service and drifting out of sync.</span>
+          </div>
+        </div>
+        <div class="sec-subs">
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;models/</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;logging/</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x2514;&#x2500;&#x2500;&nbsp;db&#x2011;client/</span>
+        </div>
       </div>
-    </div>
 
-    <!-- Progress -->
-    <div class="progress-row">
-      <span class="progress-label" id="progressLabel">0 of 5 explored</span>
-      <div class="progress-track">
-        <div class="progress-fill" id="progressFill" style="width:0%"></div>
+      <div class="sec-divider"></div>
+
+      <!-- infra/ ─────────────────────────────── -->
+      <div class="sec s-infra">
+        <div class="sec-head">
+          <span class="sec-path"><span class="conn">&#x251C;&#x2500;&#x2500;&nbsp;</span><span class="sec-name">infra/</span></span>
+          <div class="chip">
+            <div class="chip-dot"></div>
+            <span class="chip-text">Docker Compose files, container definitions, and configuration. Describes how the system is built and deployed so anyone can recreate the same environment from scratch.</span>
+          </div>
+        </div>
+        <div class="sec-subs">
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;docker&#x2011;compose.yml</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x2514;&#x2500;&#x2500;&nbsp;config/</span>
+        </div>
       </div>
-      <span class="progress-done" id="progressDone">Full map built.</span>
+
+      <div class="sec-divider"></div>
+
+      <!-- tests/ ─────────────────────────────── -->
+      <div class="sec s-tests">
+        <div class="sec-head">
+          <span class="sec-path"><span class="conn">&#x251C;&#x2500;&#x2500;&nbsp;</span><span class="sec-name">tests/</span></span>
+          <div class="chip">
+            <div class="chip-dot"></div>
+            <span class="chip-text">Automated tests for services and shared libraries. Your safety net — run the full suite before you change anything to establish a known-good baseline.</span>
+          </div>
+        </div>
+        <div class="sec-subs">
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;services/</span>
+          <span class="sub-path">&#x2502;&nbsp;&nbsp;&nbsp;&#x2514;&#x2500;&#x2500;&nbsp;shared/</span>
+        </div>
+      </div>
+
+      <div class="sec-divider"></div>
+
+      <!-- docs/ ─────────────────────────────── -->
+      <div class="sec s-docs">
+        <div class="sec-head">
+          <span class="sec-path"><span class="conn">&#x2514;&#x2500;&#x2500;&nbsp;</span><span class="sec-name">docs/</span></span>
+          <div class="chip">
+            <div class="chip-dot"></div>
+            <span class="chip-text">Top-level README, setup notes, and architecture references. The fastest way to orient yourself — read this folder before opening any service code.</span>
+          </div>
+        </div>
+        <div class="sec-subs">
+          <span class="sub-path">&nbsp;&nbsp;&nbsp;&nbsp;&#x251C;&#x2500;&#x2500;&nbsp;README.md</span>
+          <span class="sub-path">&nbsp;&nbsp;&nbsp;&nbsp;&#x2514;&#x2500;&#x2500;&nbsp;architecture/</span>
+        </div>
+      </div>
+
+    </div><!-- /card -->
+
+    <!-- Callout note -->
+    <div class="callout">
+      <span class="callout-icon">&#x2192;</span>
+      <p class="callout-text"><strong>Map before you move.</strong> For each box on the Chapter&nbsp;1.1 architecture diagram, identify the folder here that implements it and write down its one-sentence responsibility. When you can make that connection, finding any feature becomes a lookup, not a search.</p>
     </div>
 
-  </div>
-</div>
+    <!-- Legend -->
+    <div class="legend">
+      <span class="legend-label">Top-level folders</span>
+      <div class="legend-item"><div class="legend-dot" style="background:#1878DC"></div><span class="legend-text">services</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#328F51"></div><span class="legend-text">shared</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#D35722"></div><span class="legend-text">infra</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#DE4C45"></div><span class="legend-text">tests</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#8754FD"></div><span class="legend-text">docs</span></div>
+    </div>
 
-<script>
-const ITEMS = [
-  {
-    id: 'services',
-    label: 'Services',
-    dir: 'services/',
-    files: ['gateway/', 'app-service/', 'worker/'],
-    note: 'One folder per independently deployable service',
-    responsibility: 'Each service is a separate deployable unit with its own entry point. Keeping them in separate folders makes boundaries visible and prevents one service from reaching into another\'s internals.'
-  },
-  {
-    id: 'shared',
-    label: 'Shared Libs',
-    dir: 'shared/',
-    files: ['models/', 'logging/', 'db-client/'],
-    note: 'Code used by more than one service',
-    responsibility: 'Logic that multiple services need lives here once rather than being copied into each. Changes flow to all consumers together, so nothing drifts out of sync over time.'
-  },
-  {
-    id: 'infra',
-    label: 'Infra as Code',
-    dir: 'infra/',
-    files: ['docker-compose.yml', 'Dockerfile.*', 'config/'],
-    note: 'Environment definitions and configuration',
-    responsibility: 'Describes how every part of the system is assembled and started. Anyone can recreate the exact same environment from scratch by running one command against these files — that is what makes local setup repeatable.'
-  },
-  {
-    id: 'tests',
-    label: 'Tests',
-    dir: 'tests/',
-    files: ['unit/', 'integration/', 'e2e/'],
-    note: 'Automated test suites for services and shared code',
-    responsibility: 'Your safety net. Run the full suite before you touch anything to establish a known-good baseline. Any failure that appears after your change is yours to investigate — not a pre-existing problem.'
-  },
-  {
-    id: 'docs',
-    label: 'Docs',
-    dir: 'docs/',
-    files: ['README.md', 'setup.md', 'architecture.md'],
-    note: 'README, setup guide, architecture notes',
-    responsibility: 'The fastest way to orient yourself in any codebase. Always read these first — they tell you how to run the project and which folder owns which service, saving you an hour of guessing.'
-  }
-];
+  </div><!-- /fig -->
 
-const ALL_DIRS = ITEMS.map(i => i.dir);
-
-let activeId  = null;
-const explored = new Set();
-
-// ── Build chips ──────────────────────────────────────────────
-const archRow = document.getElementById('archRow');
-ITEMS.forEach(item => {
-  const chip = document.createElement('button');
-  chip.className = 'arch-chip';
-  chip.dataset.id = item.id;
-  chip.innerHTML = item.label + '<span class="tick"></span>';
-  chip.addEventListener('click', () => activate(item.id));
-  archRow.appendChild(chip);
-});
-
-// ── Initial tree (all greyed) ────────────────────────────────
-function renderTree(activeDir) {
-  const panel = document.getElementById('treePanel');
-  panel.innerHTML = '';
-  ALL_DIRS.forEach(dir => {
-    const li = document.createElement('li');
-    li.className = 'tree-item' + (dir === activeDir ? ' hl' : '');
-    li.textContent = dir;
-    panel.appendChild(li);
-  });
-}
-renderTree(null);
-
-// ── Activate ─────────────────────────────────────────────────
-function activate(id) {
-  activeId = id;
-  explored.add(id);
-  const item = ITEMS.find(i => i.id === id);
-
-  // Update chips
-  document.querySelectorAll('.arch-chip').forEach(chip => {
-    const cid = chip.dataset.id;
-    chip.classList.toggle('active',    cid === id);
-    chip.classList.toggle('explored',  explored.has(cid));
-  });
-
-  // Tree
-  renderTree(item.dir);
-
-  // Contents
-  const cp = document.getElementById('contentsPanel');
-  cp.innerHTML = '';
-  const ul = document.createElement('ul');
-  ul.className = 'contents-files';
-  item.files.forEach(f => {
-    const li = document.createElement('li');
-    li.className = 'contents-file';
-    li.textContent = f;
-    ul.appendChild(li);
-  });
-  const note = document.createElement('p');
-  note.className = 'contents-note';
-  note.textContent = item.note;
-  cp.appendChild(ul);
-  cp.appendChild(note);
-
-  // Responsibility
-  document.getElementById('respBullet').className = 'resp-bullet on';
-  const rt = document.getElementById('respText');
-  rt.className = 'resp-text on';
-  rt.textContent = item.responsibility;
-
-  // Progress
-  const n   = explored.size;
-  const pct = (n / ITEMS.length) * 100;
-  document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressLabel').textContent =
-    n + ' of ' + ITEMS.length + ' explored';
-  const done = document.getElementById('progressDone');
-  done.classList.toggle('show', n === ITEMS.length);
-}
-</script>
+</div><!-- /wrap -->
 </body>
 </html>

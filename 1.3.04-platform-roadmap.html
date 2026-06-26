@@ -3,533 +3,469 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>04. The Roadmap — Platform Layer Builder</title>
+  <title>1.3.04 — Platform Roadmap</title>
   <style>
     @font-face {
       font-family: 'Suisse Intl';
       src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntl-Regular-WebM.woff2') format('woff2');
       font-weight: 400;
       font-style: normal;
+      font-display: swap;
     }
     @font-face {
       font-family: 'Suisse Intl Mono';
       src: url('https://d2jcw3k6onjdla.cloudfront.net/fonts/suisse/SuisseIntlMono-Regular-WebS.woff2') format('woff2');
       font-weight: 400;
       font-style: normal;
+      font-display: swap;
     }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
-    body {
-      font-family: 'Suisse Intl', system-ui, -apple-system, sans-serif;
-      font-size: 18px;
-      color: #1A1A1A;
+    html, body {
       background: #FFFFFF;
-      line-height: 1.5;
+      font-family: 'Suisse Intl', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #1A1A1A;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      cursor: default;
     }
 
-    .container {
+    .diagram-wrap {
       width: 100%;
       max-width: 700px;
       margin: 0 auto;
       background: #FFFFFF;
     }
 
-    /* ── Hint header ── */
-    .hint-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 24px 24px 16px;
-      font-size: 18px;
+    /* ── Header ─────────────────────────────────────── */
+    .diagram-header {
+      padding: 48px 32px 0 32px;
+    }
+
+    .eyebrow {
+      font-family: 'Suisse Intl Mono', 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(0,0,0,0.50);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    h1.diagram-title {
+      font-size: 22px;
+      font-weight: 400;
+      line-height: 1.3;
       color: #1A1A1A;
+      margin-bottom: 12px;
     }
 
-    .cursor-icon {
-      flex-shrink: 0;
-      animation: cursor-wiggle 4s infinite;
-    }
-
-    @keyframes cursor-wiggle {
-      0%, 100% { transform: rotate(0deg); }
-      15%       { transform: rotate(-10deg); }
-      30%       { transform: rotate(10deg); }
-      45%       { transform: rotate(-8deg); }
-      60%       { transform: rotate(6deg); }
-      75%       { transform: rotate(-3deg); }
-      90%       { transform: rotate(0deg); }
-    }
-
-    /* ── Progress bar ── */
-    .progress-track {
-      height: 4px;
-      background: rgba(0,0,0,0.08);
-      margin: 0 24px;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: #1878DC;
-      border-radius: 2px;
-      transition: width 0.35s ease;
-    }
-    .progress-label {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      padding: 6px 24px 0;
+    .diagram-caption {
       font-size: 14px;
       color: rgba(0,0,0,0.50);
-    }
-    .progress-label .mono {
-      font-family: 'Suisse Intl Mono', monospace;
-    }
-
-    /* ── Platform stack ── */
-    .platform-wrap {
-      padding: 20px 24px 0;
+      line-height: 1.6;
+      max-width: 560px;
     }
 
-    .platform-stack {
+    /* ── Stack ───────────────────────────────────────── */
+    .stack {
+      padding: 32px 32px 0 32px;
+    }
+
+    /* ── Connector arrows ─────────────────────────────── */
+    .connector {
       display: flex;
-      flex-direction: column-reverse;
-      gap: 4px;
-      min-height: 52px;
+      justify-content: center;
+      height: 24px;
     }
 
-    @keyframes layer-in {
-      from { opacity: 0; transform: translateY(-12px) scale(0.98); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .layer {
-      display: none;
+    .connector-shaft {
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 10px 16px;
-      border-radius: 10px;
-      font-size: 15px;
-      transition: box-shadow 0.2s;
-    }
-    .layer.shown {
-      display: flex;
-      animation: layer-in 0.35s ease forwards;
-    }
-    .layer.active {
-      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      width: 16px;
     }
 
-    .layer-name { flex: 1; font-size: 15px; }
-    .layer-tag {
+    .c-line {
+      width: 1px;
+      flex: 1;
+      background: rgba(0,0,0,0.20);
+    }
+
+    .c-arrowhead {
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid rgba(0,0,0,0.20);
+    }
+
+    /* ── Seed / Starting platform ─────────────────────── */
+    .seed-card {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      padding: 20px 24px;
+      text-align: center;
+    }
+
+    .seed-overline {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .seed-title {
+      font-size: 17px;
+      color: #1A1A1A;
+      line-height: 1.35;
+      margin-bottom: 12px;
+    }
+
+    .seed-tags {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .seed-tag {
       font-family: 'Suisse Intl Mono', monospace;
       font-size: 12px;
-      opacity: 0.60;
-      white-space: nowrap;
-    }
-
-    /* Layer colour themes */
-    .layer-base {
-      background: #F2F1EE;
+      color: rgba(0,0,0,0.50);
+      background: rgba(0,0,0,0.06);
       border: 1px solid rgba(0,0,0,0.10);
-      color: #1A1A1A;
-      font-weight: 500;
-    }
-    .layer-m2 {
-      background: rgba(24,120,220,0.08);
-      border: 1px solid rgba(24,120,220,0.22);
-      color: #155faa;
-    }
-    .layer-m3 {
-      background: rgba(50,143,81,0.08);
-      border: 1px solid rgba(50,143,81,0.22);
-      color: #246b3c;
-    }
-    .layer-m4 {
-      background: rgba(211,87,34,0.08);
-      border: 1px solid rgba(211,87,34,0.22);
-      color: #a84222;
-    }
-    .layer-m5 {
-      background: rgba(135,84,253,0.08);
-      border: 1px solid rgba(135,84,253,0.22);
-      color: #6637c9;
-    }
-    .layer-m6 {
-      background: rgba(222,76,69,0.08);
-      border: 1px solid rgba(222,76,69,0.22);
-      color: #b83030;
-    }
-    .layer-m7 {
-      background: rgba(244,142,0,0.10);
-      border: 1px solid rgba(244,142,0,0.22);
-      color: #a06000;
-    }
-    .layer-m8 {
-      background: rgba(0,0,0,0.04);
-      border: 1px solid rgba(0,0,0,0.12);
-      color: #1A1A1A;
-    }
-    .layer-cap {
-      background: linear-gradient(to right, rgba(24,120,220,0.10), rgba(135,84,253,0.10));
-      border: 1px solid rgba(24,120,220,0.28);
-      color: #1A1A1A;
-      font-weight: 500;
+      border-radius: 4px;
+      padding: 3px 8px;
+      display: inline-block;
     }
 
-    /* active accent border on left */
-    .layer.active::before {
-      content: '';
-      display: block;
-      width: 3px;
-      height: 100%;
-      border-radius: 2px;
-      flex-shrink: 0;
-    }
-    .layer-base.active::before    { background: rgba(0,0,0,0.25); }
-    .layer-m2.active::before      { background: #1878DC; }
-    .layer-m3.active::before      { background: #328F51; }
-    .layer-m4.active::before      { background: #D35722; }
-    .layer-m5.active::before      { background: #8754FD; }
-    .layer-m6.active::before      { background: #DE4C45; }
-    .layer-m7.active::before      { background: #F48E00; }
-    .layer-m8.active::before      { background: rgba(0,0,0,0.40); }
-    .layer-cap.active::before     { background: linear-gradient(to bottom, #1878DC, #8754FD); }
-
-    /* ── Info panel ── */
-    .info-panel {
-      margin: 20px 24px 0;
+    /* ── Layer card ──────────────────────────────────── */
+    .layer-card {
       background: #F2F1EE;
-      border-radius: 12px;
-      padding: 20px;
-      min-height: 132px;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 4px 1fr;
     }
-    .info-tag {
-      font-size: 13px;
+
+    .layer-bar {
+      background: var(--c);
+    }
+
+    .layer-body {
+      padding: 16px 20px;
+    }
+
+    .layer-overline {
       font-family: 'Suisse Intl Mono', monospace;
-      color: rgba(0,0,0,0.45);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--c);
       margin-bottom: 4px;
+      display: block;
     }
-    .info-headline {
-      font-size: 20px;
-      font-weight: 600;
-      color: #1A1A1A;
-      margin-bottom: 8px;
-      line-height: 1.3;
-    }
-    .info-adds {
+
+    .layer-title {
       font-size: 16px;
       color: #1A1A1A;
+      line-height: 1.35;
+      margin-bottom: 4px;
+    }
+
+    .layer-desc {
+      font-size: 14px;
+      color: rgba(0,0,0,0.55);
       line-height: 1.55;
       margin-bottom: 10px;
     }
-    .info-component {
-      font-size: 13px;
-      color: rgba(0,0,0,0.50);
-    }
-    .info-component code {
+
+    .layer-component {
       font-family: 'Suisse Intl Mono', monospace;
-      font-size: 12px;
-      background: rgba(0,0,0,0.06);
-      padding: 1px 5px;
-      border-radius: 4px;
-    }
-
-    /* ── Navigation ── */
-    .nav-row {
-      display: flex;
-      gap: 12px;
-      padding: 20px 24px 28px;
-    }
-
-    .btn {
+      font-size: 11px;
+      color: rgba(0,0,0,0.45);
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-family: 'Suisse Intl', system-ui, sans-serif;
-      font-size: 16px;
-      cursor: pointer;
-      border: 1px solid rgba(0,0,0,0.14);
-      background: #FFFFFF;
-      color: #1A1A1A;
-      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.30), 0 1px 3px 0 rgba(0,0,0,0.15);
-      transition: background 0.15s, transform 0.1s, opacity 0.15s;
-      white-space: nowrap;
+      gap: 6px;
+      flex-wrap: wrap;
     }
-    .btn:hover:not(:disabled) { background: #F2F1EE; }
-    .btn:active:not(:disabled) { transform: scale(0.97); }
-    .btn:disabled { opacity: 0.32; cursor: not-allowed; }
 
-    .btn-primary {
-      flex: 1;
-      background: #1878DC;
-      color: #FFFFFF;
-      border-color: #1878DC;
-    }
-    .btn-primary:hover:not(:disabled) { background: #1465bd; }
-
-    .btn-done {
-      flex: 1;
-      background: #328F51;
-      color: #FFFFFF;
-      border-color: #328F51;
-    }
-    .btn-done:hover { background: #26733f; }
-
-    /* ── Completion banner ── */
-    .completion-banner {
-      display: none;
-      align-items: center;
-      gap: 12px;
-      margin: 0 24px;
-      padding: 12px 16px;
-      background: rgba(50,143,81,0.08);
-      border: 1px solid rgba(50,143,81,0.22);
-      border-radius: 10px;
-      font-size: 15px;
-      color: #246b3c;
-    }
-    .completion-banner.shown { display: flex; }
-    .completion-check {
-      font-size: 20px;
+    .comp-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--c);
+      opacity: 0.55;
       flex-shrink: 0;
     }
 
+    /* ── Capstone card ───────────────────────────────── */
+    .capstone-card {
+      background: #1A1A1A;
+      border: 1px solid #1A1A1A;
+      border-radius: 16px;
+      box-shadow: 0 0 0.5px 0 rgba(0,0,0,0.40), 0 2px 4px 0 rgba(0,0,0,0.25);
+      padding: 20px 24px;
+    }
+
+    .capstone-overline {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.40);
+      margin-bottom: 4px;
+      display: block;
+    }
+
+    .capstone-title {
+      font-size: 17px;
+      color: #FFFFFF;
+      line-height: 1.35;
+      margin-bottom: 4px;
+    }
+
+    .capstone-desc {
+      font-size: 14px;
+      color: rgba(255,255,255,0.55);
+      line-height: 1.55;
+      margin-bottom: 10px;
+    }
+
+    .capstone-component {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cap-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.35);
+      flex-shrink: 0;
+    }
+
+    /* ── Legend ──────────────────────────────────────── */
+    .legend-wrap {
+      padding: 24px 32px 48px 32px;
+    }
+
+    .legend {
+      background: #F2F1EE;
+      border: 1px solid rgba(0,0,0,0.14);
+      border-radius: 16px;
+      padding: 16px 20px;
+    }
+
+    .legend-heading {
+      font-family: 'Suisse Intl Mono', monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: rgba(0,0,0,0.40);
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .legend-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: rgba(0,0,0,0.65);
+    }
+
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* ── Responsive ──────────────────────────────────── */
     @media (max-width: 480px) {
-      .hint-header    { padding: 16px 16px 12px; font-size: 16px; }
-      .progress-track { margin: 0 16px; }
-      .progress-label { padding: 6px 16px 0; }
-      .platform-wrap  { padding: 16px 16px 0; }
-      .info-panel     { margin: 16px 16px 0; padding: 16px; }
-      .completion-banner { margin: 0 16px; }
-      .nav-row        { padding: 16px 16px 20px; }
-      .info-headline  { font-size: 18px; }
+      .diagram-header,
+      .stack,
+      .legend-wrap {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      h1.diagram-title {
+        font-size: 19px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .diagram-header {
+        padding-top: 32px;
+      }
+      .seed-tags {
+        gap: 6px;
+      }
     }
   </style>
 </head>
 <body>
-<div class="container">
+<div class="diagram-wrap">
 
-  <!-- Hint header -->
-  <div class="hint-header">
-    <svg class="cursor-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
-         xmlns="http://www.w3.org/2000/svg">
-      <path d="M9 3.5V2M5.06066 5.06066L4 4M5.06066 13L4 14.0607M13 5.06066L14.0607 4M3.5 9H2M15.8645 16.1896L13.3727 20.817C13.0881 21.3457 12.9457 21.61 12.7745 21.6769C12.6259 21.7349 12.4585 21.7185 12.324 21.6328C12.1689 21.534 12.0806 21.2471 11.9038 20.6733L8.44519 9.44525C8.3008 8.97651 8.2286 8.74213 8.28669 8.58383C8.33729 8.44595 8.44595 8.33729 8.58383 8.2867C8.74213 8.22861 8.9765 8.3008 9.44525 8.44519L20.6732 11.9038C21.247 12.0806 21.5339 12.169 21.6327 12.324C21.7185 12.4586 21.7348 12.6259 21.6768 12.7745C21.61 12.9458 21.3456 13.0881 20.817 13.3728L16.1896 15.8645C16.111 15.9068 16.0717 15.9279 16.0374 15.9551C16.0068 15.9792 15.9792 16.0068 15.9551 16.0374C15.9279 16.0717 15.9068 16.111 15.8645 16.1896Z"
-            stroke="black" stroke-opacity="0.83" stroke-width="1.75"
-            stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    Step through each module and watch the platform grow.
+  <header class="diagram-header">
+    <span class="eyebrow">Sprint 1 · Chapter 1.3 · Lesson 4 of 5</span>
+    <h1 class="diagram-title">The Roadmap: How Each Module Adds a Layer</h1>
+    <p class="diagram-caption">One platform, built continuously across eight modules. Each module touches a specific component and leaves the platform more production-ready than before.</p>
+  </header>
+
+  <div class="stack">
+
+    <!-- Starting platform -->
+    <div class="seed-card">
+      <span class="seed-overline">Starting platform — Module 1 seed</span>
+      <div class="seed-title">Stateless service · database · cache</div>
+      <div class="seed-tags">
+        <span class="seed-tag">app service</span>
+        <span class="seed-tag">postgres</span>
+        <span class="seed-tag">redis</span>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 2 -->
+    <div class="layer-card" style="--c: #1878DC;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 2 — API &amp; Service Architecture</span>
+        <div class="layer-title">Build the API</div>
+        <p class="layer-desc">A real API is built on top of the starting service, with proper routing, protocols, and service boundaries.</p>
+        <div class="layer-component"><div class="comp-dot"></div>API gateway · application services</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 3 -->
+    <div class="layer-card" style="--c: #328F51;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 3 — Data Architecture &amp; Storage</span>
+        <div class="layer-title">Scale the data layer</div>
+        <p class="layer-desc">The data layer is scaled so it can hold more data and serve more reads without falling over.</p>
+        <div class="layer-component"><div class="comp-dot"></div>database · cache · object storage</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 4 -->
+    <div class="layer-card" style="--c: #D35722;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 4 — Cloud Infrastructure &amp; Platform Engineering</span>
+        <div class="layer-title">Deploy to the cloud</div>
+        <p class="layer-desc">The platform is deployed to the cloud and runs as more than one copy behind a single entry point.</p>
+        <div class="layer-component"><div class="comp-dot"></div>load balancer · deployment · service tier</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 5 -->
+    <div class="layer-card" style="--c: #8754FD;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 5 — Distributed Systems &amp; Event-Driven Architecture</span>
+        <div class="layer-title">Add event-driven processing</div>
+        <p class="layer-desc">Event-driven processing is added so slow work can happen in the background instead of blocking each request.</p>
+        <div class="layer-component"><div class="comp-dot"></div>message broker · queue · background workers</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 6 -->
+    <div class="layer-card" style="--c: #DE4C45;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 6 — Security &amp; Compliance</span>
+        <div class="layer-title">Add security</div>
+        <p class="layer-desc">Security is added across the system — authentication, the trust boundary, and the handling of external services.</p>
+        <div class="layer-component"><div class="comp-dot"></div>gateway authentication · trust boundary</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 7 -->
+    <div class="layer-card" style="--c: #1878DC;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 7 — AI &amp; Applied Machine Learning</span>
+        <div class="layer-title">Add the AI layer</div>
+        <p class="layer-desc">The AI layer is added so the platform can call models and serve intelligent features on top of the system built so far.</p>
+        <div class="layer-component"><div class="comp-dot"></div>AI services · external model APIs</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Module 8 -->
+    <div class="layer-card" style="--c: #328F51;">
+      <div class="layer-bar"></div>
+      <div class="layer-body">
+        <span class="layer-overline">Module 8 — Documentation &amp; Technical Leadership</span>
+        <div class="layer-title">Document and lead</div>
+        <p class="layer-desc">Documentation, diagrams, and leadership practices are added so the system can be understood, reviewed, and handed off.</p>
+        <div class="layer-component"><div class="comp-dot"></div>the whole system · described and communicated</div>
+      </div>
+    </div>
+
+    <div class="connector"><div class="connector-shaft"><div class="c-line"></div><div class="c-arrowhead"></div></div></div>
+
+    <!-- Capstone -->
+    <div class="capstone-card">
+      <span class="capstone-overline">Capstone</span>
+      <div class="capstone-title">Your own use case</div>
+      <p class="capstone-desc">Take the platform the last mile and apply it to a real use case of your own choosing.</p>
+      <div class="capstone-component"><div class="cap-dot"></div>the complete platform · end to end</div>
+    </div>
+
   </div>
 
-  <!-- Progress -->
-  <div class="progress-track">
-    <div class="progress-fill" id="progressFill" style="width:0%"></div>
-  </div>
-  <div class="progress-label">
-    <span id="stepTitle">Starting platform</span>
-    <span class="mono" id="stepCounter">0 / 8</span>
-  </div>
-
-  <!-- Platform stack visualisation -->
-  <div class="platform-wrap">
-    <div class="platform-stack" id="platformStack">
-      <!-- Rendered bottom-to-top via column-reverse flex -->
-      <div class="layer layer-base" data-layer="0">
-        <span class="layer-name">Starting Platform</span>
-        <span class="layer-tag">service · database · cache</span>
-      </div>
-      <div class="layer layer-m2" data-layer="1">
-        <span class="layer-name">API Layer</span>
-        <span class="layer-tag">M2</span>
-      </div>
-      <div class="layer layer-m3" data-layer="2">
-        <span class="layer-name">Scaled Data Layer</span>
-        <span class="layer-tag">M3</span>
-      </div>
-      <div class="layer layer-m4" data-layer="3">
-        <span class="layer-name">Cloud &amp; Load Balancer</span>
-        <span class="layer-tag">M4</span>
-      </div>
-      <div class="layer layer-m5" data-layer="4">
-        <span class="layer-name">Event-Driven Processing</span>
-        <span class="layer-tag">M5</span>
-      </div>
-      <div class="layer layer-m6" data-layer="5">
-        <span class="layer-name">Security Layer</span>
-        <span class="layer-tag">M6</span>
-      </div>
-      <div class="layer layer-m7" data-layer="6">
-        <span class="layer-name">AI Layer</span>
-        <span class="layer-tag">M7</span>
-      </div>
-      <div class="layer layer-m8" data-layer="7">
-        <span class="layer-name">Docs &amp; Technical Leadership</span>
-        <span class="layer-tag">M8</span>
-      </div>
-      <div class="layer layer-cap" data-layer="8">
-        <span class="layer-name">Capstone — Your Use Case</span>
-        <span class="layer-tag">Capstone</span>
+  <div class="legend-wrap">
+    <div class="legend">
+      <span class="legend-heading">Color key — component group</span>
+      <div class="legend-items">
+        <div class="legend-item"><div class="legend-swatch" style="background: #1878DC;"></div>API &amp; AI services</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: #328F51;"></div>Data &amp; documentation</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: #D35722;"></div>Cloud deployment</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: #8754FD;"></div>Distributed processing</div>
+        <div class="legend-item"><div class="legend-swatch" style="background: #DE4C45;"></div>Security</div>
       </div>
     </div>
   </div>
 
-  <!-- Info panel -->
-  <div class="info-panel">
-    <div class="info-tag" id="infoTag"></div>
-    <div class="info-headline" id="infoHeadline"></div>
-    <div class="info-adds" id="infoAdds"></div>
-    <div class="info-component" id="infoComponent"></div>
-  </div>
-
-  <!-- Completion banner (shown on last step) -->
-  <div class="completion-banner" id="completionBanner">
-    <span class="completion-check">&#10003;</span>
-    <span>Nine layers, one platform. Every module builds on what came before — and the capstone finishes what you started in Sprint 1.</span>
-  </div>
-
-  <!-- Navigation -->
-  <div class="nav-row">
-    <button class="btn" id="backBtn" onclick="goBack()" disabled>&#8592; Back</button>
-    <button class="btn btn-primary" id="nextBtn" onclick="goNext()">Next &#8594;</button>
-  </div>
-
 </div>
-
-<script>
-var STEPS = [
-  {
-    tag: 'Sprint 1 · Chapter 1.3',
-    headline: 'The seed',
-    adds: 'A single stateless service, a database, and a cache. Small — but the foundation for everything that follows.',
-    component: 'service · database · cache',
-    label: 'Starting platform'
-  },
-  {
-    tag: 'Module 2',
-    headline: 'API and Service Architecture',
-    adds: 'A real API is built on top of the starting service, with proper routing, protocols, and service boundaries.',
-    component: 'API gateway · application services',
-    label: 'Module 2'
-  },
-  {
-    tag: 'Module 3',
-    headline: 'Data Architecture and Storage',
-    adds: 'The data layer is scaled so it can hold more data and serve more reads without falling over.',
-    component: 'database · cache · object storage',
-    label: 'Module 3'
-  },
-  {
-    tag: 'Module 4',
-    headline: 'Cloud Infrastructure and Platform Engineering',
-    adds: 'The platform is deployed to the cloud and learns to run as more than one copy behind a single entry point.',
-    component: 'load balancer · deployment · service tier',
-    label: 'Module 4'
-  },
-  {
-    tag: 'Module 5',
-    headline: 'Distributed Systems and Event-Driven Architecture',
-    adds: 'Event-driven processing is added so slow work can happen in the background instead of blocking each request.',
-    component: 'message broker · queue · background workers',
-    label: 'Module 5'
-  },
-  {
-    tag: 'Module 6',
-    headline: 'Security and Compliance',
-    adds: 'Security is added across the system — authentication, the trust boundary, and the handling of external services.',
-    component: 'gateway authentication · trust boundary',
-    label: 'Module 6'
-  },
-  {
-    tag: 'Module 7',
-    headline: 'AI and Applied Machine Learning',
-    adds: 'The AI layer is added, so the platform can call models and serve intelligent features on top of everything you have built.',
-    component: 'AI services · external model APIs',
-    label: 'Module 7'
-  },
-  {
-    tag: 'Module 8',
-    headline: 'Documentation and Technical Leadership',
-    adds: 'Documentation, diagrams, and leadership practices are added so the system can be understood, reviewed, and handed off.',
-    component: 'the whole system, described and communicated',
-    label: 'Module 8'
-  },
-  {
-    tag: 'Capstone',
-    headline: 'Your own use case',
-    adds: 'You take the platform the last mile and apply it to a real use case of your own. Every layer you built is already there.',
-    component: 'the complete platform, end to end',
-    label: 'Capstone'
-  }
-];
-
-var TOTAL = STEPS.length - 1; // 8
-var current = 0;
-var layerEls = document.querySelectorAll('.layer');
-
-function render() {
-  var step = STEPS[current];
-
-  // Progress
-  document.getElementById('progressFill').style.width = (current / TOTAL * 100) + '%';
-  document.getElementById('stepTitle').textContent = step.label;
-  document.getElementById('stepCounter').textContent = current + ' / ' + TOTAL;
-
-  // Layers: show all up to current, mark current as active
-  layerEls.forEach(function(el) {
-    var idx = parseInt(el.dataset.layer, 10);
-    var wasShown = el.classList.contains('shown');
-    var shouldShow = idx <= current;
-
-    if (shouldShow && !wasShown) {
-      // Force reflow to re-trigger animation when showing
-      el.classList.remove('shown');
-      void el.offsetWidth;
-      el.classList.add('shown');
-    } else if (!shouldShow) {
-      el.classList.remove('shown');
-    }
-
-    el.classList.toggle('active', idx === current);
-  });
-
-  // Info panel
-  document.getElementById('infoTag').textContent = step.tag;
-  document.getElementById('infoHeadline').textContent = step.headline;
-  document.getElementById('infoAdds').textContent = step.adds;
-  document.getElementById('infoComponent').innerHTML =
-    'Touches: <code>' + step.component + '</code>';
-
-  // Completion banner
-  document.getElementById('completionBanner').classList.toggle('shown', current === TOTAL);
-
-  // Back button
-  document.getElementById('backBtn').disabled = current === 0;
-
-  // Next button
-  var nextBtn = document.getElementById('nextBtn');
-  if (current === TOTAL) {
-    nextBtn.textContent = 'Start over';
-    nextBtn.className = 'btn btn-done';
-  } else {
-    nextBtn.textContent = 'Next →';
-    nextBtn.className = 'btn btn-primary';
-  }
-}
-
-function goNext() {
-  if (current < TOTAL) { current++; render(); }
-  else { current = 0; render(); }
-}
-
-function goBack() {
-  if (current > 0) { current--; render(); }
-}
-
-// Initialise
-render();
-</script>
 </body>
 </html>
